@@ -13,11 +13,6 @@ use crate::net::{Guid, NetEntity, ObjectStore, SelfPlayer};
 
 use super::{Hovered, HoveredObject, PickOcclusion, ReactionInputs, SelectCommit, TargetUpdate};
 
-/// The facing the ARPG view turns an idle character to: the selection's feet, while it is a live
-/// enemy. Written by [`soft_target`], read by the player's controller a frame later.
-#[derive(Resource, Default, Clone, Copy)]
-pub(crate) struct ArpgFacing(pub(crate) Option<Vec3>);
-
 /// The magnet's reach and whether the hover selects, read once from the environment.
 #[derive(Resource, Clone, Copy)]
 struct SoftTargetConfig {
@@ -33,8 +28,8 @@ impl SoftTargetConfig {
             .filter(|v| v.is_finite())
             .unwrap_or(3.0)
             .clamp(0.0, 15.0);
-        let selects = !std::env::var("WOW_ARPG_SOFT_TARGET")
-            .is_ok_and(|v| matches!(v.trim(), "0" | "off"));
+        let selects =
+            !std::env::var("WOW_ARPG_SOFT_TARGET").is_ok_and(|v| matches!(v.trim(), "0" | "off"));
         Self { magnet, selects }
     }
 }
@@ -43,7 +38,6 @@ impl SoftTargetConfig {
 /// all read the snapped hover and the new selection.
 pub(crate) fn plugin(app: &mut App) {
     app.insert_resource(SoftTargetConfig::from_env())
-        .init_resource::<ArpgFacing>()
         .add_systems(
             Update,
             soft_target
@@ -77,8 +71,8 @@ fn magnet_pick<T: PartialEq>(
     nearest.map(|(item, _)| item)
 }
 
-/// Snap the hover to the enemy nearest the cursor when it lies on open ground, select the hovered
-/// enemy, and publish the facing. A cursor over a UI panel neither snaps nor selects, as the pick
+/// Snap the hover to the enemy nearest the cursor when it lies on open ground, and select the
+/// hovered enemy. A cursor over a UI panel neither snaps nor selects, as the pick
 /// itself yields to the UI. While swinging, only an enemy truly under the cursor (not a snap)
 /// switches the target, since a switch stops and restarts the swing.
 #[allow(clippy::type_complexity)]
@@ -97,7 +91,6 @@ fn soft_target(
     me: Query<Option<&ObjectStore>, With<SelfPlayer>>,
     reaction: ReactionInputs,
     mut select: SelectCommit,
-    mut facing: ResMut<ArpgFacing>,
 ) {
     let self_store = me.single().ok().flatten();
     let live_enemy = |store: Option<&ObjectStore>| {
@@ -141,11 +134,6 @@ fn soft_target(
             }
         }
     }
-    // Face the selection while it is a live enemy.
-    let target = select.selection.target.and_then(|e| units.get(e).ok());
-    facing.0 = target
-        .filter(|(_, _, _, store)| live_enemy(*store))
-        .map(|(_, _, t, _)| t.translation);
 }
 
 #[cfg(test)]
@@ -162,14 +150,23 @@ mod tests {
     #[test]
     fn the_magnet_takes_the_nearest_inside_its_reach() {
         // Height is ignored: the unit 35 yd above is 1 yd away on the ground.
-        assert_eq!(magnet_pick(POINT, 3.0, None, CANDIDATES.into_iter()), Some(2));
+        assert_eq!(
+            magnet_pick(POINT, 3.0, None, CANDIDATES.into_iter()),
+            Some(2)
+        );
         assert_eq!(magnet_pick(POINT, 0.5, None, CANDIDATES.into_iter()), None);
     }
 
     #[test]
     fn the_magnet_keeps_the_current_target_while_it_is_in_reach() {
-        assert_eq!(magnet_pick(POINT, 3.0, Some(1), CANDIDATES.into_iter()), Some(1));
+        assert_eq!(
+            magnet_pick(POINT, 3.0, Some(1), CANDIDATES.into_iter()),
+            Some(1)
+        );
         // Out of reach, the current target is not kept.
-        assert_eq!(magnet_pick(POINT, 3.0, Some(3), CANDIDATES.into_iter()), Some(2));
+        assert_eq!(
+            magnet_pick(POINT, 3.0, Some(3), CANDIDATES.into_iter()),
+            Some(2)
+        );
     }
 }

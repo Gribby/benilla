@@ -16,8 +16,10 @@
 //!
 //! Spells need no tab-targeting: the enemy under the cursor is the target
 //! (`crate::target::arpg_soft`), a ground spell cast from a key lands at the cursor at once
-//! (`crate::spell::targeting::quick_cast_location`; one clicked on the bar waits for a click),
-//! and a standing character turns to face its target so the server's facing check passes.
+//! (`crate::spell::targeting::quick_cast_location`; one clicked on the bar waits for a click).
+//!
+//! The character always faces the cursor: standing, it turns to the aim; walking, it faces within
+//! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -121,9 +123,9 @@ pub(super) struct ArpgMouse {
     pub(super) holding: bool,
     /// Where the character is walking to.
     pub(super) goal: Option<Vec3>,
-    /// The live enemy target's feet, which an idle character turns to face, so a cast or a swing
-    /// meets the server's facing check (`crate::target::arpg_soft::ArpgFacing`, last frame's).
-    pub(super) face_target: Option<Vec3>,
+    /// Where the cursor aims: the hovered unit's feet, else the world point under the cursor;
+    /// `None` over a UI panel or the sky. The character always faces it.
+    pub(super) aim: Option<Vec3>,
     /// The flat distance to `goal` last frame, for the stall test.
     last_dist: f32,
     /// Seconds the released walk has been stuck.
@@ -139,7 +141,7 @@ impl Default for ArpgMouse {
             left_selects: false,
             holding: false,
             goal: None,
-            face_target: None,
+            aim: None,
             last_dist: f32::INFINITY,
             stall: 0.0,
         }
@@ -205,7 +207,8 @@ fn pin_view(
     object: Option<Res<crate::target::HoveredObject>>,
     occlusion: Option<Res<crate::target::PickOcclusion>>,
     spell_targeting: Option<Res<crate::spell::targeting::SpellTargeting>>,
-    face: Option<Res<crate::target::arpg_soft::ArpgFacing>>,
+    over_panel: Option<Res<crate::ui_script::PointerOverUiPanel>>,
+    transforms: Query<&Transform>,
     mut approach: ResMut<approach::Approach>,
     mut follow: ResMut<FollowState>,
     mut rig: ResMut<CameraControl>,
@@ -219,11 +222,23 @@ fn pin_view(
         .is_some_and(|h| h.any().is_some() || h.refused)
         || object.as_ref().is_some_and(|o| o.target.is_some());
     let ground = occlusion.as_ref().and_then(|o| o.point);
+    // Aim at a hovered unit's feet: the world point behind a standing model lies past it.
+    let hovered_feet = hovered
+        .as_ref()
+        .and_then(|h| h.target)
+        .and_then(|e| transforms.get(e).ok())
+        .map(|t| t.translation);
+    let on_panel = over_panel.as_ref().is_some_and(|p| p.0);
+    let aim = if on_panel {
+        None
+    } else {
+        hovered_feet.or(ground)
+    };
     let mouse = &mut rig.arpg;
     mouse.over_target = over_target;
     mouse.ground = ground;
     mouse.spell_targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
-    mouse.face_target = face.and_then(|f| f.0);
+    mouse.aim = aim;
     if mouse.holding || mouse.goal.is_some() {
         if approach.active() {
             approach.stop();
@@ -245,28 +260,49 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
-/// An idle character turns to its target only inside this reach, in yards: past any spell range.
-const FACE_REACH: f32 = 45.0;
-/// An idle character re-faces its target only once it is this far off, in radians (20°), well
-/// inside the server's front arc (120° for a swing, 180° for a spell).
-const FACE_DEADZONE: f32 = 0.35;
+/// The aim is turned to only past this far from the feet, in yards: closer, a pixel of mouse
+/// travel swings the bearing wildly.
+const AIM_MIN: f32 = 0.5;
+/// A standing character re-faces the aim only past this, in radians (about 1°): each facing change
+/// is a packet, and float noise in the pick must not send one a frame.
+const AIM_DEADZONE: f32 = 0.02;
 
-/// The yaw that faces from `pos` to `at` on the ground, `None` with `at` underfoot or past
-/// [`FACE_REACH`].
-fn facing_toward(pos: Vec3, at: Vec3) -> Option<f32> {
+/// The yaw that faces from `pos` to `at` on the ground, `None` with `at` within [`AIM_MIN`].
+fn yaw_toward(pos: Vec3, at: Vec3) -> Option<f32> {
     let (dx, dz) = (at.x - pos.x, at.z - pos.z);
-    let dist = (dx * dx + dz * dz).sqrt();
-    (0.3..=FACE_REACH)
-        .contains(&dist)
-        .then(|| f32::atan2(-dx, -dz))
+    ((dx * dx + dz * dz).sqrt() >= AIM_MIN).then(|| f32::atan2(-dx, -dz))
 }
 
-/// Turn the frame's movement keys and the mouse walk into a walk relative to the camera. With a
-/// direction, the character faces it at once and walks forward along it, so the walk animation,
-/// the speeds and the movement packets are the stock ones; the keys' own strafe and turn are
-/// dropped, as A and D are directions here. A key beats the mouse and ends its walk. With neither,
-/// only autorun, `/follow` and a Click-to-Move approach keep walking, along their own facing. A
-/// character that cannot turn (stunned, dead) keeps its facing.
+/// Split a walk along `move_yaw` into the stock axes around a facing near `aim_yaw`. WoW walks in
+/// eight directions relative to the facing (forward, back, the strafes and the four diagonals), so
+/// the facing snaps to the one that makes the walk go exactly `move_yaw`, which leaves the
+/// character within 22.5° of the aim. Returns `(facing, fwd, side)`, side positive right; a yaw
+/// grows leftward, so a walk a quarter turn left of the facing is a strafe left.
+fn aim_and_walk(move_yaw: f32, aim_yaw: f32) -> (f32, i32, i32) {
+    use std::f32::consts::FRAC_PI_4;
+    let octant = (wrap_pi(move_yaw - aim_yaw) / FRAC_PI_4).round() as i32;
+    let facing = wrap_pi(move_yaw - octant as f32 * FRAC_PI_4);
+    let (fwd, side) = match octant {
+        0 => (1, 0),
+        1 => (1, -1),
+        -1 => (1, 1),
+        2 => (0, -1),
+        -2 => (0, 1),
+        3 => (-1, -1),
+        -3 => (-1, 1),
+        _ => (-1, 0),
+    };
+    (facing, fwd, side)
+}
+
+/// Turn the frame's movement keys and the mouse walk into a walk relative to the camera, with the
+/// character always facing the cursor's aim. A walk is split into the stock forward, back and
+/// strafe axes around that facing ([`aim_and_walk`]), so the animations, the speeds (backpedal is
+/// slower, as in WoW) and the movement packets are the stock ones; the keys' own strafe and turn
+/// are dropped, as A and D are directions here. A key beats the mouse and ends its walk. With
+/// neither, autorun, `/follow` and a Click-to-Move approach keep their own facing; otherwise a
+/// standing character turns to the aim. A character that cannot turn (stunned, dead) keeps its
+/// facing.
 pub(super) fn steer(
     axes: MoveAxes,
     binds: &BindingsState,
@@ -275,7 +311,7 @@ pub(super) fn steer(
     cam_yaw: f32,
     mouse: &mut ArpgMouse,
     may_turn: bool,
-    // On our feet: a seated body is not turned to its target, as the facing commit refuses one.
+    // On our feet: a seated body is not turned to the aim, as the facing commit refuses one.
     standing: bool,
     dt: f32,
 ) -> MoveAxes {
@@ -295,30 +331,49 @@ pub(super) fn steer(
         }
     }
     // A character that cannot turn does not walk the mouse's way along a stale facing.
-    let mouse_facing = || if may_turn { mouse.walk_toward_goal(pos, dt) } else { None };
-    let facing = key_facing.or_else(mouse_facing);
-    if let Some(yaw) = facing.filter(|_| may_turn) {
-        *face_yaw = yaw;
-    }
-    // Standing with nothing else steering (no key, no mouse walk, no autorun, `/follow` or
-    // approach), face the live enemy target, as the server wants for a cast or a swing. Only past
-    // a deadzone, as each facing change is a packet and a moving target would send one a frame.
-    if facing.is_none() && axes.fwd == 0 && may_turn && standing {
-        if let Some(yaw) = mouse.face_target.and_then(|at| facing_toward(pos, at)) {
-            if wrap_pi(yaw - *face_yaw).abs() > FACE_DEADZONE {
-                *face_yaw = yaw;
-            }
+    let mouse_facing = || {
+        if may_turn {
+            mouse.walk_toward_goal(pos, dt)
+        } else {
+            None
         }
+    };
+    let move_yaw = key_facing.or_else(mouse_facing);
+    let aim_yaw = mouse.aim.and_then(|at| yaw_toward(pos, at));
+    let (mut fwd, mut side) = (axes.fwd, 0);
+    match (move_yaw, aim_yaw) {
+        // Walking and aiming: face the aim, walk the way the player asked.
+        (Some(walk), Some(aim)) if may_turn => {
+            let (facing, f, s) = aim_and_walk(walk, aim);
+            *face_yaw = facing;
+            (fwd, side) = (f, s);
+        }
+        // Walking with no aim (the cursor on a panel or the sky): face the walk.
+        (Some(walk), _) => {
+            if may_turn {
+                *face_yaw = walk;
+            }
+            fwd = 1;
+        }
+        // Standing with nothing else steering: face the aim.
+        (None, Some(aim))
+            if axes.fwd == 0
+                && may_turn
+                && standing
+                && wrap_pi(aim - *face_yaw).abs() > AIM_DEADZONE =>
+        {
+            *face_yaw = aim;
+        }
+        _ => {}
     }
-    let fwd = if facing.is_some() { 1 } else { axes.fwd };
     MoveAxes {
         fwd,
-        side: 0,
+        side,
         mouselook: false,
         turning: false,
-        translating: fwd != 0,
-        strafe_left: false,
-        strafe_right: false,
+        translating: fwd != 0 || side != 0,
+        strafe_left: side < 0,
+        strafe_right: side > 0,
         turn_left: false,
         turn_right: false,
         ..axes
@@ -369,12 +424,48 @@ mod tests {
     }
 
     #[test]
-    fn an_idle_character_faces_a_target_in_reach_only() {
-        let yaw = facing_toward(Vec3::ZERO, Vec3::new(-10.0, 0.0, 0.0)).unwrap();
+    fn the_aim_bearing_ignores_height_and_a_cursor_underfoot() {
+        let yaw = yaw_toward(Vec3::ZERO, Vec3::new(-10.0, 5.0, 0.0)).unwrap();
         // Due -X is a quarter turn left of -Z.
         assert!(gap(yaw, std::f32::consts::FRAC_PI_2) < 1.0e-5);
-        assert_eq!(facing_toward(Vec3::ZERO, Vec3::new(0.1, 3.0, 0.0)), None);
-        assert_eq!(facing_toward(Vec3::ZERO, Vec3::new(60.0, 0.0, 0.0)), None);
+        assert_eq!(yaw_toward(Vec3::ZERO, Vec3::new(0.1, 3.0, 0.0)), None);
+    }
+
+    /// The ground direction a facing and the stock axes walk, as `control` builds it.
+    fn walked(facing: f32, fwd: i32, side: i32) -> f32 {
+        let rot = Quat::from_rotation_y(facing);
+        let dir = rot * Vec3::NEG_Z * fwd as f32 + rot * Vec3::X * side as f32;
+        f32::atan2(-dir.x, -dir.z)
+    }
+
+    #[test]
+    fn a_walk_goes_exactly_its_way_while_the_facing_stays_near_the_aim() {
+        use std::f32::consts::FRAC_PI_8;
+        for walk in [0.0, 0.5, 1.6, -2.2, 3.1] {
+            for aim in [0.0, 0.9, -1.4, 2.8, -3.0] {
+                let (facing, fwd, side) = aim_and_walk(walk, aim);
+                assert!(
+                    gap(walked(facing, fwd, side), walk) < 1.0e-4,
+                    "walk {walk} aim {aim}"
+                );
+                assert!(
+                    gap(facing, aim) <= FRAC_PI_8 + 1.0e-4,
+                    "walk {walk} aim {aim}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn walking_toward_the_aim_is_forward_and_away_is_backpedal() {
+        let (facing, fwd, side) = aim_and_walk(0.4, 0.4);
+        assert!(gap(facing, 0.4) < 1.0e-6);
+        assert_eq!((fwd, side), (1, 0));
+        let (_, fwd, side) = aim_and_walk(0.4 + std::f32::consts::PI, 0.4);
+        assert_eq!((fwd, side), (-1, 0));
+        // A quarter turn left of the aim is a strafe left.
+        let (_, fwd, side) = aim_and_walk(0.4 + std::f32::consts::FRAC_PI_2, 0.4);
+        assert_eq!((fwd, side), (0, -1));
     }
 
     #[test]
