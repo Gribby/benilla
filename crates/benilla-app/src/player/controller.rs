@@ -370,6 +370,11 @@ pub(super) fn control(
             may_translate,
             may_turn,
         );
+        // Fork-only, not 1.12.1: in the ARPG view the keys walk relative to the fixed camera.
+        let axes = match rig.arpg_pin {
+            Some(pin) => arpg::steer(axes, binds, &mut player.face_yaw, pin.yaw, may_turn),
+            None => axes,
+        };
         let input::MoveAxes {
             fwd: fwd_axis,
             side: side_axis,
