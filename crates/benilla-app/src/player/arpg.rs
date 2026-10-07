@@ -7,6 +7,12 @@
 //!
 //! WASD then walk relative to that camera, not the character ([`steer`]): W is up the screen, S
 //! down, A left, D right, and the character turns to face the way it walks.
+//!
+//! The mouse never starts a mouse-look, so the cursor stays on screen (`camera::run_arpg_clicks`).
+//! Holding the left button on the ground walks toward the cursor, and letting go walks on to the
+//! last point; a left-click on a unit or object is the stock right-click interact (attack, talk,
+//! loot, use). While a spell waits for a target or a ground point, a left-click is the stock
+//! select click that places it. The right button keeps its stock click.
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -74,10 +80,136 @@ pub(super) fn plugin(app: &mut App) {
     );
 }
 
-/// Set the rig's pin once; `seat_camera` re-applies it each frame.
-fn pin_view(view: Res<ArpgView>, mut rig: ResMut<CameraControl>) {
+/// A walk to a point stops this close to it, in yards, flat.
+const GOAL_STOP: f32 = 0.75;
+/// While the button is held, a cursor this close to the character walks nowhere, so a cursor
+/// resting on the character does not spin it in place.
+const HOLD_DEADZONE: f32 = 1.0;
+/// A released walk that closes on its point slower than this, in yards per second, is stuck.
+const STALL_RATE: f32 = 0.5;
+/// How long a released walk may stay stuck before it gives up, in seconds.
+const STALL_LIMIT: f32 = 0.5;
+
+/// The ARPG view's mouse state, on [`CameraControl`] so the look session and the controller share
+/// it. The pick fields are last frame's, the frame `crate::target`'s press latch also reads.
+#[derive(Clone, Copy, Debug)]
+pub(super) struct ArpgMouse {
+    /// The world point under the cursor, if the cursor ray hits anything.
+    pub(super) ground: Option<Vec3>,
+    /// The cursor is over a unit, a corpse or a GameObject: a left press there interacts.
+    pub(super) over_target: bool,
+    /// A spell is waiting for a target or a point: a left press is the stock select click.
+    pub(super) spell_targeting: bool,
+    /// The left press in flight settles as the stock select click, not the interact.
+    pub(super) left_selects: bool,
+    /// The left button went down on the ground and is still held.
+    pub(super) holding: bool,
+    /// Where the character is walking to.
+    pub(super) goal: Option<Vec3>,
+    /// The flat distance to `goal` last frame, for the stall test.
+    last_dist: f32,
+    /// Seconds the released walk has been stuck.
+    stall: f32,
+}
+
+impl Default for ArpgMouse {
+    fn default() -> Self {
+        Self {
+            ground: None,
+            over_target: false,
+            spell_targeting: false,
+            left_selects: false,
+            holding: false,
+            goal: None,
+            last_dist: f32::INFINITY,
+            stall: 0.0,
+        }
+    }
+}
+
+impl ArpgMouse {
+    /// A left press on the ground: walk to the cursor, a fresh walk.
+    pub(super) fn press_ground(&mut self) {
+        self.holding = true;
+        self.goal = self.ground;
+        self.reset_stall();
+    }
+
+    /// A left press on a unit or object, a spell-targeting click, or a right press: the click owns
+    /// any walk from here (an interact's Click-to-Move approach).
+    pub(super) fn press_target(&mut self) {
+        self.holding = false;
+        self.goal = None;
+        self.reset_stall();
+    }
+
+    fn reset_stall(&mut self) {
+        self.last_dist = f32::INFINITY;
+        self.stall = 0.0;
+    }
+
+    /// The facing that walks from `pos` to the goal this frame, `None` when there is no goal, it
+    /// is reached, or a released walk is stuck; a reached or stuck released walk ends.
+    fn walk_toward_goal(&mut self, pos: Vec3, dt: f32) -> Option<f32> {
+        let goal = self.goal?;
+        let (dx, dz) = (goal.x - pos.x, goal.z - pos.z);
+        let dist = (dx * dx + dz * dz).sqrt();
+        if self.holding {
+            self.reset_stall();
+            return (dist >= HOLD_DEADZONE).then(|| f32::atan2(-dx, -dz));
+        }
+        let closing = if dt > 0.0 {
+            (self.last_dist - dist) / dt
+        } else {
+            f32::INFINITY
+        };
+        self.stall = if closing < STALL_RATE {
+            self.stall + dt
+        } else {
+            0.0
+        };
+        self.last_dist = dist;
+        if dist < GOAL_STOP || self.stall > STALL_LIMIT {
+            self.goal = None;
+            self.reset_stall();
+            return None;
+        }
+        Some(f32::atan2(-dx, -dz))
+    }
+}
+
+/// Set the rig's pin and refresh the cursor's pick for the mouse. A walk to a point ends any
+/// Click-to-Move approach or `/follow`, as a movement key does.
+fn pin_view(
+    view: Res<ArpgView>,
+    hovered: Option<Res<crate::target::Hovered>>,
+    object: Option<Res<crate::target::HoveredObject>>,
+    occlusion: Option<Res<crate::target::PickOcclusion>>,
+    spell_targeting: Option<Res<crate::spell::targeting::SpellTargeting>>,
+    mut approach: ResMut<approach::Approach>,
+    mut follow: ResMut<FollowState>,
+    mut rig: ResMut<CameraControl>,
+) {
     if rig.arpg_pin != Some(view.0) {
         rig.arpg_pin = Some(view.0);
+    }
+    // The negation of the ground leg in `crate::target::click::act_on_right_click`.
+    let over_target = hovered
+        .as_ref()
+        .is_some_and(|h| h.any().is_some() || h.refused)
+        || object.as_ref().is_some_and(|o| o.target.is_some());
+    let ground = occlusion.as_ref().and_then(|o| o.point);
+    let mouse = &mut rig.arpg;
+    mouse.over_target = over_target;
+    mouse.ground = ground;
+    mouse.spell_targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
+    if mouse.holding || mouse.goal.is_some() {
+        if approach.active() {
+            approach.stop();
+        }
+        if follow.guid.is_some() {
+            follow.stop();
+        }
     }
 }
 
@@ -92,17 +224,21 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
-/// Turn the frame's movement keys into a walk relative to the camera. With a direction held, the
-/// character faces it at once and walks forward along it, so the walk animation, the speeds and
-/// the movement packets are the stock ones; the keys' own strafe and turn are dropped, as A and D
-/// are directions here. With none held, only autorun and `/follow` keep walking, along the facing.
-/// A character that cannot turn (stunned, dead) keeps its facing.
+/// Turn the frame's movement keys and the mouse walk into a walk relative to the camera. With a
+/// direction, the character faces it at once and walks forward along it, so the walk animation,
+/// the speeds and the movement packets are the stock ones; the keys' own strafe and turn are
+/// dropped, as A and D are directions here. A key beats the mouse and ends its walk. With neither,
+/// only autorun, `/follow` and a Click-to-Move approach keep walking, along their own facing. A
+/// character that cannot turn (stunned, dead) keeps its facing.
 pub(super) fn steer(
     axes: MoveAxes,
     binds: &BindingsState,
     face_yaw: &mut f32,
+    pos: Vec3,
     cam_yaw: f32,
+    mouse: &mut ArpgMouse,
     may_turn: bool,
+    dt: f32,
 ) -> MoveAxes {
     let key = |input: Input| i32::from(binds.pressed(input));
     let up = key(Input::MoveForward) - key(Input::MoveBackward);
@@ -110,7 +246,18 @@ pub(super) fn steer(
         - key(Input::StrafeLeft)
         - key(Input::TurnLeft))
     .signum();
-    let facing = screen_facing(cam_yaw, up, right);
+    let key_facing = screen_facing(cam_yaw, up, right);
+    if key_facing.is_some() {
+        mouse.goal = None;
+    } else if mouse.holding {
+        // The held walk follows the cursor; off the world (the sky) it keeps the last point.
+        if let Some(at) = mouse.ground {
+            mouse.goal = Some(at);
+        }
+    }
+    // A character that cannot turn does not walk the mouse's way along a stale facing.
+    let mouse_facing = || if may_turn { mouse.walk_toward_goal(pos, dt) } else { None };
+    let facing = key_facing.or_else(mouse_facing);
     if let Some(yaw) = facing.filter(|_| may_turn) {
         *face_yaw = yaw;
     }
@@ -155,6 +302,48 @@ mod tests {
         assert!(gap(left, cam + std::f32::consts::FRAC_PI_2) < 1.0e-5);
         let down = screen_facing(cam, -1, 0).unwrap();
         assert!(gap(down, cam + std::f32::consts::PI) < 1.0e-5);
+    }
+
+    #[test]
+    fn a_released_walk_faces_its_point_and_ends_on_arrival() {
+        let mut mouse = ArpgMouse {
+            ground: Some(Vec3::new(0.0, 0.0, -10.0)),
+            ..default()
+        };
+        mouse.press_ground();
+        mouse.holding = false;
+        // Due -Z from the origin is yaw 0.
+        let yaw = mouse.walk_toward_goal(Vec3::ZERO, 0.1).unwrap();
+        assert!(gap(yaw, 0.0) < 1.0e-5);
+        assert_eq!(mouse.walk_toward_goal(Vec3::new(0.0, 0.0, -9.5), 0.1), None);
+        assert_eq!(mouse.goal, None);
+    }
+
+    #[test]
+    fn a_held_walk_rests_inside_the_deadzone_and_keeps_its_goal() {
+        let mut mouse = ArpgMouse {
+            ground: Some(Vec3::new(0.5, 0.0, 0.0)),
+            ..default()
+        };
+        mouse.press_ground();
+        assert_eq!(mouse.walk_toward_goal(Vec3::ZERO, 0.1), None);
+        assert!(mouse.goal.is_some());
+    }
+
+    #[test]
+    fn a_released_walk_into_a_wall_gives_up() {
+        let mut mouse = ArpgMouse {
+            ground: Some(Vec3::new(20.0, 0.0, 0.0)),
+            ..default()
+        };
+        mouse.press_ground();
+        mouse.holding = false;
+        let mut frames = 0;
+        while mouse.walk_toward_goal(Vec3::ZERO, 0.1).is_some() {
+            frames += 1;
+            assert!(frames < 20, "a stuck walk never gave up");
+        }
+        assert_eq!(mouse.goal, None);
     }
 
     #[test]

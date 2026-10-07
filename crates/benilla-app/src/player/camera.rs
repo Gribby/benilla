@@ -567,6 +567,8 @@ pub(crate) struct CameraControl {
     pub(super) clipped: bool,
     /// The fork's fixed ARPG pose (`WOW_ARPG`, [`super::arpg`]); `None` in stock 1.12.1.
     pub(super) arpg_pin: Option<super::arpg::ArpgPin>,
+    /// The ARPG view's mouse walk and pick ([`super::arpg::ArpgMouse`]); idle in stock 1.12.1.
+    pub(super) arpg: super::arpg::ArpgMouse,
 }
 
 impl CameraControl {
@@ -819,6 +821,21 @@ pub(super) fn run_look_session(
     // The primary window has the OS focus.
     focused: bool,
 ) {
+    // Fork-only, not 1.12.1: the ARPG view has no mouse-look at all.
+    if rig.arpg_pin.is_some() {
+        run_arpg_clicks(
+            rig,
+            window,
+            cursor_opts,
+            inspect_enabled || click_consumed,
+            world_click,
+            world_right_click,
+            left_click,
+            right_click,
+            now,
+        );
+        return;
+    }
     // The mouse moves the view only through a held cursor: motion while unfocused, or on the frame
     // that takes the cursor back, is the pointer travelling in another app.
     let motion = if sync_look_focus(rig, focused, window, cursor_opts) {
@@ -931,6 +948,73 @@ pub(super) fn run_look_session(
     // Freelook is right-held mouse-look or a both-button run, which steers like it; a left-drag
     // orbit is not. This test and the `face_yaw` sync above must stay alike.
     rig.freelook = rig.look == Some(LookButton::Right) || (rig.look.is_some() && both_buttons);
+}
+
+/// Fork-only, not 1.12.1: the ARPG view's mouse ([`super::arpg`]). No look session starts, so the
+/// cursor stays free and visible, and the camera is the pin's. A left press on the ground starts the
+/// walk to the cursor; one on a unit or object is a click test that settles, on a clean release, as
+/// the stock right-click interact, which reads the press pick `crate::target` latches. While a
+/// spell is targeting, a left press is the stock select click instead, which places it. The right
+/// button keeps its stock click. Outside targeting no left click selects, so walking never clears
+/// the target.
+fn run_arpg_clicks(
+    rig: &mut CameraControl,
+    window: &mut Window,
+    cursor_opts: &mut CursorOptions,
+    // The left press is not the world's: the inspector holds it, or the UI took it as a
+    // cursor-payload drop, which must neither walk nor interact.
+    left_taken: bool,
+    world_click: &mut MessageWriter<WorldClick>,
+    world_right_click: &mut MessageWriter<WorldRightClick>,
+    left_click: &mut Option<PressGesture>,
+    right_click: &mut Option<PressGesture>,
+    now: f32,
+) {
+    // A session from before the view came on, or a `MouselookStart` script, ends here.
+    if rig.look.is_some() {
+        disengage_look(rig, window, cursor_opts);
+    }
+    rig.freelook = false;
+    let wm = &rig.world_mouse;
+    let (left_down, left_held) = (wm.down(LookButton::Left), wm.held(LookButton::Left));
+    let (right_down, right_held) = (wm.down(LookButton::Right), wm.held(LookButton::Right));
+    // A chord or a `MouselookStart`/`Stop` arms no click and kills a pending one, as in stock
+    // (`0x514ac1`, `0x51481a`); the press pick is not re-latched on a chord either.
+    let chord = (left_held && right_held) || wm.disarmed();
+    if chord {
+        *left_click = None;
+        *right_click = None;
+    }
+    // Which click a left press settles as, latched at the press: the targeting mode can end
+    // before the release, and the release must still place what the press aimed.
+    if left_down && !left_taken && !chord {
+        if rig.arpg.spell_targeting || rig.arpg.over_target {
+            rig.arpg.press_target();
+            rig.arpg.left_selects = rig.arpg.spell_targeting;
+            *left_click = Some(PressGesture::new(now));
+        } else {
+            rig.arpg.press_ground();
+            *left_click = None;
+        }
+    }
+    if !left_held {
+        rig.arpg.holding = false;
+        if left_click.take().is_some_and(|test| test.is_click(now)) {
+            if rig.arpg.left_selects {
+                world_click.write(WorldClick);
+            } else {
+                world_right_click.write(WorldRightClick);
+            }
+        }
+    }
+    if right_down && !chord {
+        // A right-click's interact walk is Click-to-Move's, which a mouse walk would cancel.
+        rig.arpg.press_target();
+        *right_click = Some(PressGesture::new(now));
+    }
+    if !right_held && right_click.take().is_some_and(|test| test.is_click(now)) {
+        world_right_click.write(WorldRightClick);
+    }
 }
 
 /// Start `button`'s look session: stash the cursor, then lock and hide it until the session ends,
