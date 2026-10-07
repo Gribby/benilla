@@ -25,6 +25,8 @@ use benilla_world::schedule::WorldStage;
 
 mod approach;
 mod arc;
+// The fork's top-down ARPG view, off unless `WOW_ARPG` is set; not 1.12.1.
+mod arpg;
 mod net;
 // Writes the frame onto the body we drive: pose, `MovementState`, the counter-twist gap.
 mod body_pose;
@@ -214,6 +216,7 @@ impl Plugin for PlayerPlugin {
         approach::plugin(app);
         camera_saved::plugin(app);
         camera_view::plugin(app);
+        arpg::plugin(app);
         // The stream focus is published after `control`'s teleport snap and before the stream
         // stage, and the post-snap hold released after it. Both edges are needed: without
         // `.after(Input)` the focus can precede the snap, the world streams around the departure,

@@ -565,6 +565,8 @@ pub(crate) struct CameraControl {
     /// `[cam+0x90] & 0x30000`, written only by the solver `0x50e570`, [`SmartPivot`]'s sixth
     /// conjunct; the look session reads it a frame later, as `0x50fee0` (from `0x514446`) does.
     pub(super) clipped: bool,
+    /// The fork's fixed ARPG pose (`WOW_ARPG`, [`super::arpg`]); `None` in stock 1.12.1.
+    pub(super) arpg_pin: Option<super::arpg::ArpgPin>,
 }
 
 impl CameraControl {
@@ -1151,6 +1153,14 @@ pub(super) fn seat_camera(
     }
     if let Some(yaw) = rig.follow.advance(follow, cam.yaw, dt, look_held) {
         cam.yaw = yaw;
+    }
+    // Fork-only, not 1.12.1: the ARPG view holds one pose, so the drag, key turn and wheel above
+    // never reach the seat.
+    if let Some(pin) = rig.arpg_pin {
+        cam.yaw = pin.yaw;
+        cam.pitch = pin.pitch;
+        rig.distance = pin.distance;
+        rig.target_distance = pin.distance;
     }
     // The framing pivot is `feet + cam_pivot_height`; at zoom 0 the camera sits on it. One sweep
     // runs from the head (the capsule's top hemisphere centre) to `pivot - fwd·zoom`, and body
