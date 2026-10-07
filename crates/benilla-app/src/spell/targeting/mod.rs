@@ -41,6 +41,8 @@ pub(crate) use cursor::{drive_targeting_cursor, ground_cast_radius};
 pub(crate) use item::{commit_item_cast_on_pick, EnchantConfirmItem};
 pub(crate) use pick::{publish_unit_pick, PickChecks, UnitPick};
 pub(crate) use world::{commit_ground_cast_on_click, commit_object_cast_on_click};
+// Fork-only, not 1.12.1: the ARPG view's quick ground cast, registered by `crate::player`.
+pub(crate) use world::quick_cast_location;
 
 use bevy::prelude::*;
 

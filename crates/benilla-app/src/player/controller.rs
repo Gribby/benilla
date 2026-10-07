@@ -383,6 +383,8 @@ pub(super) fn control(
                     pin.yaw,
                     &mut rig.arpg,
                     may_turn,
+                    // `may_turn` and standing (`0x5145e0`).
+                    mouse_turns_body,
                     dt,
                 )
             }

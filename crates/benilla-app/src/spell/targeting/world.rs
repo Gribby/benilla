@@ -66,6 +66,48 @@ pub(crate) fn commit_ground_cast_on_click(
     ladder.commit_targeted(spell_id, commit, bound);
 }
 
+/// Fork-only, not 1.12.1: the ARPG view's quick cast. A spell that waits for a ground point is
+/// placed at once at the point under the cursor, as [`commit_ground_cast_on_click`] places it on a
+/// click, so a Blizzard goes where the player points with no second click. With the cursor on the
+/// sky the mode stays up and places the spell once the cursor reaches the ground. A cast begun
+/// with the cursor on a UI panel (its action button clicked) is never quick-placed: the cursor has
+/// not aimed yet, so that one waits for the stock click. Registered only while the view is on,
+/// after the script calls that enter the mode.
+pub(crate) fn quick_cast_location(
+    occlusion: Res<crate::target::PickOcclusion>,
+    over_panel: Res<crate::ui_script::PointerOverUiPanel>,
+    // The mode in flight was seen with the cursor on a panel: it waits for a click.
+    mut deferred: Local<bool>,
+    mut ladder: crate::spell::CastLadder,
+) {
+    if !ladder.ground.active() {
+        *deferred = false;
+        return;
+    }
+    // The world trace runs under the UI too: a point behind a panel is not where the player aims.
+    if over_panel.0 {
+        *deferred = true;
+    }
+    if *deferred {
+        return;
+    }
+    let Some((spell_id, commit)) = ladder.ground.pending_for(TargetingWants::Location) else {
+        return;
+    };
+    let Some(point) = occlusion.point else {
+        return;
+    };
+    let at = bevy_to_wow(point);
+    let Some(bound) = ladder.ground.location_bind(at) else {
+        return;
+    };
+    debug!(
+        "arpg: quick ground cast {spell_id} at wow ({:.2}, {:.2}, {:.2}) as {bound:?}",
+        at[0], at[1], at[2]
+    );
+    ladder.commit_targeted(spell_id, commit, bound);
+}
+
 /// The object leg. A left-click on an object goes `0x492ce0` → `0x4925d0` → `SetSelection
 /// 0x493540`, whose first act while targeting is `BindTarget 0x6e5b40` and return, so the click
 /// never changes the player's target and never reaches the GameObject's unselectable check.

@@ -13,6 +13,11 @@
 //! last point; a left-click on a unit or object is the stock right-click interact (attack, talk,
 //! loot, use). While a spell waits for a target or a ground point, a left-click is the stock
 //! select click that places it. The right button keeps its stock click.
+//!
+//! Spells need no tab-targeting: the enemy under the cursor is the target
+//! (`crate::target::arpg_soft`), a ground spell cast from a key lands at the cursor at once
+//! (`crate::spell::targeting::quick_cast_location`; one clicked on the bar waits for a click),
+//! and a standing character turns to face its target so the server's facing check passes.
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -71,13 +76,23 @@ pub(super) fn plugin(app: &mut App) {
     let Some(pin) = ArpgPin::from_env() else {
         return;
     };
-    app.insert_resource(ArpgView(pin)).add_systems(
-        Update,
-        pin_view
-            .in_set(WorldStage::Input)
-            .before(control)
-            .in_set(crate::char_select::InWorldGated),
-    );
+    // The enemy under the cursor is the target: no tab-targeting.
+    crate::target::arpg_soft::plugin(app);
+    app.insert_resource(ArpgView(pin))
+        .add_systems(
+            Update,
+            pin_view
+                .in_set(WorldStage::Input)
+                .before(control)
+                .in_set(crate::char_select::InWorldGated),
+        )
+        // The quick ground cast after the script calls, whose casts enter the targeting mode.
+        .add_systems(
+            Update,
+            crate::spell::targeting::quick_cast_location
+                .in_set(crate::target::TargetUpdate)
+                .after(crate::script_calls::apply_script_calls),
+        );
 }
 
 /// A walk to a point stops this close to it, in yards, flat.
@@ -106,6 +121,9 @@ pub(super) struct ArpgMouse {
     pub(super) holding: bool,
     /// Where the character is walking to.
     pub(super) goal: Option<Vec3>,
+    /// The live enemy target's feet, which an idle character turns to face, so a cast or a swing
+    /// meets the server's facing check (`crate::target::arpg_soft::ArpgFacing`, last frame's).
+    pub(super) face_target: Option<Vec3>,
     /// The flat distance to `goal` last frame, for the stall test.
     last_dist: f32,
     /// Seconds the released walk has been stuck.
@@ -121,6 +139,7 @@ impl Default for ArpgMouse {
             left_selects: false,
             holding: false,
             goal: None,
+            face_target: None,
             last_dist: f32::INFINITY,
             stall: 0.0,
         }
@@ -186,6 +205,7 @@ fn pin_view(
     object: Option<Res<crate::target::HoveredObject>>,
     occlusion: Option<Res<crate::target::PickOcclusion>>,
     spell_targeting: Option<Res<crate::spell::targeting::SpellTargeting>>,
+    face: Option<Res<crate::target::arpg_soft::ArpgFacing>>,
     mut approach: ResMut<approach::Approach>,
     mut follow: ResMut<FollowState>,
     mut rig: ResMut<CameraControl>,
@@ -203,6 +223,7 @@ fn pin_view(
     mouse.over_target = over_target;
     mouse.ground = ground;
     mouse.spell_targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
+    mouse.face_target = face.and_then(|f| f.0);
     if mouse.holding || mouse.goal.is_some() {
         if approach.active() {
             approach.stop();
@@ -224,6 +245,22 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
+/// An idle character turns to its target only inside this reach, in yards: past any spell range.
+const FACE_REACH: f32 = 45.0;
+/// An idle character re-faces its target only once it is this far off, in radians (20°), well
+/// inside the server's front arc (120° for a swing, 180° for a spell).
+const FACE_DEADZONE: f32 = 0.35;
+
+/// The yaw that faces from `pos` to `at` on the ground, `None` with `at` underfoot or past
+/// [`FACE_REACH`].
+fn facing_toward(pos: Vec3, at: Vec3) -> Option<f32> {
+    let (dx, dz) = (at.x - pos.x, at.z - pos.z);
+    let dist = (dx * dx + dz * dz).sqrt();
+    (0.3..=FACE_REACH)
+        .contains(&dist)
+        .then(|| f32::atan2(-dx, -dz))
+}
+
 /// Turn the frame's movement keys and the mouse walk into a walk relative to the camera. With a
 /// direction, the character faces it at once and walks forward along it, so the walk animation,
 /// the speeds and the movement packets are the stock ones; the keys' own strafe and turn are
@@ -238,6 +275,8 @@ pub(super) fn steer(
     cam_yaw: f32,
     mouse: &mut ArpgMouse,
     may_turn: bool,
+    // On our feet: a seated body is not turned to its target, as the facing commit refuses one.
+    standing: bool,
     dt: f32,
 ) -> MoveAxes {
     let key = |input: Input| i32::from(binds.pressed(input));
@@ -260,6 +299,16 @@ pub(super) fn steer(
     let facing = key_facing.or_else(mouse_facing);
     if let Some(yaw) = facing.filter(|_| may_turn) {
         *face_yaw = yaw;
+    }
+    // Standing with nothing else steering (no key, no mouse walk, no autorun, `/follow` or
+    // approach), face the live enemy target, as the server wants for a cast or a swing. Only past
+    // a deadzone, as each facing change is a packet and a moving target would send one a frame.
+    if facing.is_none() && axes.fwd == 0 && may_turn && standing {
+        if let Some(yaw) = mouse.face_target.and_then(|at| facing_toward(pos, at)) {
+            if wrap_pi(yaw - *face_yaw).abs() > FACE_DEADZONE {
+                *face_yaw = yaw;
+            }
+        }
     }
     let fwd = if facing.is_some() { 1 } else { axes.fwd };
     MoveAxes {
@@ -317,6 +366,15 @@ mod tests {
         assert!(gap(yaw, 0.0) < 1.0e-5);
         assert_eq!(mouse.walk_toward_goal(Vec3::new(0.0, 0.0, -9.5), 0.1), None);
         assert_eq!(mouse.goal, None);
+    }
+
+    #[test]
+    fn an_idle_character_faces_a_target_in_reach_only() {
+        let yaw = facing_toward(Vec3::ZERO, Vec3::new(-10.0, 0.0, 0.0)).unwrap();
+        // Due -X is a quarter turn left of -Z.
+        assert!(gap(yaw, std::f32::consts::FRAC_PI_2) < 1.0e-5);
+        assert_eq!(facing_toward(Vec3::ZERO, Vec3::new(0.1, 3.0, 0.0)), None);
+        assert_eq!(facing_toward(Vec3::ZERO, Vec3::new(60.0, 0.0, 0.0)), None);
     }
 
     #[test]

@@ -14,6 +14,8 @@ use benilla_assets::AssetSet;
 use benilla_world::interact::{WorldClick, WorldRightClick};
 use benilla_world::schedule::WorldStage;
 
+// Fork-only, not 1.12.1: the ARPG view's soft target, registered by `crate::player`'s ARPG plugin.
+pub(crate) mod arpg_soft;
 mod by_name;
 // `pub(crate)` for the chest live probe, which drives the mouse's own `click::resolve_go_action`.
 pub(crate) mod click;
