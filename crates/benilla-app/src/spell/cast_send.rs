@@ -340,6 +340,20 @@ fn send_spell_cast(
 ) {
     let now = Instant::now();
     let def = spells.and_then(|s| s.catalog.get(spell_id));
+    // Fork-only, not 1.12.1: in the ARPG view a unit-word spell goes to the server at the aim
+    // point, which picks the unit (`cast_target::arpg_aim_kind`), so no selection, hand cursor or
+    // attack pick is involved. A hostile spell always does. A helpful one does only with nothing
+    // selected: a friend picked on the unit frames (or the self-cast modifier, which selects the
+    // caster) is the stock target. An item use and a bound object keep the stock path, as do
+    // location, item and object words.
+    let arpg = cast_target::arpg_aim_kind(def)
+        .filter(|aim| {
+            *aim == benilla_protocol::world::ArpgAim::Enemy || ctx.selection_guid.is_none()
+        })
+        .zip(
+            ctx.arpg_aim
+                .filter(|_| bound_object.is_none() && !commit.is_item()),
+        );
     // TryCast's first branch (`6e4bce`, ahead of every gate): an `Effect[0] == TRADE_SKILL` cast
     // never reaches the wire; the crafting window opens instead.
     if def.is_some_and(|d| d.effects[0] == benilla_formats::SPELL_EFFECT_TRADE_SKILL) {
@@ -425,7 +439,7 @@ fn send_spell_cast(
     // not attacking (`0x60ecb0`), goes through the attack validator `0x612df0`, which keeps a
     // hostile selection or selects the nearest enemy. It sits above the bind and the range gate,
     // so an acquired target out of reach reads "Out of range.".
-    if let Some(held) = hold {
+    if let Some(held) = hold.filter(|_| arpg.is_none()) {
         let engaged = self_player.single().is_ok_and(|(_, engaged)| engaged);
         if def.is_some_and(|d| d.initiates_combat()) && !engaged {
             debug!("ui_action: cast {spell_id} holds for the attack pick");
@@ -454,6 +468,8 @@ fn send_spell_cast(
     };
     let target = match explicit_object {
         Some(_) => None,
+        // The ARPG cast binds no unit here: the server resolves it from the aim point.
+        None if arpg.is_some() => None,
         None => {
             match cast_target::resolve_cast_target(def, &candidates, ctx.auto_self_cast, &ctx.rel) {
                 cast_target::CastWireTarget::SelfImplicit => None,
@@ -706,7 +722,15 @@ fn send_spell_cast(
                 spell_id,
                 item_guid,
             },
-            (None, None) => ClientCommand::CastSpell { spell_id, target },
+            (None, None) => match arpg {
+                Some((aim, arpg_aim)) => ClientCommand::ArpgCast {
+                    spell_id,
+                    aim,
+                    at: benilla_assets::coords::bevy_to_wow(arpg_aim.at),
+                    intended: arpg_aim.intended,
+                },
+                None => ClientCommand::CastSpell { spell_id, target },
+            },
         },
         CastCommit::Item {
             bag_index,
@@ -812,6 +836,7 @@ mod tests {
             range: cast_target::RangeInputs::default(),
             main_hand_item: None,
             self_move_flags: 0,
+            arpg_aim: None,
         }
     }
 

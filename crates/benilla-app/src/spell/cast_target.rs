@@ -78,6 +78,41 @@ const TF_GAMEOBJECT: u16 = 0x0800;
 /// The bits `BindTarget`'s item arm admits and clears (`0x6e5f1e`, `0x6e5f36`).
 const ITEM_ARM_BITS: u16 = TF_ITEM | TF_LOCKED;
 
+/// Fork-only, not 1.12.1: the ARPG view's aim point in Bevy world space, written each frame by the
+/// player module while the view is on and absent otherwise, so a stock client never reads it. A
+/// unit-word cast goes to an ARPG server at this point instead of a target ([`arpg_aim_kind`]).
+#[derive(Resource, Default, Clone, Copy, Debug)]
+pub(crate) struct ArpgCastAim {
+    /// The aim point.
+    pub(crate) at: Vec3,
+    /// The unit under the cursor (0 for none), which the server lets catch the spell.
+    pub(crate) intended: u64,
+}
+
+/// Fork-only, not 1.12.1: what an ARPG cast of `def` aims at, by its target word. An enemy word
+/// aims at the first enemy along the line to the aim point (the arc for melee range), any other
+/// living-unit word at the friend nearest the aim point, else the caster. `None` for a spell the
+/// ARPG cast does not carry (no target word, a location, an item, a GameObject, a lock, a corpse,
+/// implicit target 16 or the main hand), which keeps the stock path.
+pub(crate) fn arpg_aim_kind(
+    def: Option<&SpellDisplay>,
+) -> Option<benilla_protocol::world::ArpgAim> {
+    use benilla_protocol::world::ArpgAim;
+    let def = def?;
+    let word = cast_target_mask(def);
+    if word == 0 || def.implicit_target_a1 == 16 || def.targets_main_hand_item() {
+        return None;
+    }
+    if word & !UNIT_BITS != 0 || word & (TF_CORPSE_ENEMY | TF_CORPSE_ALLY) != 0 {
+        return None;
+    }
+    Some(if word & TF_UNIT_ENEMY != 0 {
+        ArpgAim::Enemy
+    } else {
+        ArpgAim::Ally
+    })
+}
+
 /// What the wire's target block should carry for this cast.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum CastWireTarget {
@@ -180,6 +215,8 @@ pub(crate) struct CastContext<'a> {
     /// The caster's movement flags (the client's `[unit+0x9e8]`), read by the requirement
     /// validator's moving gate.
     pub(crate) self_move_flags: u32,
+    /// Fork-only, not 1.12.1: the ARPG view's aim ([`ArpgCastAim`]); `None` in stock.
+    pub(crate) arpg_aim: Option<ArpgCastAim>,
 }
 
 impl CastContext<'_> {
@@ -264,6 +301,8 @@ pub(crate) struct CastTargeting<'w, 's> {
     player: Option<Res<'w, crate::player::Player>>,
     /// The caster's and the selection's reach and motion, for the range gate.
     range_units: super::RangeUnits<'w, 's>,
+    /// Fork-only, not 1.12.1: the ARPG view's aim point, present only while the view is on.
+    arpg_aim: Option<Res<'w, ArpgCastAim>>,
 }
 
 impl CastTargeting<'_, '_> {
@@ -310,6 +349,7 @@ impl CastTargeting<'_, '_> {
                 .and_then(|s| s.0.player_inv_slot(EQUIPMENT_SLOT_MAINHAND))
                 .filter(|&g| g != 0),
             self_move_flags: self.player.as_deref().map_or(0, |p| p.move_flags()),
+            arpg_aim: self.arpg_aim.as_deref().copied(),
         }
     }
 }

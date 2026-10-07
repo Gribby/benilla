@@ -21,6 +21,8 @@ mod writer;
 pub use reader::WorldReader;
 pub use session::{WardenRequired, WorldAuthReject, WorldSession};
 pub use writer::WorldWriter;
+// Fork-only, not 1.12.1: what an ARPG cast aims at.
+pub use writer::arpg::ArpgAim;
 
 /// The stock `mangosd` port, for probes that dial the world server without a realm list.
 pub const WORLD_PORT: u16 = 8085;

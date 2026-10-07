@@ -34,6 +34,8 @@ pub(super) fn update_pick_occlusion(
     spatial: avian3d::prelude::SpatialQuery,
     occluders: Query<(), With<PickOccluder>>,
     mut occlusion: ResMut<PickOcclusion>,
+    // Fork-only, not 1.12.1: the ARPG cutaway, whose cut geometry the ray passes through.
+    cutaway: Option<Res<benilla_world::cutaway::Cutaway>>,
 ) {
     *occlusion = PickOcclusion::default();
     let (Ok((camera, cam_tf)), Ok(window)) = (camera.single(), window.single()) else {
@@ -46,19 +48,40 @@ pub(super) fn update_pick_occlusion(
         return;
     };
     occlusion.ray = Some(ray.direction);
-    if let Some(hit) = spatial.cast_ray_predicate(
-        ray.origin,
-        ray.direction,
-        f32::MAX,
-        true,
-        // The mask that reaches every `PickOccluder` collider; the marker picks the set within it.
-        &benilla_world::collision::WorldCollision::body_filter(),
-        &|e| occluders.contains(e),
-    ) {
-        occlusion.distance = hit.distance;
-        occlusion.point = Some(ray.origin + *ray.direction * hit.distance);
+    // Fork-only, not 1.12.1: a hit in the ARPG cutaway is geometry the player cannot see, so the
+    // ray goes on through it to what is drawn (the floor under a cut ceiling). Stock casts once.
+    let cut = cutaway.as_deref().copied().unwrap_or_default();
+    let mut travelled = 0.0;
+    for pass in 0..CUT_PASSES {
+        let origin = ray.origin + *ray.direction * travelled;
+        let Some(hit) = spatial.cast_ray_predicate(
+            origin,
+            ray.direction,
+            f32::MAX,
+            // A restart past a cut hit can begin inside that collider: it must not stop at once.
+            pass == 0,
+            // The mask that reaches every `PickOccluder` collider; the marker picks the set within it.
+            &benilla_world::collision::WorldCollision::body_filter(),
+            &|e| occluders.contains(e),
+        ) else {
+            return;
+        };
+        let distance = travelled + hit.distance;
+        let point = ray.origin + *ray.direction * distance;
+        if cut.cuts(point) {
+            travelled = distance + CUT_STEP;
+            continue;
+        }
+        occlusion.distance = distance;
+        occlusion.point = Some(point);
+        return;
     }
 }
+
+/// Fork-only, not 1.12.1: how many cut surfaces the pick ray passes before it gives up (a roof, a
+/// floor above, a beam), and how far past each it restarts, in yards.
+const CUT_PASSES: usize = 6;
+const CUT_STEP: f32 = 0.05;
 
 /// The model instances whose parts are `unit`'s pick geometry: the body, everything it wears, and
 /// its mount. The reference's `0x480d90` walks the CM2 attachment tree (`[model+0x1dc]` head,

@@ -951,12 +951,12 @@ pub(super) fn run_look_session(
 }
 
 /// Fork-only, not 1.12.1: the ARPG view's mouse ([`super::arpg`]). No look session starts, so the
-/// cursor stays free and visible, and the camera is the pin's. A left press on the ground starts the
-/// walk to the cursor; one on a unit or object is a click test that settles, on a clean release, as
-/// the stock right-click interact, which reads the press pick `crate::target` latches. While a
-/// spell is targeting, a left press is the stock select click instead, which places it. The right
-/// button keeps its stock click. Outside targeting no left click selects, so walking never clears
-/// the target.
+/// cursor stays free and visible, and the camera is the pin's. A press on an enemy (either button,
+/// or the left with Shift anywhere) holds the swing until its release; a left press on the ground
+/// starts the walk to the cursor; one on any other unit or object is a click test that settles,
+/// on a clean release, as the stock right-click interact, which reads the press pick
+/// `crate::target` latches. While a spell is targeting, a left press is the stock select click
+/// instead, which places it. Outside targeting no click selects.
 fn run_arpg_clicks(
     rig: &mut CameraControl,
     window: &mut Window,
@@ -986,11 +986,22 @@ fn run_arpg_clicks(
         *right_click = None;
     }
     // Which click a left press settles as, latched at the press: the targeting mode can end
-    // before the release, and the release must still place what the press aimed.
+    // before the release, and the release must still place what the press aimed. A spell's
+    // targeting click comes first, then a swing (on an enemy, or anywhere with Shift), then the
+    // interact on anything else under the cursor, else a walk.
+    let enemy = rig.arpg.over_enemy;
     if left_down && !left_taken && !chord {
-        if rig.arpg.spell_targeting || rig.arpg.over_target {
+        if rig.arpg.spell_targeting {
             rig.arpg.press_target();
-            rig.arpg.left_selects = rig.arpg.spell_targeting;
+            rig.arpg.left_selects = true;
+            *left_click = Some(PressGesture::new(now));
+        } else if enemy.is_some() || rig.arpg.force_attack {
+            rig.arpg.press_swing(enemy);
+            rig.arpg.swing_left = true;
+            *left_click = None;
+        } else if rig.arpg.over_target {
+            rig.arpg.press_target();
+            rig.arpg.left_selects = false;
             *left_click = Some(PressGesture::new(now));
         } else {
             rig.arpg.press_ground();
@@ -999,6 +1010,7 @@ fn run_arpg_clicks(
     }
     if !left_held {
         rig.arpg.holding = false;
+        rig.arpg.swing_left = false;
         if left_click.take().is_some_and(|test| test.is_click(now)) {
             if rig.arpg.left_selects {
                 world_click.write(WorldClick);
@@ -1007,13 +1019,22 @@ fn run_arpg_clicks(
             }
         }
     }
+    // The right button swings at an enemy too, and is the stock interact on anything else.
     if right_down && !chord {
-        // A right-click's interact walk is Click-to-Move's, which a mouse walk would cancel.
-        rig.arpg.press_target();
-        *right_click = Some(PressGesture::new(now));
+        if enemy.is_some() && !rig.arpg.spell_targeting {
+            rig.arpg.press_swing(enemy);
+            rig.arpg.swing_right = true;
+        } else {
+            // A right-click's interact walk is Click-to-Move's, which a mouse walk would cancel.
+            rig.arpg.press_target();
+            *right_click = Some(PressGesture::new(now));
+        }
     }
-    if !right_held && right_click.take().is_some_and(|test| test.is_click(now)) {
-        world_right_click.write(WorldRightClick);
+    if !right_held {
+        rig.arpg.swing_right = false;
+        if right_click.take().is_some_and(|test| test.is_click(now)) {
+            world_right_click.write(WorldRightClick);
+        }
     }
 }
 
@@ -1277,7 +1298,13 @@ pub(super) fn seat_camera(
     // reaching a two-sided Möller–Trumbore test over the chunk's MCLQ slots (`0x69cc13`,
     // `0x7c2c40`, hit at `0x7c2e5f`) with no near floor. That leg is a ray (`0x672170` has no
     // radius), so `cast_camera` traces water as a ray and solids as a sphere.
-    let hit = collide.cast_camera(head, boom, dynamics.options.water_collision);
+    // Fork-only, not 1.12.1: the ARPG view's fixed camera never collides; the cutaway
+    // (`benilla_world::cutaway`) clears what stands between it and the player instead.
+    let hit = if rig.arpg_pin.is_some() {
+        None
+    } else {
+        collide.cast_camera(head, boom, dynamics.options.water_collision)
+    };
     // The solver's clip verdict (`0x50e570`'s `0x30000`, OR'd into `[cam+0x90]` by the driver):
     // [`SmartPivot`]'s sixth conjunct, so an unobstructed camera never pivots.
     rig.clipped = hit.is_some();

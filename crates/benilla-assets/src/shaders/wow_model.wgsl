@@ -436,6 +436,17 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
             discard;
         }
     }
+    // Fork-only, not 1.12.1: the ARPG cutaway (`benilla_world::cutaway`) on the WMO surfaces and
+    // interior props this path draws (`model_flags.x`, `.z`), as `static_gx.wgsl` cuts the rest of
+    // the static world; units and players are never cut. Stock leaves the radius 0.
+    let cut_r = wow_light.sh_c16.w;
+    if (cut_r > 0.0 && (m.model_flags.x > 0.5 || m.model_flags.z > 0.5)
+        && in.world_position.y > wow_light.wmo_fog_params.z) {
+        let cut_d = in.world_position.xz - vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z);
+        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+            discard;
+        }
+    }
 #ifdef WOW_WATER_CLIP
     // The straddle split: a translucent model crossing its water plane draws on each side of the
     // water pass (the far copy has `clutter_fade.z` bit 11) and each copy keeps its half, the

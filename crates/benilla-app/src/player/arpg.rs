@@ -3,20 +3,26 @@
 //! by default and stock behaviour is untouched.
 //!
 //! `WOW_ARPG_PITCH` (degrees looking down, default 55), `WOW_ARPG_YAW` (degrees, default 45) and
-//! `WOW_ARPG_DIST` (yards, default 28) shape the pose.
+//! `WOW_ARPG_DIST` (yards, default 28) shape the pose. Indoors and in caves the camera does not
+//! collide; walls and ceilings above `WOW_ARPG_CUT` yards over the feet (default 2.8) are cut away
+//! instead (`benilla_world::cutaway`).
 //!
 //! WASD then walk relative to that camera, not the character ([`steer`]): W is up the screen, S
 //! down, A left, D right, and the character turns to face the way it walks.
 //!
 //! The mouse never starts a mouse-look, so the cursor stays on screen (`camera::run_arpg_clicks`).
 //! Holding the left button on the ground walks toward the cursor, and letting go walks on to the
-//! last point; a left-click on a unit or object is the stock right-click interact (attack, talk,
-//! loot, use). While a spell waits for a target or a ground point, a left-click is the stock
-//! select click that places it. The right button keeps its stock click.
+//! last point. Holding either button on an enemy, or the left with Shift anywhere, swings: the
+//! character walks to a clicked enemy until in reach, then swings at the cursor on its weapon
+//! timer, and the server strikes whoever stands in the arc or whiffs. A click on a friendly unit,
+//! a corpse or an object is the stock interact (talk, loot, use). While a spell waits for a target
+//! or a ground point, a left-click is the stock select click that places it.
 //!
-//! Spells need no tab-targeting: the enemy under the cursor is the target
-//! (`crate::target::arpg_soft`), a ground spell cast from a key lands at the cursor at once
-//! (`crate::spell::targeting::quick_cast_location`; one clicked on the bar waits for a click).
+//! There is no selection: a unit-word spell goes to the server at the cursor's aim point
+//! (`crate::spell::ArpgCastAim`), which picks the unit, and a ground spell cast from a key lands at
+//! the cursor at once (`crate::spell::targeting::quick_cast_location`; one clicked on the bar waits
+//! for a click). These need a server with the ARPG patch, greeted at every world entry with
+//! `ClientCommand::ArpgHello` ([`greet_server`]).
 //!
 //! The character always faces the cursor: standing, it turns to the aim; walking, it faces within
 //! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
@@ -69,18 +75,24 @@ fn env_f32(name: &str, default: f32) -> f32 {
         .unwrap_or(default)
 }
 
-/// The pose to hold while the view is on.
+/// The pose to hold while the view is on, and the cutaway's height above the feet and radius.
 #[derive(Resource)]
-struct ArpgView(ArpgPin);
+struct ArpgView(ArpgPin, f32, f32);
 
 /// Hand the rig its pose; a no-op unless `WOW_ARPG` is on.
 pub(super) fn plugin(app: &mut App) {
     let Some(pin) = ArpgPin::from_env() else {
+        // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
+        app.add_systems(Startup, remove_hud);
         return;
     };
-    // The enemy under the cursor is the target: no tab-targeting.
+    // The enemy under the cursor, for the swing and the hover bar; no selection.
     crate::target::arpg_soft::plugin(app);
-    app.insert_resource(ArpgView(pin))
+    let cut = env_f32("WOW_ARPG_CUT", CUT_HEIGHT).clamp(1.5, 10.0);
+    let cut_radius = env_f32("WOW_ARPG_CUT_RADIUS", CUT_RADIUS).clamp(5.0, 120.0);
+    app.add_systems(Startup, install_hud);
+    app.insert_resource(ArpgView(pin, cut, cut_radius))
+        .init_resource::<crate::spell::ArpgCastAim>()
         .add_systems(
             Update,
             pin_view
@@ -88,6 +100,8 @@ pub(super) fn plugin(app: &mut App) {
                 .before(control)
                 .in_set(crate::char_select::InWorldGated),
         )
+        // Ungated: the world entry's message must be read the frame it is written.
+        .add_systems(Update, greet_server.before(pin_view))
         // The quick ground cast after the script calls, whose casts enter the targeting mode.
         .add_systems(
             Update,
@@ -95,6 +109,60 @@ pub(super) fn plugin(app: &mut App) {
                 .in_set(crate::target::TargetUpdate)
                 .after(crate::script_calls::apply_script_calls),
         );
+}
+
+/// The hover health bar addon, written into `AddOns/ArpgHud` in the config folder.
+const HUD_TOC: &str = "## Interface: 11200\n## Title: ARPG Hud\n## Notes: The benilla ARPG \
+client's hover health bar, installed by the client.\nArpgHud.lua\n";
+const HUD_LUA: &str = include_str!("arpg_hud.lua");
+
+/// Where the hover health bar addon lives, `AddOns/ArpgHud` in the config folder.
+fn hud_dir() -> Option<std::path::PathBuf> {
+    crate::config_dir().map(|d| d.join("AddOns").join("ArpgHud"))
+}
+
+/// Remove the hover health bar addon, if an ARPG session installed one, so the stock client does
+/// not run it. Only the two files the client writes go, and the folder if that empties it.
+fn remove_hud() {
+    let Some(dir) = hud_dir() else {
+        return;
+    };
+    if !dir.is_dir() {
+        return;
+    }
+    for name in ["ArpgHud.toc", "ArpgHud.lua"] {
+        let _ = std::fs::remove_file(dir.join(name));
+    }
+    let _ = std::fs::remove_dir(&dir);
+    info!(
+        "arpg: removed the hover health bar addon from {}",
+        dir.display()
+    );
+}
+
+/// Install (or refresh) the hover health bar addon, so the next UI load runs it. A failure only
+/// costs the bar.
+fn install_hud() {
+    let Some(dir) = hud_dir() else {
+        return;
+    };
+    let write = |name: &str, body: &str| -> std::io::Result<()> {
+        let path = dir.join(name);
+        if std::fs::read_to_string(&path).is_ok_and(|old| old == body) {
+            return Ok(());
+        }
+        std::fs::write(path, body)
+    };
+    let result = std::fs::create_dir_all(&dir)
+        .and_then(|_| write("ArpgHud.toc", HUD_TOC))
+        .and_then(|_| write("ArpgHud.lua", HUD_LUA));
+    match result {
+        Ok(()) => info!("arpg: the hover health bar addon is in {}", dir.display()),
+        Err(e) => warn!(
+            "arpg: could not install the hover health bar in {}: {e}",
+            dir.display()
+        ),
+    }
 }
 
 /// A walk to a point stops this close to it, in yards, flat.
@@ -106,6 +174,40 @@ const HOLD_DEADZONE: f32 = 1.0;
 const STALL_RATE: f32 = 0.5;
 /// How long a released walk may stay stuck before it gives up, in seconds.
 const STALL_LIMIT: f32 = 0.5;
+/// A swing at a clicked enemy walks until it is this far inside the server's melee reach, in
+/// yards, so a step of lag or the enemy's own step does not leave the swing short.
+const SWING_MARGIN: f32 = 1.0;
+/// Once swinging, the enemy may step this much further before the character walks after it
+/// again, in yards, so a gap that wavers at the edge does not toggle the swing every frame.
+const SWING_SLACK: f32 = 1.5;
+/// Our own combat reach when the store has none, in yards (the client's default, as the server's).
+const DEFAULT_REACH: f32 = 1.5;
+/// With the cursor on a panel or the sky, a cast aims this far ahead of the facing, in yards.
+const BLIND_AIM: f32 = 10.0;
+/// Indoors, static geometry this far above the feet is cut away, in yards: above any player's
+/// head (`WOW_ARPG_CUT` overrides).
+const CUT_HEIGHT: f32 = 2.8;
+/// The cutaway reaches this far from the feet on the ground, in yards (`WOW_ARPG_CUT_RADIUS`
+/// overrides): past the camera's own footprint (28 yd out at 55° is 16 yd across), so nothing
+/// between it and the player stands, while distant hills, trees and roofs keep their tops.
+const CUT_RADIUS: f32 = 30.0;
+/// The WMO group flags (`MOGP`) that make a room outdoors, as `wmo_portal::indoors_at` reads them:
+/// `EXTERIOR` and `EXTERIOR_LIT`, a city's open streets and valleys (Stormwind, Orgrimmar).
+const GROUP_OUTDOOR: u32 = 0x8 | 0x40;
+
+/// Whether `room` is an indoor room or a cave, by its group's flags.
+fn room_is_indoor(
+    room: benilla_world::wmo_portal::WmoRoom,
+    instances: &Query<&benilla_world::wmo_portal::WmoPortalInstance>,
+    wmos: &Assets<benilla_assets::WmoModel>,
+) -> bool {
+    instances
+        .get(room.instance)
+        .ok()
+        .and_then(|inst| wmos.get(&inst.handle))
+        .and_then(|wmo| wmo.group_nav.get(usize::from(room.group)))
+        .is_some_and(|nav| nav.flags & GROUP_OUTDOOR == 0)
+}
 
 /// The ARPG view's mouse state, on [`CameraControl`] so the look session and the controller share
 /// it. The pick fields are last frame's, the frame `crate::target`'s press latch also reads.
@@ -126,6 +228,25 @@ pub(super) struct ArpgMouse {
     /// Where the cursor aims: the hovered unit's feet, else the world point under the cursor;
     /// `None` over a UI panel or the sky. The character always faces it.
     pub(super) aim: Option<Vec3>,
+    /// The live enemy under the cursor and its guid, last frame's (`crate::target::arpg_soft`).
+    pub(super) over_enemy: Option<(Entity, u64)>,
+    /// Shift is held: a left press swings in place wherever the cursor is.
+    pub(super) force_attack: bool,
+    /// A swing is held on the left and the right button.
+    pub(super) swing_left: bool,
+    pub(super) swing_right: bool,
+    /// The enemy the swing was pressed on and its guid, which the character walks to until in
+    /// reach; dropped once it dies or streams out, and the swing goes on in place.
+    pub(super) swing_target: Option<(Entity, u64)>,
+    /// That enemy's feet, last frame's; `None` for a swing in place.
+    pub(super) swing_target_at: Option<Vec3>,
+    /// The flat distance at which the server can strike it: the stock melee reach, both bodies'
+    /// combat reach and 4/3 yd, at least 5 (`ObjectStore::unit_combat_reach`), less a margin.
+    pub(super) swing_reach: f32,
+    /// The swing the server should be running: held, and at a clicked enemy only once in reach.
+    pub(super) swing_wanted: bool,
+    /// The swing the server was last told of: `Some(intended)` running, `None` stopped.
+    pub(super) swing_sent: Option<u64>,
     /// The flat distance to `goal` last frame, for the stall test.
     last_dist: f32,
     /// Seconds the released walk has been stuck.
@@ -142,6 +263,15 @@ impl Default for ArpgMouse {
             holding: false,
             goal: None,
             aim: None,
+            over_enemy: None,
+            force_attack: false,
+            swing_left: false,
+            swing_right: false,
+            swing_target: None,
+            swing_target_at: None,
+            swing_reach: 5.0 - SWING_MARGIN,
+            swing_wanted: false,
+            swing_sent: None,
             last_dist: f32::INFINITY,
             stall: 0.0,
         }
@@ -162,6 +292,20 @@ impl ArpgMouse {
         self.holding = false;
         self.goal = None;
         self.reset_stall();
+    }
+
+    /// A swing press, on `enemy` (walked to) or in place: the swing owns the body, so any walk
+    /// ends.
+    pub(super) fn press_swing(&mut self, enemy: Option<(Entity, u64)>) {
+        self.holding = false;
+        self.goal = None;
+        self.swing_target = enemy;
+        self.reset_stall();
+    }
+
+    /// A swing is held on either button.
+    pub(super) fn swing_held(&self) -> bool {
+        self.swing_left || self.swing_right
     }
 
     fn reset_stall(&mut self) {
@@ -199,22 +343,60 @@ impl ArpgMouse {
     }
 }
 
-/// Set the rig's pin and refresh the cursor's pick for the mouse. A walk to a point ends any
-/// Click-to-Move approach or `/follow`, as a movement key does.
+/// The pick this frame's mouse reads, all last frame's: one parameter under Bevy's limit.
+type ArpgPicks<'w, 's> = (
+    Option<Res<'w, crate::target::Hovered>>,
+    Option<Res<'w, crate::target::HoveredObject>>,
+    Option<Res<'w, crate::target::PickOcclusion>>,
+    Option<Res<'w, crate::target::arpg_soft::ArpgEnemyHover>>,
+    Option<Res<'w, crate::spell::targeting::SpellTargeting>>,
+    Option<Res<'w, crate::ui_script::PointerOverUiPanel>>,
+    // Every unit's fields: the swing target's life and reach, ours.
+    Query<'w, 's, &'static crate::net::ObjectStore>,
+    Query<'w, 's, &'static crate::net::ObjectStore, With<crate::net::SelfPlayer>>,
+);
+
+/// The room the player stands in and what tells an indoor one: one parameter under Bevy's limit.
+type ArpgRooms<'w, 's> = (
+    Res<'w, benilla_world::wmo_portal::PlayerWmoRoom>,
+    Query<'w, 's, &'static benilla_world::wmo_portal::WmoPortalInstance>,
+    Res<'w, Assets<benilla_assets::WmoModel>>,
+);
+
+/// Set the rig's pin, refresh the cursor's pick for the mouse, publish the cast aim, and talk to
+/// the ARPG server: the hello once per character in world, and the swing whenever the controller's
+/// wish changes. A walk to a point ends any Click-to-Move approach or `/follow`, as a movement key
+/// does.
 fn pin_view(
     view: Res<ArpgView>,
-    hovered: Option<Res<crate::target::Hovered>>,
-    object: Option<Res<crate::target::HoveredObject>>,
-    occlusion: Option<Res<crate::target::PickOcclusion>>,
-    spell_targeting: Option<Res<crate::spell::targeting::SpellTargeting>>,
-    over_panel: Option<Res<crate::ui_script::PointerOverUiPanel>>,
+    picks: ArpgPicks,
+    keys: Res<ButtonInput<KeyCode>>,
+    player: Res<Player>,
+    net: Res<NetCommands>,
     transforms: Query<&Transform>,
+    mut cast_aim: ResMut<crate::spell::ArpgCastAim>,
+    // The room the player stands in, and the cutaway it opens.
+    rooms: ArpgRooms,
+    mut cutaway: ResMut<benilla_world::cutaway::Cutaway>,
     mut approach: ResMut<approach::Approach>,
     mut follow: ResMut<FollowState>,
     mut rig: ResMut<CameraControl>,
 ) {
+    let (hovered, object, occlusion, enemy_hover, spell_targeting, over_panel, stores, me) = picks;
+    let (room, instances, wmos) = rooms;
     if rig.arpg_pin != Some(view.0) {
         rig.arpg_pin = Some(view.0);
+    }
+    // Indoors (a WMO room or a cave), the walls, ceiling and any hill above the head are cut away
+    // around the player.
+    let indoor = room.0.filter(|r| room_is_indoor(*r, &instances, &wmos));
+    let fresh = benilla_world::cutaway::Cutaway {
+        plane: indoor.map(|_| player.pos.y + view.1),
+        center: player.pos,
+        radius: view.2,
+    };
+    if *cutaway != fresh {
+        *cutaway = fresh;
     }
     // The negation of the ground leg in `crate::target::click::act_on_right_click`.
     let over_target = hovered
@@ -239,6 +421,39 @@ fn pin_view(
     mouse.ground = ground;
     mouse.spell_targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
     mouse.aim = aim;
+    mouse.over_enemy = enemy_hover.and_then(|h| h.0);
+    mouse.force_attack = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
+    // The clicked enemy, while it lives: once it dies or streams out the swing goes on in place.
+    let target_store = mouse.swing_target.and_then(|(e, _)| stores.get(e).ok());
+    if mouse.swing_target.is_some() && target_store.is_none_or(|s| s.0.unit_reads_dead()) {
+        mouse.swing_target = None;
+    }
+    mouse.swing_target_at = mouse
+        .swing_target
+        .and_then(|(e, _)| transforms.get(e).ok())
+        .map(|t| t.translation);
+    let own_reach = me
+        .single()
+        .map_or(DEFAULT_REACH, |s| s.0.unit_combat_reach());
+    let their_reach = target_store.map_or(DEFAULT_REACH, |s| s.0.unit_combat_reach());
+    mouse.swing_reach = (own_reach + their_reach + 4.0 / 3.0).max(5.0) - SWING_MARGIN;
+    // The cast aim: the cursor, or ahead of the facing with the cursor on a panel or the sky, and
+    // the unit under the cursor, which the server lets catch the spell.
+    let ahead = Vec3::new(-player.face_yaw.sin(), 0.0, -player.face_yaw.cos()) * BLIND_AIM;
+    let hovered_unit = hovered.as_ref().and_then(|h| h.guid).filter(|_| !on_panel);
+    *cast_aim = crate::spell::ArpgCastAim {
+        at: aim.unwrap_or(player.pos + ahead),
+        intended: hovered_unit.unwrap_or(0),
+    };
+    // The swing the controller asked for last frame, at the enemy it was pressed on; a press on
+    // another enemy while swinging re-sends the start with the new one.
+    let wanted = mouse
+        .swing_wanted
+        .then(|| mouse.swing_target.map_or(0, |(_, guid)| guid));
+    if wanted != mouse.swing_sent {
+        let _ = net.0.send(ClientCommand::ArpgSwing(wanted));
+        mouse.swing_sent = wanted;
+    }
     if mouse.holding || mouse.goal.is_some() {
         if approach.active() {
             approach.stop();
@@ -260,12 +475,40 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
+/// Greet the ARPG server at every world entry, a reconnect and a relog of the same character
+/// included, as the server's player is a new one each time; and after any map transfer re-send the
+/// held swing, as a release sent during the loading screen never arrives and the server ends the
+/// swing at the transfer.
+fn greet_server(
+    mut entered: MessageReader<crate::net::EnteredWorldMessage>,
+    mut transfers: MessageReader<WorldportMessage>,
+    net: Res<NetCommands>,
+    rig: Option<ResMut<CameraControl>>,
+) {
+    let greet = entered.read().count() > 0;
+    let transferred = transfers.read().count() > 0;
+    if greet {
+        info!("arpg: greeting the server as an ARPG client");
+        let _ = net.0.send(ClientCommand::ArpgHello);
+    }
+    if greet || transferred {
+        if let Some(mut rig) = rig {
+            rig.arpg.swing_sent = None;
+        }
+    }
+}
+
 /// The aim is turned to only past this far from the feet, in yards: closer, a pixel of mouse
 /// travel swings the bearing wildly.
 const AIM_MIN: f32 = 0.5;
 /// A standing character re-faces the aim only past this, in radians (about 1°): each facing change
 /// is a packet, and float noise in the pick must not send one a frame.
 const AIM_DEADZONE: f32 = 0.02;
+
+/// The distance from `pos` to `at` on the ground, in yards.
+fn flat_distance(pos: Vec3, at: Vec3) -> f32 {
+    Vec2::new(at.x - pos.x, at.z - pos.z).length()
+}
 
 /// The yaw that faces from `pos` to `at` on the ground, `None` with `at` within [`AIM_MIN`].
 fn yaw_toward(pos: Vec3, at: Vec3) -> Option<f32> {
@@ -339,6 +582,21 @@ pub(super) fn steer(
         }
     };
     let move_yaw = key_facing.or_else(mouse_facing);
+    // The held swing at a clicked enemy walks to it until in reach; a key still steers. Once
+    // swinging, the enemy may step a little further before the walk resumes.
+    let reach = if mouse.swing_wanted {
+        mouse.swing_reach + SWING_SLACK
+    } else {
+        mouse.swing_reach
+    };
+    let swing_gap = mouse.swing_target_at.map(|at| flat_distance(pos, at));
+    let swing_walk = match (mouse.swing_held(), mouse.swing_target_at, swing_gap) {
+        (true, Some(at), Some(gap)) if gap > reach && may_turn => yaw_toward(pos, at),
+        _ => None,
+    };
+    let move_yaw = move_yaw.or(swing_walk);
+    // The server swings while the swing is held, once a clicked enemy is in reach.
+    mouse.swing_wanted = mouse.swing_held() && swing_gap.is_none_or(|gap| gap <= reach);
     let aim_yaw = mouse.aim.and_then(|at| yaw_toward(pos, at));
     let (mut fwd, mut side) = (axes.fwd, 0);
     match (move_yaw, aim_yaw) {

@@ -198,6 +198,8 @@ fn build_light_data(
     lights_q: Query<(&WorldPointLight, &GlobalTransform, Option<&LightRooms>)>,
     // The per-frame portal PVS, for the rooms term.
     portals: Query<&crate::wmo_portal::WmoPortalInstance>,
+    // Fork-only, not 1.12.1: the ARPG cutaway plane, absent in a harness.
+    cutaway: Option<Res<crate::cutaway::Cutaway>>,
     mut data: ResMut<WowLightData>,
     time: Res<Time>,
     mut last_dump: Local<f64>,
@@ -233,6 +235,16 @@ fn build_light_data(
     rows[19] = [l.wmo_fog_start, l.wmo_fog_end, 0.0, 0.0];
     // Rows 0-2, 6-12.xyz and 17.yzw: the model-light core.
     pack_model_core_rows(rows, l.ambient, l.diffuse, l.sun_dir);
+    // Fork-only, not 1.12.1: the ARPG cutaway in the free lanes, 12.w the radius (0 off), 19.z the
+    // plane and 19.w / 5.z the centre's X and Z, which `static_gx.wgsl`, `wow_model.wgsl` and
+    // `terrain.wgsl` read (`crate::cutaway`). Stock writes zeros there, so the cut is off.
+    if let Some(c) = cutaway {
+        let [radius, plane, x, z] = c.lanes();
+        rows[12][3] = radius;
+        rows[19][2] = plane;
+        rows[19][3] = x;
+        rows[5][2] = z;
+    }
     // The point table: lights within [`POINT_PACK_RADIUS`], nearest first past capacity. Dividing
     // by 4π undoes the spawn's premultiply, so the colour is the authored `colour × intensity`,
     // committed raw. Entries past the count stay stale; the count row guards every reader.

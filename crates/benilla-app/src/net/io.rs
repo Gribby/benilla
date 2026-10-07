@@ -1020,6 +1020,14 @@ fn writer_loop(
                     ClientCommand::CastSpellAtDest { spell_id, dest } => {
                         w.cast_spell_at_dest(spell_id, dest)
                     }
+                    ClientCommand::ArpgHello => w.arpg_hello(),
+                    ClientCommand::ArpgSwing(start) => w.arpg_swing(start),
+                    ClientCommand::ArpgCast {
+                        spell_id,
+                        aim,
+                        at,
+                        intended,
+                    } => w.arpg_cast(spell_id, aim, at, intended),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {
                         w.cast_spell_at_source(spell_id, src)
                     }

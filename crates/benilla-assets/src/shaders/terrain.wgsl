@@ -36,12 +36,12 @@ struct WowLight {
     light_sun: vec4<f32>,     // xyz = world-space sun travel direction (to-light = −xyz); w unused.
     light_spec: vec4<f32>,    // rgb = row 9 specular color; w = shininess (20). rgb == 0 disables.
     fog_color: vec4<f32>,     // rgb = row 7 fog (raw, gamma 0..1); w = enable (>0.5 ⇒ blend).
-    fog_params: vec4<f32>,    // x = fog_start yd; y = fog_end yd; z unused; w = farclip wall.
+    fog_params: vec4<f32>,    // x = fog_start yd; y = fog_end yd; z = ARPG cut centre Z; w = farclip wall.
     _sh: array<vec4<f32>, 6>, // rows 6-11: model SH coefficients, unread by terrain.
-    sh_c16: vec4<f32>,        // row 12: xyz = the models' c16 quad band; w free.
+    sh_c16: vec4<f32>,        // row 12: xyz = the models' c16 quad band; w = ARPG cut radius.
     _water: array<vec4<f32>, 4>, // rows 13-16: liquid swatches, unread by terrain.
     grade: vec4<f32>,         // row 17: reserved, layout only.
-    _wmo_fog: array<vec4<f32>, 2>, // rows 18-19: interior fog, unread by terrain.
+    _wmo_fog: array<vec4<f32>, 2>, // rows 18-19: interior fog; terrain reads only 19.zw, the ARPG cut.
     // The dynamic point-light table (`global_light::build_light_data`): row 20 `.x` = live count,
     // then two rows per light, `[pos.xyz, range]` and `[rgb, 0]`.
     point_count: vec4<f32>,
@@ -166,6 +166,15 @@ fn vertex(in: Vertex) -> TerrainVsOut {
 
 @fragment
 fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
+    // Fork-only, not 1.12.1: the ARPG cutaway (`benilla_world::cutaway`), as `static_gx.wgsl` cuts
+    // it: a hill above a cave the player stands in is not drawn. Stock leaves the radius 0.
+    let cut_r = wow_light.sh_c16.w;
+    if (cut_r > 0.0 && in.world_position.y > wow_light._wmo_fog[1].z) {
+        let cut_d = in.world_position.xz - vec2<f32>(wow_light._wmo_fog[1].w, wow_light.fog_params.z);
+        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+            discard;
+        }
+    }
     // The far-clip wall: the reference clips the detailed world per pixel at its far plane
     // (`farclip`, about 777 yd). Discard beyond `fog_params.w` (0 disables) on planar eye-Z.
     if (wow_light.fog_params.w > 0.0) {

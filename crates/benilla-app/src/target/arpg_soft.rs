@@ -1,23 +1,27 @@
-//! Fork-only, not 1.12.1: the ARPG view's soft target (`WOW_ARPG`, [`crate::player`]'s `arpg`).
-//! The enemy under the cursor becomes the selection, so every spell, ability and swing goes at
-//! what the player points at through the stock cast and attack paths, with no tab-targeting. A
-//! cursor on open ground near an enemy snaps to it (the magnet), and moving off every enemy keeps
-//! the last one. [`plugin`] is called only while the view is on, so stock benilla never runs it.
+//! Fork-only, not 1.12.1: the ARPG view's hover (`WOW_ARPG`, [`crate::player`]'s `arpg`). There
+//! is no selection in the ARPG view: swings and casts go to an ARPG server with an aim point, and
+//! the server picks who they hit. This publishes the live enemy under the cursor ([`ArpgEnemyHover`])
+//! for the swing input and the hover health bar, and snaps a cursor on open ground near an enemy
+//! to it (the magnet), so the highlight, the cursor and the bar find it without pixel aim.
+//! [`plugin`] is called only while the view is on, so stock benilla never runs it.
 //!
-//! `WOW_ARPG_MAGNET` (yards, default 3, 0 for none) sizes the snap; `WOW_ARPG_SOFT_TARGET=0` keeps
-//! the magnet and the hover but leaves the selection to clicks.
+//! `WOW_ARPG_MAGNET` (yards, default 3, 0 for none) sizes the snap.
 
 use bevy::prelude::*;
 
 use crate::net::{Guid, NetEntity, ObjectStore, SelfPlayer};
 
-use super::{Hovered, HoveredObject, PickOcclusion, ReactionInputs, SelectCommit, TargetUpdate};
+use super::{Hovered, HoveredObject, PickOcclusion, ReactionInputs, TargetUpdate};
 
-/// The magnet's reach and whether the hover selects, read once from the environment.
+/// The live enemy under the cursor this frame, snapped or not, and its guid; `None` over anything
+/// else.
+#[derive(Resource, Default, Clone, Copy)]
+pub(crate) struct ArpgEnemyHover(pub(crate) Option<(Entity, u64)>);
+
+/// The magnet's reach, read once from the environment.
 #[derive(Resource, Clone, Copy)]
 struct SoftTargetConfig {
     magnet: f32,
-    selects: bool,
 }
 
 impl SoftTargetConfig {
@@ -28,16 +32,15 @@ impl SoftTargetConfig {
             .filter(|v| v.is_finite())
             .unwrap_or(3.0)
             .clamp(0.0, 15.0);
-        let selects =
-            !std::env::var("WOW_ARPG_SOFT_TARGET").is_ok_and(|v| matches!(v.trim(), "0" | "off"));
-        Self { magnet, selects }
+        Self { magnet }
     }
 }
 
-/// Add the soft target between the pick and the cursor, so this frame's cursor, clicks and casts
-/// all read the snapped hover and the new selection.
+/// Add the hover between the pick and the cursor, so this frame's cursor and highlight read the
+/// snapped hover.
 pub(crate) fn plugin(app: &mut App) {
     app.insert_resource(SoftTargetConfig::from_env())
+        .init_resource::<ArpgEnemyHover>()
         .add_systems(
             Update,
             soft_target
@@ -71,10 +74,10 @@ fn magnet_pick<T: PartialEq>(
     nearest.map(|(item, _)| item)
 }
 
-/// Snap the hover to the enemy nearest the cursor when it lies on open ground, and select the
-/// hovered enemy. A cursor over a UI panel neither snaps nor selects, as the pick
-/// itself yields to the UI. While swinging, only an enemy truly under the cursor (not a snap)
-/// switches the target, since a switch stops and restarts the swing.
+/// Snap the hover to the enemy nearest the cursor when it lies on open ground, and publish the
+/// live enemy under the cursor. A cursor over a UI panel neither snaps nor hovers, as the pick
+/// itself yields to the UI. The last enemy hovered holds the snap while it stays in reach, so a
+/// cursor between two enemies does not flip between them.
 #[allow(clippy::type_complexity)]
 fn soft_target(
     config: Res<SoftTargetConfig>,
@@ -90,7 +93,9 @@ fn soft_target(
     >,
     me: Query<Option<&ObjectStore>, With<SelfPlayer>>,
     reaction: ReactionInputs,
-    mut select: SelectCommit,
+    mut enemy_hover: ResMut<ArpgEnemyHover>,
+    // The last enemy hovered, which holds the magnet.
+    mut last: Local<Option<(Entity, u64)>>,
 ) {
     let self_store = me.single().ok().flatten();
     let live_enemy = |store: Option<&ObjectStore>| {
@@ -106,34 +111,31 @@ fn soft_target(
     // a refused pick, and never while a spell is choosing its target, whose word filters the hover.
     let targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
     let open_ground = hovered.any().is_none() && !hovered.refused && object.target.is_none();
-    let mut snapped = false;
     if config.magnet > 0.0 && open_ground && !targeting && !over_panel.0 {
         if let Some(point) = occlusion.point {
             let candidates = units
                 .iter()
                 .filter(|(_, _, _, store)| live_enemy(*store))
                 .map(|(e, g, t, _)| ((e, g.0), t.translation));
-            let current = select.selection.target.zip(select.selection.guid);
-            if let Some((entity, guid)) = magnet_pick(point, config.magnet, current, candidates) {
+            if let Some((entity, guid)) = magnet_pick(point, config.magnet, *last, candidates) {
                 hovered.target = Some(entity);
                 hovered.guid = Some(guid);
                 hovered.distance = occlusion.distance;
-                snapped = true;
             }
         }
     }
-    // The soft select: a live enemy under the cursor becomes the target; anything else leaves it.
-    let may_switch = !snapped || !select.engaged();
-    if config.selects && !targeting && !over_panel.0 && may_switch {
-        if let Some((entity, guid)) = hovered.mouseover(&object) {
-            let enemy = units
-                .get(entity)
-                .is_ok_and(|(_, _, _, store)| live_enemy(store));
-            if enemy && select.selection.guid != Some(guid) {
-                select.commit(entity, guid);
-            }
-        }
+    let enemy = hovered
+        .mouseover(&object)
+        .filter(|_| !over_panel.0)
+        .filter(|(entity, _)| {
+            units
+                .get(*entity)
+                .is_ok_and(|(_, _, _, store)| live_enemy(store))
+        });
+    if enemy.is_some() {
+        *last = enemy;
     }
+    enemy_hover.0 = enemy;
 }
 
 #[cfg(test)]

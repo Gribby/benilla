@@ -184,6 +184,17 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
     if (wow_light.fog_params.w > 0.0 && eye_z > wow_light.fog_params.w) {
         discard;
     }
+    // Fork-only, not 1.12.1: the ARPG cutaway (`benilla_world::cutaway`). With a radius in
+    // `sh_c16.w`, static geometry above the plane in `wmo_fog_params.z` and within that radius of
+    // the centre (`wmo_fog_params.w`, `fog_params.z`) on the ground is not drawn, so the walls and
+    // the ceiling above the player's head do not hide it indoors. Stock leaves the radius 0.
+    let cut_r = wow_light.sh_c16.w;
+    if (cut_r > 0.0 && in.world_position.y > wow_light.wmo_fog_params.z) {
+        let cut_d = in.world_position.xz - vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z);
+        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+            discard;
+        }
+    }
     // The sampler follows the wrap flags; a mixed batch clamps its clamped axis a half texel in.
     // Every sample runs unconditionally: implicit derivatives need uniform control flow.
     var base = vec4<f32>(1.0);

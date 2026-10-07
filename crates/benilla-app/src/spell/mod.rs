@@ -29,6 +29,8 @@ pub(crate) mod validator;
 // `send_spell_cast` is private to `cast_send`, so no second send path can exist.
 pub(crate) use cast_send::{CastCommit, CastLadder, HeldCast, HeldForPick, TargetedBind};
 pub(crate) use cast_target::AutoSelfCast;
+// Fork-only, not 1.12.1: the ARPG view's aim point, which the player module writes.
+pub(crate) use cast_target::ArpgCastAim;
 pub(crate) use cooldowns::Cooldowns;
 pub(crate) use inflight::{
     inflight, ActiveChannel, AutoRepeatActive, LocalMoveStart, PendingCast, QueuedMeleeSpell,

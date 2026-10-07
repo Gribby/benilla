@@ -969,6 +969,19 @@ pub(crate) enum ClientCommand {
         target: benilla_protocol::messages::CorpseTarget,
         corpse_guid: u64,
     },
+    /// Fork-only, not 1.12.1: the ARPG client's hello (`CMSG_ARPG_ACTION`), sent once in world.
+    ArpgHello,
+    /// Fork-only: start the ARPG held swing at the unit under the cursor (`Some(guid)`, 0 for
+    /// none), or stop it (`None`).
+    ArpgSwing(Option<u64>),
+    /// Fork-only: cast `spell_id` aimed at `at` (WoW coordinates); the server resolves the unit,
+    /// letting `intended` (the unit under the cursor, 0 for none) catch it.
+    ArpgCast {
+        spell_id: u32,
+        aim: benilla_protocol::world::ArpgAim,
+        at: [f32; 3],
+        intended: u64,
+    },
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {
         spell_id: u32,

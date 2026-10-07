@@ -110,6 +110,8 @@ pub mod build_id;
 pub mod clouds;
 pub mod clutter;
 pub mod collision;
+// Fork-only, not 1.12.1: the ARPG view's cutaway.
+pub mod cutaway;
 pub mod decal;
 pub mod dev_state;
 pub mod doodad_anim;

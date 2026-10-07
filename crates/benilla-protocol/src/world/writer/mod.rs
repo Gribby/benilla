@@ -10,6 +10,8 @@ use super::send_packet;
 
 mod action_bar;
 mod area_trigger;
+// Fork-only, not 1.12.1: the ARPG client's packet.
+pub mod arpg;
 mod attack;
 mod auction;
 mod bank;

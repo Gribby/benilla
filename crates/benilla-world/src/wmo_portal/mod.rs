@@ -247,6 +247,7 @@ impl Plugin for WmoPortalPlugin {
         .init_resource::<CurrentAreaInterior>()
         .init_resource::<CameraWmoFog>()
         .init_resource::<CameraInteriorClaim>()
+        .init_resource::<crate::cutaway::Cutaway>()
         .init_resource::<ExteriorWindows>()
         .init_resource::<WmoCullProbe>()
         .add_systems(
@@ -271,6 +272,28 @@ const MAX_FLOOR_DROP: f32 = 1760.0;
 
 /// Recompute each resident WMO's per-group visible set from the camera; a portal-less prop stays
 /// all-visible.
+/// Fork-only, not 1.12.1: a WMO group's world bounds, from its model-space (WoW axes) box, for the
+/// ARPG cutaway's reveal.
+fn group_world_bounds(
+    nav: &benilla_assets::WmoGroupNav,
+    world_from_local: &Affine3A,
+) -> (Vec3, Vec3) {
+    let (lo, hi) = (nav.bbox_min, nav.bbox_max);
+    let mut min = Vec3::splat(f32::INFINITY);
+    let mut max = Vec3::splat(f32::NEG_INFINITY);
+    for i in 0..8 {
+        let corner = [
+            if i & 1 == 0 { lo[0] } else { hi[0] },
+            if i & 2 == 0 { lo[1] } else { hi[1] },
+            if i & 4 == 0 { lo[2] } else { hi[2] },
+        ];
+        let p = world_from_local.transform_point3(benilla_assets::coords::wow_to_bevy(corner));
+        min = min.min(p);
+        max = max.max(p);
+    }
+    (min, max)
+}
+
 fn compute_wmo_pvs(
     wmos: Res<Assets<WmoModel>>,
     cam: Query<(&GlobalTransform, &Projection), With<WorldCamera>>,
@@ -281,6 +304,8 @@ fn compute_wmo_pvs(
     mut camera_fog: ResMut<CameraWmoFog>,
     mut camera_claim: ResMut<CameraInteriorClaim>,
     mut camera_windows: ResMut<ExteriorWindows>,
+    // Fork-only, not 1.12.1: the ARPG cutaway, which draws the buildings it opens whole.
+    cutaway: Option<Res<crate::cutaway::Cutaway>>,
 ) {
     // No world camera yet: keep last frame's sets, all visible.
     let Some((cam_t, proj)) = cam.iter().next() else {
@@ -359,6 +384,18 @@ fn compute_wmo_pvs(
             &world_from_local,
             &mut (&mut tap, &mut log),
         );
+        // Fork-only, not 1.12.1: the rooms the cutaway opens show through the cut roof, which no
+        // portal of the camera's flood reaches, so each group inside its cylinder is drawn.
+        if let Some(cut) = cutaway.as_deref().filter(|c| c.plane.is_some()) {
+            for (g, nav) in model.group_nav.iter().enumerate() {
+                if fresh.visible.get(g) == Some(&false) {
+                    let (min, max) = group_world_bounds(nav, &world_from_local);
+                    if cut.reveals(min, max) {
+                        fresh.visible[g] = true;
+                    }
+                }
+            }
+        }
         if inst.bypass_change_detection().visible != fresh.visible {
             inst.bypass_change_detection().visible = fresh.visible;
             inst.set_changed();
