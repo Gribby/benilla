@@ -81,6 +81,12 @@ fn env_f32(name: &str, default: f32) -> f32 {
         .unwrap_or(default)
 }
 
+/// A press of the Attack key (the action bar's Attack, the ATTACKTARGET binding) for the ARPG view
+/// to apply: it toggles a swing at the enemy under the cursor in place of the stock auto attack,
+/// which would select a target. Present only while the view is on.
+#[derive(Resource, Default)]
+pub(crate) struct ArpgAttackKey(pub(crate) bool);
+
 /// The pose to hold while the view is on, the cutaway's height above the feet and radius, and
 /// whether outdoor occluders dither (`WOW_ARPG_XRAY`).
 #[derive(Resource)]
@@ -104,6 +110,7 @@ pub(super) fn plugin(app: &mut App) {
     let xray = std::env::var("WOW_ARPG_XRAY").map_or(true, |v| v.trim() != "0");
     app.insert_resource(ArpgView(pin, cut, cut_radius, xray))
         .init_resource::<crate::spell::ArpgCastAim>()
+        .init_resource::<ArpgAttackKey>()
         .add_systems(
             Update,
             pin_view
@@ -260,6 +267,8 @@ pub(super) struct ArpgMouse {
     /// A swing is held on the left and the right button.
     pub(super) swing_left: bool,
     pub(super) swing_right: bool,
+    /// The Attack key's swing: on until pressed again, the enemy dies, or a walk is clicked.
+    pub(super) swing_key: bool,
     /// The enemy the swing was pressed on and its guid, which the character walks to until in
     /// reach; dropped once it dies or streams out, and the swing goes on in place.
     pub(super) swing_target: Option<(Entity, u64)>,
@@ -292,6 +301,7 @@ impl Default for ArpgMouse {
             force_attack: false,
             swing_left: false,
             swing_right: false,
+            swing_key: false,
             swing_target: None,
             swing_target_at: None,
             swing_reach: 5.0 - SWING_MARGIN,
@@ -306,6 +316,8 @@ impl Default for ArpgMouse {
 impl ArpgMouse {
     /// A left press on the ground: walk to the cursor, a fresh walk.
     pub(super) fn press_ground(&mut self) {
+        // A walk clicked on the ground ends the Attack key's swing.
+        self.swing_key = false;
         self.holding = true;
         self.goal = self.ground;
         self.reset_stall();
@@ -322,15 +334,29 @@ impl ArpgMouse {
     /// A swing press, on `enemy` (walked to) or in place: the swing owns the body, so any walk
     /// ends.
     pub(super) fn press_swing(&mut self, enemy: Option<(Entity, u64)>) {
+        // A button's swing takes over from the Attack key's.
+        self.swing_key = false;
         self.holding = false;
         self.goal = None;
         self.swing_target = enemy;
         self.reset_stall();
     }
 
-    /// A swing is held on either button.
+    /// A swing is held on either button, or the Attack key's swing is on.
     pub(super) fn swing_held(&self) -> bool {
-        self.swing_left || self.swing_right
+        self.swing_left || self.swing_right || self.swing_key
+    }
+
+    /// The Attack key (the action bar's Attack, the ATTACKTARGET binding): a swing at the enemy
+    /// under the cursor that stays on without a button held, as the stock auto attack does, or
+    /// off again if it was on. With no enemy under the cursor it only turns off.
+    pub(super) fn toggle_swing_key(&mut self) {
+        if self.swing_key {
+            self.swing_key = false;
+        } else if let Some(enemy) = self.over_enemy {
+            self.press_swing(Some(enemy));
+            self.swing_key = true;
+        }
     }
 
     fn reset_stall(&mut self) {
@@ -406,6 +432,7 @@ fn pin_view(
     mut approach: ResMut<approach::Approach>,
     mut follow: ResMut<FollowState>,
     mut rig: ResMut<CameraControl>,
+    mut attack_key: ResMut<ArpgAttackKey>,
 ) {
     let (hovered, object, occlusion, enemy_hover, spell_targeting, over_panel, stores, me) = picks;
     let (room, instances, wmos) = rooms;
@@ -453,11 +480,16 @@ fn pin_view(
     mouse.spell_targeting = spell_targeting.as_ref().is_some_and(|t| t.active());
     mouse.aim = aim;
     mouse.over_enemy = enemy_hover.and_then(|h| h.0);
+    if std::mem::take(&mut attack_key.0) {
+        mouse.toggle_swing_key();
+    }
     mouse.force_attack = keys.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]);
     // The clicked enemy, while it lives: once it dies or streams out the swing goes on in place.
     let target_store = mouse.swing_target.and_then(|(e, _)| stores.get(e).ok());
     if mouse.swing_target.is_some() && target_store.is_none_or(|s| s.0.unit_reads_dead()) {
         mouse.swing_target = None;
+        // The Attack key's swing ends with its enemy, as the stock auto attack does.
+        mouse.swing_key = false;
     }
     mouse.swing_target_at = mouse
         .swing_target
@@ -919,6 +951,25 @@ mod tests {
         assert!(!aim_moved((at, 0), (at + Vec3::X * 0.1, 0)));
         assert!(aim_moved((at, 0), (at + Vec3::X * 0.5, 0)));
         assert!(aim_moved((at, 0), (at, 7)));
+    }
+
+    #[test]
+    fn the_attack_key_toggles_a_swing_at_the_enemy_under_the_cursor() {
+        let enemy = (Entity::from_raw_u32(7).unwrap(), 0x2a);
+        let mut mouse = ArpgMouse::default();
+        // Nothing under the cursor: nothing to start.
+        mouse.toggle_swing_key();
+        assert!(!mouse.swing_held());
+        mouse.over_enemy = Some(enemy);
+        mouse.toggle_swing_key();
+        assert!(mouse.swing_held());
+        assert_eq!(mouse.swing_target, Some(enemy));
+        // Pressed again, it stops; a walk click stops it too.
+        mouse.toggle_swing_key();
+        assert!(!mouse.swing_held());
+        mouse.toggle_swing_key();
+        mouse.press_ground();
+        assert!(!mouse.swing_held());
     }
 
     #[test]

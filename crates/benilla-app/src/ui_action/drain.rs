@@ -74,6 +74,8 @@ pub(crate) struct AttackPress<'w, 's> {
     selection: ResMut<'w, crate::target::Selection>,
     seam: crate::creature_anim::AttackSeam<'w, 's>,
     ui_errors: ResMut<'w, UiErrorKeys>,
+    /// Fork-only, not 1.12.1: present in the ARPG view, which takes the press instead.
+    arpg_key: Option<ResMut<'w, crate::player::ArpgAttackKey>>,
 }
 
 impl AttackPress<'_, '_> {
@@ -83,6 +85,12 @@ impl AttackPress<'_, '_> {
     /// (`0x5ecb70`). Only the start cancels auto-repeat (`0x5ecd8c`), so stopping melee leaves
     /// Auto Shot running.
     pub(crate) fn attack_target(&mut self) {
+        // Fork-only, not 1.12.1: in the ARPG view there is no selection to attack; the press
+        // toggles a swing at the enemy under the cursor (`crate::player::ArpgAttackKey`).
+        if let Some(key) = self.arpg_key.as_mut() {
+            key.0 = true;
+            return;
+        }
         let Some(guid) = self.validate(None) else {
             return;
         };
@@ -122,6 +130,7 @@ impl AttackPress<'_, '_> {
             selection,
             seam,
             ui_errors,
+            ..
         } = self;
         let (me, my_guid) = pick.player();
         if attack_actor_refusal(me, my_guid, ui_errors) {
