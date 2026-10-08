@@ -982,6 +982,12 @@ pub(crate) enum ClientCommand {
         at: [f32; 3],
         intended: u64,
     },
+    /// Fork-only: re-aim the running ARPG cast at `at` (WoW coordinates), with the unit under the
+    /// cursor (`intended`, 0 for none).
+    ArpgAim {
+        at: [f32; 3],
+        intended: u64,
+    },
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {
         spell_id: u32,

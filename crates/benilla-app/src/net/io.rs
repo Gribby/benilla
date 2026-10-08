@@ -1028,6 +1028,7 @@ fn writer_loop(
                         at,
                         intended,
                     } => w.arpg_cast(spell_id, aim, at, intended),
+                    ClientCommand::ArpgAim { at, intended } => w.arpg_aim(at, intended),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {
                         w.cast_spell_at_source(spell_id, src)
                     }

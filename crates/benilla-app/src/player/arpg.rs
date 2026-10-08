@@ -113,6 +113,13 @@ pub(super) fn plugin(app: &mut App) {
         )
         // Ungated: the world entry's message must be read the frame it is written.
         .add_systems(Update, greet_server.before(pin_view))
+        // The cursor follows a running cast to the server, after this frame's aim.
+        .add_systems(
+            Update,
+            stream_aim
+                .after(pin_view)
+                .in_set(crate::char_select::InWorldGated),
+        )
         // The quick ground cast after the script calls, whose casts enter the targeting mode.
         .add_systems(
             Update,
@@ -499,6 +506,47 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
+/// While a cast runs, the cursor goes to the server at most this often, in seconds, and only once
+/// it has moved this far, in yards, or onto another unit.
+const AIM_STREAM_SECS: f64 = 0.1;
+const AIM_STREAM_MOVE: f32 = 0.25;
+
+/// Whether the cursor has moved enough since the last aim sent to send another.
+fn aim_moved(last: (Vec3, u64), now: (Vec3, u64)) -> bool {
+    last.0.distance(now.0) >= AIM_STREAM_MOVE || last.1 != now.1
+}
+
+/// While one of the player's casts runs, send the cursor to the server, which re-aims the cast with
+/// it (`ClientCommand::ArpgAim`): a skillshot goes where the player points when it is released, not
+/// where it pointed at the press. The cast itself carries the first aim.
+fn stream_aim(
+    cast_aim: Res<crate::spell::ArpgCastAim>,
+    pending: Res<crate::spell::PendingCast>,
+    net: Res<NetCommands>,
+    time: Res<Time>,
+    // The aim last sent (or carried by the cast) and when.
+    mut last: Local<Option<(Vec3, u64, f64)>>,
+) {
+    if !pending.in_flight(std::time::Instant::now()) {
+        *last = None;
+        return;
+    }
+    let now = time.elapsed_secs_f64();
+    let aim = (cast_aim.at, cast_aim.intended);
+    match *last {
+        None => *last = Some((aim.0, aim.1, now)),
+        Some((at, intended, sent)) => {
+            if now - sent >= AIM_STREAM_SECS && aim_moved((at, intended), aim) {
+                let _ = net.0.send(ClientCommand::ArpgAim {
+                    at: benilla_assets::coords::bevy_to_wow(aim.0),
+                    intended: aim.1,
+                });
+                *last = Some((aim.0, aim.1, now));
+            }
+        }
+    }
+}
+
 /// How long after the world entry the hello goes out a second time, in seconds.
 const REGREET_SECS: f64 = 3.0;
 
@@ -863,6 +911,14 @@ mod tests {
         assert_eq!(walk_axes(PI, PI / 2.0), (0, -1));
         // Turned, forward.
         assert_eq!(walk_axes(PI, PI - 0.1), (1, 0));
+    }
+
+    #[test]
+    fn the_aim_streams_on_a_real_move_or_a_new_unit() {
+        let at = Vec3::new(1.0, 0.0, 1.0);
+        assert!(!aim_moved((at, 0), (at + Vec3::X * 0.1, 0)));
+        assert!(aim_moved((at, 0), (at + Vec3::X * 0.5, 0)));
+        assert!(aim_moved((at, 0), (at, 7)));
     }
 
     #[test]

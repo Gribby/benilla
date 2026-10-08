@@ -4,7 +4,8 @@
 //!
 //! Body: `u8` kind, then by kind: hello `u8` version; swing start `u64` intended; swing stop
 //! nothing; cast `u32` spell id, `u8` aim (0 an enemy, 1 an ally), three `f32` WoW world coords and
-//! `u64` intended. `intended` is the unit under the cursor (0 for none): the server lets it catch
+//! `u64` intended; aim three `f32` WoW world coords and `u64` intended, the cursor while a cast runs,
+//! which re-aims it. `intended` is the unit under the cursor (0 for none): the server lets it catch
 //! the swing or the spell even when it would not pick it itself (a neutral, a sheep).
 
 use anyhow::Result;
@@ -20,6 +21,7 @@ const KIND_HELLO: u8 = 0;
 const KIND_SWING_START: u8 = 1;
 const KIND_SWING_STOP: u8 = 2;
 const KIND_CAST: u8 = 3;
+const KIND_AIM: u8 = 4;
 
 /// What an ARPG cast aims at, by the spell's own target word: the server resolves the unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,6 +67,19 @@ pub fn arpg_cast_body(spell_id: u32, aim: ArpgAim, at: [f32; 3], intended: u64) 
     body
 }
 
+/// An aim body: where the cursor is now, in WoW coordinates, and the unit under it (`intended`, 0
+/// for none). The server re-aims the running cast with it, so the shot goes where the player points
+/// when it is released.
+pub fn arpg_aim_body(at: [f32; 3], intended: u64) -> Vec<u8> {
+    let mut body = Vec::with_capacity(21);
+    body.push(KIND_AIM);
+    for c in at {
+        body.extend_from_slice(&c.to_le_bytes());
+    }
+    body.extend_from_slice(&intended.to_le_bytes());
+    body
+}
+
 impl WorldWriter {
     /// The hello: this player is on the ARPG client.
     pub fn arpg_hello(&mut self) -> Result<()> {
@@ -93,6 +108,11 @@ impl WorldWriter {
             &arpg_cast_body(spell_id, aim, at, intended),
         )
     }
+
+    /// Re-aim the running cast at a world point; unanswered.
+    pub fn arpg_aim(&mut self, at: [f32; 3], intended: u64) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_aim_body(at, intended))
+    }
 }
 
 #[cfg(test)]
@@ -111,6 +131,15 @@ mod tests {
             u64::from_le_bytes(body[18..26].try_into().unwrap()),
             0xF130_0000_0000_002A
         );
+    }
+
+    #[test]
+    fn the_aim_body_is_kind_the_point_and_the_intended_unit() {
+        let body = arpg_aim_body([1.0, -2.0, 3.5], 9);
+        assert_eq!(body.len(), 21);
+        assert_eq!(body[0], KIND_AIM);
+        assert_eq!(f32::from_le_bytes(body[5..9].try_into().unwrap()), -2.0);
+        assert_eq!(u64::from_le_bytes(body[13..21].try_into().unwrap()), 9);
     }
 
     #[test]
