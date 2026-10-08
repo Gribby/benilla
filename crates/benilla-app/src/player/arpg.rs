@@ -499,6 +499,9 @@ fn screen_facing(cam_yaw: f32, up: i32, right: i32) -> Option<f32> {
     (x != 0.0 || z != 0.0).then(|| f32::atan2(-x, -z))
 }
 
+/// How long after the world entry the hello goes out a second time, in seconds.
+const REGREET_SECS: f64 = 3.0;
+
 /// Greet the ARPG server at every world entry, a reconnect and a relog of the same character
 /// included, as the server's player is a new one each time; and after any map transfer re-send the
 /// held swing, as a release sent during the loading screen never arrives and the server ends the
@@ -508,12 +511,22 @@ fn greet_server(
     mut transfers: MessageReader<WorldportMessage>,
     net: Res<NetCommands>,
     rig: Option<ResMut<CameraControl>>,
+    time: Res<Time>,
+    // When to say hello again: the first can reach the server while it is still loading the
+    // character, and the session drops it.
+    mut regreet_at: Local<Option<f64>>,
 ) {
     let greet = entered.read().count() > 0;
     let transferred = transfers.read().count() > 0;
+    let now = time.elapsed_secs_f64();
     if greet {
         info!("arpg: greeting the server as an ARPG client");
         let _ = net.0.send(ClientCommand::ArpgHello);
+        *regreet_at = Some(now + REGREET_SECS);
+    } else if regreet_at.is_some_and(|at| now >= at) {
+        info!("arpg: greeting the server again");
+        let _ = net.0.send(ClientCommand::ArpgHello);
+        *regreet_at = None;
     }
     if greet || transferred {
         if let Some(mut rig) = rig {
