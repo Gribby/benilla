@@ -48,6 +48,28 @@ pub fn pack(rgb: [u8; 3]) -> u32 {
     0xff00_0000 | (u32::from(rgb[0]) << 16) | (u32::from(rgb[1]) << 8) | u32::from(rgb[2])
 }
 
+/// Fork-only, not 1.12.1: `word` with the ARPG hit flash folded in. The flash rides the alpha
+/// byte, which [`pack`] pins to `0xff`: `wow_model.wgsl` washes the unit toward white by
+/// `1 − alpha/255`, so stock words flash nothing. The modulate colour is kept (white for
+/// [`IDENTITY`]); a flash at or below 0 returns `word` unchanged.
+pub fn with_flash(word: u32, flash: f32) -> u32 {
+    if flash.is_nan() || flash <= 0.0 {
+        return word;
+    }
+    let rgb = if word == IDENTITY {
+        0x00ff_ffff
+    } else {
+        word & 0x00ff_ffff
+    };
+    // At least 1: a full flash on a black tint must not pack to `0`, the identity.
+    let alpha = (255 - (flash.min(1.0) * 255.0).round() as u32).max(1);
+    // A flash too faint for a byte step keeps the word as it was.
+    if alpha == 255 {
+        return word;
+    }
+    (alpha << 24) | rgb
+}
+
 /// Off-world `wow_light`-layout buffers that also carry the tint region, by key; deliberately not
 /// [`crate::rig_palette::RigPaletteMirrors`]' list. Portraits stay off it: the reference bakes one
 /// from a fresh CM2 with colour (1,1,1) and alpha 1 (`0x524f60`, ctor `0x70ea60`, set again at
@@ -149,6 +171,20 @@ mod tests {
         // Spell 27200 (Defile) authors param0 = 0: a real black tint.
         assert_eq!(pack([0, 0, 0]), 0xff00_0000);
         assert_ne!(pack([0, 0, 0]), IDENTITY);
+    }
+
+    #[test]
+    fn a_flash_rides_the_alpha_byte_and_keeps_the_colour() {
+        assert_eq!(with_flash(IDENTITY, 0.0), IDENTITY);
+        assert_eq!(with_flash(IDENTITY, 1.0), 0x01ff_ffff);
+        assert_ne!(with_flash(pack([0, 0, 0]), 1.0), IDENTITY);
+        assert_eq!(
+            with_flash(pack([10, 20, 30]), 0.5) & 0x00ff_ffff,
+            0x000a_141e
+        );
+        assert_eq!(with_flash(pack([10, 20, 30]), 0.5) >> 24, 127);
+        // A packed tint itself never flashes: its alpha byte is 0xff.
+        assert_eq!(pack([0, 0, 0]) >> 24, 0xff);
     }
 
     #[test]

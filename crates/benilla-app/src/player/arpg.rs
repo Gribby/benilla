@@ -5,7 +5,11 @@
 //! `WOW_ARPG_PITCH` (degrees looking down, default 55), `WOW_ARPG_YAW` (degrees, default 45) and
 //! `WOW_ARPG_DIST` (yards, default 28) shape the pose. Indoors and in caves the camera does not
 //! collide; walls and ceilings above `WOW_ARPG_CUT` yards over the feet (default 2.8) are cut away
-//! instead (`benilla_world::cutaway`).
+//! instead (`benilla_world::cutaway`). Outdoors, roofs, awnings and tree crowns between the player
+//! and the camera draw see-through instead (a dither; `WOW_ARPG_XRAY=0` turns it off).
+//!
+//! A unit the player hits flashes white (`fx`), and the character turns to a new facing quickly
+//! rather than snapping ([`TURN_RATE`]).
 //!
 //! WASD then walk relative to that camera, not the character ([`steer`]): W is up the screen, S
 //! down, A left, D right, and the character turns to face the way it walks.
@@ -26,6 +30,8 @@
 //!
 //! The character always faces the cursor: standing, it turns to the aim; walking, it faces within
 //! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
+
+mod fx;
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -75,9 +81,10 @@ fn env_f32(name: &str, default: f32) -> f32 {
         .unwrap_or(default)
 }
 
-/// The pose to hold while the view is on, and the cutaway's height above the feet and radius.
+/// The pose to hold while the view is on, the cutaway's height above the feet and radius, and
+/// whether outdoor occluders dither (`WOW_ARPG_XRAY`).
 #[derive(Resource)]
-struct ArpgView(ArpgPin, f32, f32);
+struct ArpgView(ArpgPin, f32, f32, bool);
 
 /// Hand the rig its pose; a no-op unless `WOW_ARPG` is on.
 pub(super) fn plugin(app: &mut App) {
@@ -88,10 +95,14 @@ pub(super) fn plugin(app: &mut App) {
     };
     // The enemy under the cursor, for the swing and the hover bar; no selection.
     crate::target::arpg_soft::plugin(app);
+    // The struck unit's white flash.
+    fx::plugin(app);
     let cut = env_f32("WOW_ARPG_CUT", CUT_HEIGHT).clamp(1.5, 10.0);
     let cut_radius = env_f32("WOW_ARPG_CUT_RADIUS", CUT_RADIUS).clamp(5.0, 120.0);
     app.add_systems(Startup, install_hud);
-    app.insert_resource(ArpgView(pin, cut, cut_radius))
+    // `WOW_ARPG_XRAY=0` turns the outdoor see-through off.
+    let xray = std::env::var("WOW_ARPG_XRAY").map_or(true, |v| v.trim() != "0");
+    app.insert_resource(ArpgView(pin, cut, cut_radius, xray))
         .init_resource::<crate::spell::ArpgCastAim>()
         .add_systems(
             Update,
@@ -191,6 +202,13 @@ const CUT_HEIGHT: f32 = 2.8;
 /// overrides): past the camera's own footprint (28 yd out at 55° is 16 yd across), so nothing
 /// between it and the player stands, while distant hills, trees and roofs keep their tops.
 const CUT_RADIUS: f32 = 30.0;
+/// Outdoors, the see-through dither ([`benilla_world::cutaway::Cutaway::dither`]): a disc this far
+/// toward the camera from the feet, this wide, over this height above them, in yards. It covers
+/// the slope between the player and the camera, where a roof, an awning or a tree crown hides the
+/// player, and stops short of the player's own ground.
+const XRAY_AHEAD: f32 = 4.0;
+const XRAY_RADIUS: f32 = 6.5;
+const XRAY_HEIGHT: f32 = 1.8;
 /// The WMO group flags (`MOGP`) that make a room outdoors, as `wmo_portal::indoors_at` reads them:
 /// `EXTERIOR` and `EXTERIOR_LIT`, a city's open streets and valleys (Stormwind, Orgrimmar).
 const GROUP_OUTDOOR: u32 = 0x8 | 0x40;
@@ -390,10 +408,16 @@ fn pin_view(
     // Indoors (a WMO room or a cave), the walls, ceiling and any hill above the head are cut away
     // around the player.
     let indoor = room.0.filter(|r| room_is_indoor(*r, &instances, &wmos));
-    let fresh = benilla_world::cutaway::Cutaway {
-        plane: indoor.map(|_| player.pos.y + view.1),
-        center: player.pos,
-        radius: view.2,
+    let fresh = match indoor {
+        Some(_) => benilla_world::cutaway::Cutaway {
+            plane: Some(player.pos.y + view.1),
+            center: player.pos,
+            radius: view.2,
+            dither: false,
+        },
+        // Outdoors, whatever stands between the player and the camera goes see-through.
+        None if view.3 => xray_cut(player.pos, view.0.yaw),
+        None => benilla_world::cutaway::Cutaway::default(),
     };
     if *cutaway != fresh {
         *cutaway = fresh;
@@ -504,6 +528,33 @@ const AIM_MIN: f32 = 0.5;
 /// A standing character re-faces the aim only past this, in radians (about 1°): each facing change
 /// is a packet, and float noise in the pick must not send one a frame.
 const AIM_DEADZONE: f32 = 0.02;
+/// How fast the character turns to a new facing, in radians a second (about 860°/s): a half turn
+/// takes a fifth of a second, quick enough to feel instant at the mouse and slow enough that the
+/// body visibly swings round rather than snapping.
+const TURN_RATE: f32 = 15.0;
+
+/// `from` turned toward `to` by at most `TURN_RATE × dt`, the short way round. A zero or
+/// negative `dt` snaps, so a first frame never leaves the facing stale.
+fn turn_toward(from: f32, to: f32, dt: f32) -> f32 {
+    let delta = wrap_pi(to - from);
+    let step = TURN_RATE * dt;
+    if dt <= 0.0 || delta.abs() <= step {
+        return wrap_pi(to);
+    }
+    wrap_pi(from + step.copysign(delta))
+}
+
+/// The outdoor see-through for a player at `feet` under a camera turned `cam_yaw`: the camera
+/// looks along `(−sin, 0, −cos)` of its yaw ([`screen_facing`]), so it stands the other way.
+fn xray_cut(feet: Vec3, cam_yaw: f32) -> benilla_world::cutaway::Cutaway {
+    let toward_camera = Vec3::new(cam_yaw.sin(), 0.0, cam_yaw.cos());
+    benilla_world::cutaway::Cutaway {
+        plane: Some(feet.y + XRAY_HEIGHT),
+        center: feet + toward_camera * XRAY_AHEAD,
+        radius: XRAY_RADIUS,
+        dither: true,
+    }
+}
 
 /// The distance from `pos` to `at` on the ground, in yards.
 fn flat_distance(pos: Vec3, at: Vec3) -> f32 {
@@ -525,7 +576,20 @@ fn aim_and_walk(move_yaw: f32, aim_yaw: f32) -> (f32, i32, i32) {
     use std::f32::consts::FRAC_PI_4;
     let octant = (wrap_pi(move_yaw - aim_yaw) / FRAC_PI_4).round() as i32;
     let facing = wrap_pi(move_yaw - octant as f32 * FRAC_PI_4);
-    let (fwd, side) = match octant {
+    let (fwd, side) = octant_axes(octant);
+    (facing, fwd, side)
+}
+
+/// The stock axes nearest a walk along `move_yaw` from the body's actual `facing`: while the body
+/// turns toward [`aim_and_walk`]'s facing, the walk keeps to the pressed way within 22.5°.
+fn walk_axes(move_yaw: f32, facing: f32) -> (i32, i32) {
+    use std::f32::consts::FRAC_PI_4;
+    octant_axes((wrap_pi(move_yaw - facing) / FRAC_PI_4).round() as i32)
+}
+
+/// `(fwd, side)` for a walk `octant` eighths of a turn left of the facing, side positive right.
+fn octant_axes(octant: i32) -> (i32, i32) {
+    match octant {
         0 => (1, 0),
         1 => (1, -1),
         -1 => (1, 1),
@@ -534,8 +598,7 @@ fn aim_and_walk(move_yaw: f32, aim_yaw: f32) -> (f32, i32, i32) {
         3 => (-1, -1),
         -3 => (-1, 1),
         _ => (-1, 0),
-    };
-    (facing, fwd, side)
+    }
 }
 
 /// Turn the frame's movement keys and the mouse walk into a walk relative to the camera, with the
@@ -602,16 +665,18 @@ pub(super) fn steer(
     match (move_yaw, aim_yaw) {
         // Walking and aiming: face the aim, walk the way the player asked.
         (Some(walk), Some(aim)) if may_turn => {
-            let (facing, f, s) = aim_and_walk(walk, aim);
-            *face_yaw = facing;
-            (fwd, side) = (f, s);
+            let (facing, _, _) = aim_and_walk(walk, aim);
+            *face_yaw = turn_toward(*face_yaw, facing, dt);
+            (fwd, side) = walk_axes(walk, *face_yaw);
         }
         // Walking with no aim (the cursor on a panel or the sky): face the walk.
         (Some(walk), _) => {
             if may_turn {
-                *face_yaw = walk;
+                *face_yaw = turn_toward(*face_yaw, walk, dt);
+                (fwd, side) = walk_axes(walk, *face_yaw);
+            } else {
+                fwd = 1;
             }
-            fwd = 1;
         }
         // Standing with nothing else steering: face the aim.
         (None, Some(aim))
@@ -620,7 +685,7 @@ pub(super) fn steer(
                 && standing
                 && wrap_pi(aim - *face_yaw).abs() > AIM_DEADZONE =>
         {
-            *face_yaw = aim;
+            *face_yaw = turn_toward(*face_yaw, aim, dt);
         }
         _ => {}
     }
@@ -735,6 +800,70 @@ mod tests {
         mouse.press_ground();
         assert_eq!(mouse.walk_toward_goal(Vec3::ZERO, 0.1), None);
         assert!(mouse.goal.is_some());
+    }
+
+    #[test]
+    fn the_outdoor_dither_sits_between_the_player_and_the_camera() {
+        let feet = Vec3::new(10.0, 5.0, -3.0);
+        for cam in [0.0, 0.785, -2.0] {
+            let cut = xray_cut(feet, cam);
+            assert!(cut.dither);
+            // Up the screen is away from the camera, so the disc lies the other way.
+            let up = screen_facing(cam, 1, 0).unwrap();
+            let away = Vec3::new(-up.sin(), 0.0, -up.cos());
+            assert!(
+                (cut.center - feet).dot(away) < -XRAY_AHEAD + 1e-4,
+                "cam {cam}"
+            );
+            // A roof edge toward the camera is inside it, a wall beyond the player and the
+            // player's own ground are not.
+            assert!(!cut.cuts(feet + away * 3.0 + Vec3::Y * 4.0));
+            assert!(!cut.cuts(feet + Vec3::Y));
+            assert!(cut.cuts(feet - away * XRAY_AHEAD + Vec3::Y * 4.0));
+        }
+    }
+
+    #[test]
+    fn the_hud_addon_loads_and_paints() {
+        let script = benilla_ui::script::UiScript::new().expect("VM");
+        // The addon's own code, then a paint of each part in the same chunk, where its locals are
+        // in scope; the bare VM has no player, so the orbs read empty.
+        let chunk = format!(
+            "if not UIParent then CreateFrame(\"Frame\", \"UIParent\") end\n\
+             for _, f in ipairs({{\"GameFontHighlight\", \"GameFontNormalSmall\"}}) do\n\
+             if not _G[f] then CreateFont(f) end end\n{HUD_LUA}\n\
+             refresh()\nrefreshOrbs()\n\
+             paintOrb(healthOrb, 0.5, HEALTH_COLOR, 50)\n\
+             assert(healthOrb.filled == ORB_SLICES / 2, healthOrb.filled)\n\
+             paintOrb(powerOrb, 2, POWER_COLORS[1], 9)\n\
+             assert(powerOrb.filled == ORB_SLICES)\n"
+        );
+        script.run(&chunk).expect("the HUD addon runs");
+    }
+
+    #[test]
+    fn a_walk_mid_turn_keeps_to_the_pressed_way() {
+        use std::f32::consts::PI;
+        // Facing ahead and asked to walk back: backpedal until the body has turned.
+        assert_eq!(walk_axes(PI, 0.0), (-1, 0));
+        // Half way round, a strafe.
+        assert_eq!(walk_axes(PI, PI / 2.0), (0, -1));
+        // Turned, forward.
+        assert_eq!(walk_axes(PI, PI - 0.1), (1, 0));
+    }
+
+    #[test]
+    fn a_turn_is_rate_limited_and_takes_the_short_way() {
+        use std::f32::consts::PI;
+        // A small turn lands at once; a half turn takes several frames.
+        assert!(gap(turn_toward(0.0, 0.1, 1.0 / 60.0), 0.1) < 1e-6);
+        let one = turn_toward(0.0, PI - 0.01, 1.0 / 60.0);
+        assert!((one - TURN_RATE / 60.0).abs() < 1e-5);
+        // Across the ±π seam, the turn goes the short way, not the long way round.
+        let seam = turn_toward(PI - 0.1, -PI + 0.1, 1.0 / 60.0);
+        assert!(gap(seam, PI) < 0.11, "{seam}");
+        // A zero step snaps.
+        assert_eq!(turn_toward(0.0, 2.0, 0.0), 2.0);
     }
 
     #[test]

@@ -1,0 +1,79 @@
+# benilla ARPG fork
+
+This fork (Gribby/benilla, branch `arpg`) turns benilla into a Diablo-style ARPG client for a
+self-hosted cmangos Classic + playerbots server. It pairs with the server fork Gribby/mangos-classic
+(branch `arpg`), which owns hit resolution. **Read this before `AGENTS.md`'s rules:** upstream
+benilla is a faithful 1.12.1 client; this fork deliberately is not, but only behind a switch.
+
+## Ground rules
+
+- Everything ARPG is gated. Client: `WOW_ARPG=1`. Server: `Arpg.Enable = 1` in `mangosd.conf`, and
+  a player becomes ARPG only after the client's hello. With either off, stock behaviour is untouched
+  (bots, stock clients, the stock benilla build).
+- Mark fork code with `Fork-only, not 1.12.1:` in its doc comment, as the existing ARPG code does.
+- Keep upstream's quality bar: `cargo clippy --all-targets -- -D warnings`, `cargo fmt`, tests for
+  new logic, doc comments in the house style.
+
+## What exists
+
+Client (`crates/`):
+
+| Area | Where |
+|---|---|
+| Top-down pinned camera, camera-relative WASD, 8-way walk facing the cursor, smooth turning | `benilla-app/src/player/arpg.rs` (`steer`, `aim_and_walk`, `turn_toward`) |
+| Free cursor, hold-to-move, click to swing/interact | `benilla-app/src/player/camera.rs` (`run_arpg_clicks`) |
+| No selection; magnet hover on enemies | `benilla-app/src/target/arpg_soft.rs` |
+| Casts at the cursor (`CMSG_ARPG_ACTION` kind 3) | `benilla-app/src/spell/cast_send.rs`, `cast_target.rs`, `targeting/world.rs` |
+| Wire format | `benilla-protocol/src/world/writer/arpg.rs` |
+| Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
+| Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
+| Hover health bar + health/power orbs (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
+
+Floating damage numbers are stock benilla (`combat_text`).
+
+Env knobs: `WOW_ARPG_PITCH`, `WOW_ARPG_YAW`, `WOW_ARPG_DIST`, `WOW_ARPG_CUT` (2.8),
+`WOW_ARPG_CUT_RADIUS` (30), `WOW_ARPG_MAGNET` (3), `WOW_ARPG_XRAY` (`0` turns the dither off).
+
+Server (`src/game/Arpg/`, plus hooks in `Player`, `Unit`, `Spell`, `SpellEffects`,
+`UnitAuraProcHandler`, `Opcodes`, `World`): `CMSG_ARPG_ACTION` = 0x33C, protocol version 2.
+Kinds: 0 hello (`u8` version), 1 swing start (`u64` intended), 2 swing stop, 3 cast (`u32` spell,
+`u8` aim 0 enemy/1 ally, `f32` x y z WoW coords, `u64` intended). Swings strike whoever is in the
+frontal arc or whiff; line skillshots pick the first enemy along the aim and, with none (or a target
+that dies mid-flight), fly on to max range and are spent.
+
+## Roadmap
+
+Done: phase 1 (targetless combat, whiffs, cutaway, hover bar) and phase 2 (empty-air skillshots,
+hit flash, smooth turning, outdoor dither, orbs).
+
+Next:
+- Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
+  animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
+- Phase 3: loot on the ground (labels, click to pick up), more and denser mobs (server spawn
+  scaling), mob packs, dodge/evade movement skill, potions on hotkeys.
+- Phase 4: vanilla raids as weekly-lockout solo ARPG dungeons (scaled bosses, trash density,
+  pacing like vanilla's raid week).
+
+## Building and verifying
+
+Windows (the user's machine): `cargo build --release -p benilla-app`, then run the binary with
+`WOW_ARPG=1` and `WOW_DATA` pointing at a 1.12.1 `Data` folder. Use `cargo build`, not
+`cargo test`, on Windows (some upstream tests use `std::os::unix`).
+
+Linux sandbox (cloud sessions, ~7 GB RAM):
+
+```sh
+apt-get install -y libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+export RUSTUP_TOOLCHAIN=stable CARGO_PROFILE_DEV_DEBUG=0   # pinned 1.98.1 may be missing
+cargo clippy -j2 -p benilla-app -p benilla-world -p benilla-assets --all-targets -- -D warnings
+cargo test -j2 -p benilla-app player::arpg
+cargo test -j2 -p benilla-world cutaway instance_tint
+cargo test -j2 -p benilla-protocol arpg
+```
+
+Run clippy, tests and the server build one at a time, or the linker gets OOM-killed. Shader
+changes cannot be exercised without a GPU: validate them with naga + naga_oil (compose with the
+bevy_pbr/render/shader/core_pipeline/mesh 0.18.1 sources as import roots and `crates/`).
+
+Server: cmangos builds with CMake (`-DPCH=1` recommended; re-run cmake after adding files, sources
+are globbed). `make -j2 mangosd` in the build directory.

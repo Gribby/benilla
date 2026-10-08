@@ -440,10 +440,12 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
     // interior props this path draws (`model_flags.x`, `.z`), as `static_gx.wgsl` cuts the rest of
     // the static world; units and players are never cut. Stock leaves the radius 0.
     let cut_r = wow_light.sh_c16.w;
-    if (cut_r > 0.0 && (m.model_flags.x > 0.5 || m.model_flags.z > 0.5)
+    if (cut_r != 0.0 && (m.model_flags.x > 0.5 || m.model_flags.z > 0.5)
         && in.world_position.y > wow_light.wmo_fog_params.z) {
         let cut_d = in.world_position.xz - vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z);
-        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+        // A negative radius is the outdoor dither: every other pixel, so the player shows through.
+        let dither_keep = ((u32(in.position.x) + u32(in.position.y)) & 1u) != 0u;
+        if (dot(cut_d, cut_d) < cut_r * cut_r && (cut_r > 0.0 || !dither_keep)) {
             discard;
         }
     }
@@ -567,6 +569,9 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
         vec3<f32>(1.0),
         tint_word == 0u,
     );
+    // Fork-only, not 1.12.1: the ARPG hit flash rides the tint word's alpha byte, which the
+    // reference's packing pins to 0xff (`instance_tint::pack`), so stock words flash 0.
+    let hit_flash = select(1.0 - f32(tint_word >> 24u) / 255.0, 0.0, tint_word == 0u);
     // The blend twin re-applies its source's cutout: the reference scales ALPHAREF with the fade,
     // so the cutoff stays tex.a < 224/255 on the unfaded alpha. Only for a source batch that
     // alpha-tests (bit 10): ALPHAREF keys on the stored blend mode.
@@ -776,6 +781,11 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
     let is_mod2x = (u32(m.clutter_fade.z) & 256u) != 0u;
     if ((is_mod || is_mod2x) && !is_wmo) {
         rgb = base.rgb;
+    }
+    // The ARPG hit flash: the struck unit washes toward white for a moment, opaque and
+    // alpha-blended batches only (an additive or Mod batch would glow or grey out instead).
+    if (hit_flash > 0.0 && !is_mod && !is_mod2x && (u32(m.clutter_fade.z) & 4u) == 0u) {
+        rgb = mix(rgb, vec3<f32>(1.0), hit_flash);
     }
 
     // Linear fog by planar eye depth, as in terrain.wgsl. Per-batch colour policy (`clutter_fade.z`

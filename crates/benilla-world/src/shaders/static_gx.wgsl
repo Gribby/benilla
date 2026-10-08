@@ -189,9 +189,11 @@ fn fragment(in: GxVsOut) -> @location(0) vec4<f32> {
     // the centre (`wmo_fog_params.w`, `fog_params.z`) on the ground is not drawn, so the walls and
     // the ceiling above the player's head do not hide it indoors. Stock leaves the radius 0.
     let cut_r = wow_light.sh_c16.w;
-    if (cut_r > 0.0 && in.world_position.y > wow_light.wmo_fog_params.z) {
+    if (cut_r != 0.0 && in.world_position.y > wow_light.wmo_fog_params.z) {
         let cut_d = in.world_position.xz - vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z);
-        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+        // A negative radius is the outdoor dither: every other pixel, so the player shows through.
+        let dither_keep = ((u32(in.position.x) + u32(in.position.y)) & 1u) != 0u;
+        if (dot(cut_d, cut_d) < cut_r * cut_r && (cut_r > 0.0 || !dither_keep)) {
             discard;
         }
     }

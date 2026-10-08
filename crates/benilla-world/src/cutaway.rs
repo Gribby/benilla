@@ -5,9 +5,14 @@
 //! and the WMO groups inside that cylinder skip portal culling, since the camera now sees rooms
 //! through the cut roof that its portals would hide. Units and players are never cut.
 //!
+//! Outdoors the ARPG client sets a smaller [`Cutaway::dither`] cut instead, between the player and
+//! the camera: the WMO walls, roofs and static doodads (a tree crown, an awning) there draw every
+//! other pixel, so the player shows through them and they still read as there. A dither reveals
+//! no rooms and leaves terrain whole.
+//!
 //! The ARPG client writes this each frame; it stays at its default (off) in stock benilla. The
 //! cut reaches the shaders through the shared light buffer's free lanes (`global_light`): row 12
-//! `.w` the radius (0 off), row 19 `.z` the plane, row 19 `.w` and row 5 `.z` the centre's X and
+//! `.w` the radius (0 off, negative for a dither), row 19 `.z` the plane, row 19 `.w` and row 5 `.z` the centre's X and
 //! Z, so no binding changes.
 
 use bevy::prelude::*;
@@ -22,6 +27,8 @@ pub struct Cutaway {
     pub center: Vec3,
     /// The cut cylinder's radius, in yards.
     pub radius: f32,
+    /// A see-through dither in place of the cut: the outdoor occluder fade.
+    pub dither: bool,
 }
 
 impl Cutaway {
@@ -29,7 +36,7 @@ impl Cutaway {
     /// cut cylinder on the ground and reaches up past the player's feet, so the camera sees into it
     /// through the cut. A room below the floor stays culled, as the floor still hides it.
     pub fn reveals(&self, min: Vec3, max: Vec3) -> bool {
-        if self.plane.is_none() || max.y < self.center.y - 1.0 {
+        if self.plane.is_none() || self.dither || max.y < self.center.y - 1.0 {
             return false;
         }
         let nearest = Vec2::new(
@@ -51,10 +58,17 @@ impl Cutaway {
     }
 
     /// The four light-buffer lanes the shaders read: `[radius, plane, centre x, centre z]`, all
-    /// zero (radius 0, off) without a plane.
+    /// zero (radius 0, off) without a plane. A dither sends the radius negated.
     pub fn lanes(&self) -> [f32; 4] {
         match self.plane {
-            Some(plane) if self.radius > 0.0 => [self.radius, plane, self.center.x, self.center.z],
+            Some(plane) if self.radius > 0.0 => {
+                let radius = if self.dither {
+                    -self.radius
+                } else {
+                    self.radius
+                };
+                [radius, plane, self.center.x, self.center.z]
+            }
             _ => [0.0; 4],
         }
     }
@@ -69,7 +83,20 @@ mod tests {
             plane: Some(10.0),
             center: Vec3::ZERO,
             radius: 20.0,
+            dither: false,
         }
+    }
+
+    #[test]
+    fn a_dither_sends_its_radius_negated_and_reveals_no_room() {
+        let dither = Cutaway {
+            dither: true,
+            ..on()
+        };
+        assert_eq!(dither.lanes(), [-20.0, 10.0, 0.0, 0.0]);
+        assert!(!dither.reveals(Vec3::new(-5.0, -1.0, -5.0), Vec3::new(5.0, 6.0, 5.0)));
+        // The cylinder is the shaders' as for a cut (the pick stops at a dither regardless).
+        assert!(dither.cuts(Vec3::new(5.0, 10.5, -5.0)));
     }
 
     #[test]

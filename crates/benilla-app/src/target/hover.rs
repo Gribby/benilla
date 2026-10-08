@@ -68,7 +68,9 @@ pub(super) fn update_pick_occlusion(
         };
         let distance = travelled + hit.distance;
         let point = ray.origin + *ray.direction * distance;
-        if cut.cuts(point) {
+        // An outdoor dither still draws half its pixels, and terrain under it draws whole, so the
+        // ray stops at it as at anything drawn.
+        if !cut.dither && cut.cuts(point) {
             travelled = distance + CUT_STEP;
             continue;
         }

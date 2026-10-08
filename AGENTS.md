@@ -1,5 +1,8 @@
 # benilla
 
+**This is the ARPG fork: read `ARPG.md` first.** It says what the fork changes and how its
+rules differ from the faithful-client rules below.
+
 A from-scratch World of Warcraft 1.12.1 client in Rust and Bevy. The reference client is the
 spec: benilla is a faithful, modern implementation of it, not a place to get creative.
 
