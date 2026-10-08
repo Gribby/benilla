@@ -988,6 +988,15 @@ pub(crate) enum ClientCommand {
         at: [f32; 3],
         intended: u64,
     },
+    /// Fork-only: pick up the item in loot `slot` (0xFF the gold) off `corpse`'s ground loot.
+    ArpgLoot {
+        corpse: u64,
+        slot: u8,
+    },
+    /// Fork-only: ask for `corpse`'s ground loot list.
+    ArpgLootQuery {
+        corpse: u64,
+    },
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {
         spell_id: u32,

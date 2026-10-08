@@ -5,7 +5,9 @@
 //! Body: `u8` kind, then by kind: hello `u8` version; swing start `u64` intended; swing stop
 //! nothing; cast `u32` spell id, `u8` aim (0 an enemy, 1 an ally), three `f32` WoW world coords and
 //! `u64` intended; aim three `f32` WoW world coords and `u64` intended, the cursor while a cast runs,
-//! which re-aims it. `intended` is the unit under the cursor (0 for none): the server lets it catch
+//! which re-aims it; loot `u64` corpse and `u8` loot slot (0xFF the gold), a ground pick-up; loot
+//! query `u64` corpse, which asks for that corpse's ground loot list.
+//! `intended` is the unit under the cursor (0 for none): the server lets it catch
 //! the swing or the spell even when it would not pick it itself (a neutral, a sheep).
 
 use anyhow::Result;
@@ -22,6 +24,8 @@ const KIND_SWING_START: u8 = 1;
 const KIND_SWING_STOP: u8 = 2;
 const KIND_CAST: u8 = 3;
 const KIND_AIM: u8 = 4;
+const KIND_LOOT: u8 = 5;
+const KIND_LOOT_QUERY: u8 = 6;
 
 /// What an ARPG cast aims at, by the spell's own target word: the server resolves the unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +84,24 @@ pub fn arpg_aim_body(at: [f32; 3], intended: u64) -> Vec<u8> {
     body
 }
 
+/// A pick-up body: the item in loot `slot` off `corpse`'s ground loot, or its gold
+/// ([`crate::messages::arpg::LOOT_SLOT_GOLD`]).
+pub fn arpg_loot_body(corpse: u64, slot: u8) -> Vec<u8> {
+    let mut body = Vec::with_capacity(10);
+    body.push(KIND_LOOT);
+    body.extend_from_slice(&corpse.to_le_bytes());
+    body.push(slot);
+    body
+}
+
+/// A loot query body: send `corpse`'s ground loot list.
+pub fn arpg_loot_query_body(corpse: u64) -> Vec<u8> {
+    let mut body = Vec::with_capacity(9);
+    body.push(KIND_LOOT_QUERY);
+    body.extend_from_slice(&corpse.to_le_bytes());
+    body
+}
+
 impl WorldWriter {
     /// The hello: this player is on the ARPG client.
     pub fn arpg_hello(&mut self) -> Result<()> {
@@ -107,6 +129,17 @@ impl WorldWriter {
             CMSG_ARPG_ACTION,
             &arpg_cast_body(spell_id, aim, at, intended),
         )
+    }
+
+    /// Pick up the item in loot `slot` (or the gold) off `corpse`'s ground loot; answered with
+    /// that corpse's list.
+    pub fn arpg_loot(&mut self, corpse: u64, slot: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_loot_body(corpse, slot))
+    }
+
+    /// Ask for `corpse`'s ground loot list; answered with it, if it is a corpse near us.
+    pub fn arpg_loot_query(&mut self, corpse: u64) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_loot_query_body(corpse))
     }
 
     /// Re-aim the running cast at a world point; unanswered.
@@ -140,6 +173,19 @@ mod tests {
         assert_eq!(body[0], KIND_AIM);
         assert_eq!(f32::from_le_bytes(body[5..9].try_into().unwrap()), -2.0);
         assert_eq!(u64::from_le_bytes(body[13..21].try_into().unwrap()), 9);
+    }
+
+    #[test]
+    fn the_loot_body_is_kind_the_corpse_and_the_slot() {
+        let body = arpg_loot_body(0x0102_0304_0506_0708, 0xFF);
+        assert_eq!(body.len(), 10);
+        assert_eq!(body[0], KIND_LOOT);
+        assert_eq!(body[1], 0x08);
+        assert_eq!(body[9], 0xFF);
+        assert_eq!(
+            arpg_loot_query_body(7),
+            vec![KIND_LOOT_QUERY, 7, 0, 0, 0, 0, 0, 0, 0]
+        );
     }
 
     #[test]

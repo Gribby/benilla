@@ -417,6 +417,13 @@ pub enum SessionEvent {
     PlayMusic { music_id: u32 },
     /// A server-pushed 3D sound kit at object `guid` (`SMSG_PLAY_OBJECT_SOUND`).
     PlayObjectSound { sound_id: u32, guid: u64 },
+    /// Fork-only, not 1.12.1: what a corpse holds for us on the ARPG server's ground loot
+    /// (`SMSG_ARPG_LOOT`); empty when nothing is left there for us.
+    ArpgLoot {
+        corpse: u64,
+        gold: u32,
+        items: Vec<crate::messages::ArpgLootItem>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

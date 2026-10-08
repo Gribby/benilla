@@ -32,6 +32,7 @@
 //! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
 
 mod fx;
+mod loot;
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -94,6 +95,8 @@ struct ArpgView(ArpgPin, f32, f32, bool);
 
 /// Hand the rig its pose; a no-op unless `WOW_ARPG` is on.
 pub(super) fn plugin(app: &mut App) {
+    // The ground loot's wire half, whatever the view: every session event kind needs an owner.
+    loot::register_net(app);
     let Some(pin) = ArpgPin::from_env() else {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -103,6 +106,8 @@ pub(super) fn plugin(app: &mut App) {
     crate::target::arpg_soft::plugin(app);
     // The struck unit's white flash.
     fx::plugin(app);
+    // The corpse loot lying on the ground.
+    loot::plugin(app);
     let cut = env_f32("WOW_ARPG_CUT", CUT_HEIGHT).clamp(1.5, 10.0);
     let cut_radius = env_f32("WOW_ARPG_CUT_RADIUS", CUT_RADIUS).clamp(5.0, 120.0);
     app.add_systems(Startup, install_hud);
@@ -269,6 +274,15 @@ pub(super) struct ArpgMouse {
     pub(super) swing_right: bool,
     /// The Attack key's swing: on until pressed again, the enemy dies, or a walk is clicked.
     pub(super) swing_key: bool,
+    /// The ground loot drop under the cursor (`loot`), which a left press picks up.
+    pub(super) over_loot: Option<loot::LootKey>,
+    /// The cursor is on that drop's label, not just near its glow: a label is over everything, a
+    /// glow yields to an enemy standing on it.
+    pub(super) over_loot_label: bool,
+    /// The drop a left press was on, which the character walks to and picks up.
+    pub(super) loot_goal: Option<loot::LootKey>,
+    /// That walk has started: the goal it set going away means it ended.
+    pub(super) loot_walking: bool,
     /// The enemy the swing was pressed on and its guid, which the character walks to until in
     /// reach; dropped once it dies or streams out, and the swing goes on in place.
     pub(super) swing_target: Option<(Entity, u64)>,
@@ -302,6 +316,10 @@ impl Default for ArpgMouse {
             swing_left: false,
             swing_right: false,
             swing_key: false,
+            over_loot: None,
+            over_loot_label: false,
+            loot_goal: None,
+            loot_walking: false,
             swing_target: None,
             swing_target_at: None,
             swing_reach: 5.0 - SWING_MARGIN,
@@ -318,6 +336,7 @@ impl ArpgMouse {
     pub(super) fn press_ground(&mut self) {
         // A walk clicked on the ground ends the Attack key's swing.
         self.swing_key = false;
+        self.end_loot_walk();
         self.holding = true;
         self.goal = self.ground;
         self.reset_stall();
@@ -326,6 +345,7 @@ impl ArpgMouse {
     /// A left press on a unit or object, a spell-targeting click, or a right press: the click owns
     /// any walk from here (an interact's Click-to-Move approach).
     pub(super) fn press_target(&mut self) {
+        self.end_loot_walk();
         self.holding = false;
         self.goal = None;
         self.reset_stall();
@@ -336,10 +356,29 @@ impl ArpgMouse {
     pub(super) fn press_swing(&mut self, enemy: Option<(Entity, u64)>) {
         // A button's swing takes over from the Attack key's.
         self.swing_key = false;
+        self.end_loot_walk();
         self.holding = false;
         self.goal = None;
         self.swing_target = enemy;
         self.reset_stall();
+    }
+
+    /// A left press on a drop on the ground: walk to it and pick it up (`loot`). It ends any
+    /// walk, swing or Attack-key swing.
+    pub(super) fn press_loot(&mut self, key: loot::LootKey) {
+        self.swing_key = false;
+        self.holding = false;
+        self.goal = None;
+        self.swing_target = None;
+        self.reset_stall();
+        self.loot_goal = Some(key);
+        self.loot_walking = false;
+    }
+
+    /// The walk to a drop is over: picked up, gone, or cut short.
+    pub(super) fn end_loot_walk(&mut self) {
+        self.loot_goal = None;
+        self.loot_walking = false;
     }
 
     /// A swing is held on either button, or the Attack key's swing is on.

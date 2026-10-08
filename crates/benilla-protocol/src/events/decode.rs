@@ -45,6 +45,15 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::PlayObjectSound { sound_id, guid } => {
             vec![SessionEvent::PlayObjectSound { sound_id, guid }]
         }
+        ServerPacket::ArpgLoot {
+            corpse,
+            gold,
+            items,
+        } => vec![SessionEvent::ArpgLoot {
+            corpse,
+            gold,
+            items,
+        }],
         ServerPacket::Weather {
             weather_type,
             grade,

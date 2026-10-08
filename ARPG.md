@@ -28,6 +28,8 @@ Client (`crates/`):
 | Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
 | Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
 | Hover health bar + health/power orbs (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
+| The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
+| Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |
 
 Floating damage numbers are stock benilla (`combat_text`).
 
@@ -37,20 +39,34 @@ Env knobs: `WOW_ARPG_PITCH`, `WOW_ARPG_YAW`, `WOW_ARPG_DIST`, `WOW_ARPG_CUT` (2.
 Server (`src/game/Arpg/`, plus hooks in `Player`, `Unit`, `Spell`, `SpellEffects`,
 `UnitAuraProcHandler`, `Opcodes`, `World`): `CMSG_ARPG_ACTION` = 0x33C, protocol version 2.
 Kinds: 0 hello (`u8` version), 1 swing start (`u64` intended), 2 swing stop, 3 cast (`u32` spell,
-`u8` aim 0 enemy/1 ally, `f32` x y z WoW coords, `u64` intended). Swings strike whoever is in the
+`u8` aim 0 enemy/1 ally, `f32` x y z WoW coords, `u64` intended), 4 aim (`f32` x y z, `u64`
+intended: re-aims the running cast), 5 loot (`u64` corpse, `u8` loot slot, 0xFF the gold), 6 loot
+query (`u64` corpse). A swing, cast, aim or loot action also counts as the hello (the first hello
+can arrive while the character still loads). Server to client: `SMSG_ARPG_LOOT` = 0x33D (`u64`
+corpse, `u32` gold, `u8` n, then n × `u8` slot, `u32` item, `u32` display, `u8` quality, `u8`
+count), sent at the kill, after any change, and on a query (`src/game/Arpg/ArpgLoot.{h,cpp}`). Swings strike whoever is in the
 frontal arc or whiff; line skillshots pick the first enemy along the aim and, with none (or a target
 that dies mid-flight), fly on to max range and are spent.
 
 ## Roadmap
 
-Done: phase 1 (targetless combat, whiffs, cutaway, hover bar) and phase 2 (empty-air skillshots,
-hit flash, smooth turning, outdoor dither, orbs).
+Done: phase 1 (targetless combat, whiffs, cutaway, hover bar), phase 2 (empty-air skillshots,
+hit flash, smooth turning, outdoor dither, orbs), skillshots that re-aim at the cursor while the
+cast runs and hit neutral wild creatures, and ground loot (phase 3's first item).
+
+Ground loot today: grey and white drops glow faintly with no beam; green, blue, purple and orange
+glow brighter with a beam that grows with the quality (`look()` in `loot.rs`). Labels show within
+30 yd, all of them with Alt. Known gaps: under group, need-before-greed or master loot an item at
+or over the loot threshold is held for a roll only the loot window starts, so it is not on the
+ground (open the corpse as in stock); drops vanish with the corpse (no persistent ground items);
+no item models yet (weapons and shields could lie as their real M2s, everything else a sack).
 
 Next:
 - Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
-- Phase 3: loot on the ground (labels, click to pick up), more and denser mobs (server spawn
-  scaling), mob packs, dodge/evade movement skill, potions on hotkeys.
+- Phase 3: more and denser mobs (server spawn scaling), mob packs, dodge/evade movement skill,
+  potions on hotkeys, real item models on the ground.
+- Itemisation: see `docs/ARPG-ITEMISATION.md`.
 - Phase 4: vanilla raids as weekly-lockout solo ARPG dungeons (scaled bosses, trash density,
   pacing like vanilla's raid week).
 

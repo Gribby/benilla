@@ -2,8 +2,10 @@
 //! [`parse_server`], client bodies are built here; the header framing lives in [`crate::world`].
 
 mod action_bar;
+// Fork-only, not 1.12.1: the ARPG server's messages.
 pub mod addons;
 mod area_trigger;
+pub mod arpg;
 mod attack;
 mod auction;
 mod bank;
@@ -62,6 +64,7 @@ pub use action_bar::{
 };
 pub use addons::{hidden_from_reply, SecureAddon, STANDARD_MODULUS_CRC, STOCK_SECURE_ADDONS};
 pub use area_trigger::area_trigger;
+pub use arpg::ArpgLootItem;
 pub use attack::{attack_swing, AttackSwingError, AttackerState};
 pub use auction::{
     auction_action, auction_duration, auction_error, auction_filter, auction_hello,

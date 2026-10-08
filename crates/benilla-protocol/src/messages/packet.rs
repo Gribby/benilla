@@ -374,6 +374,13 @@ pub enum ServerPacket {
         sound_id: u32,
         guid: u64,
     },
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_LOOT`, what a corpse holds for this player on the ARPG
+    /// server's ground loot ([`crate::messages::arpg`]).
+    ArpgLoot {
+        corpse: u64,
+        gold: u32,
+        items: Vec<crate::messages::ArpgLootItem>,
+    },
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1344,6 +1351,7 @@ impl ServerPacket {
             ServerPacket::PlayMusic { .. } => "SMSG_PLAY_MUSIC".into(),
             ServerPacket::PlayObjectSound { .. } => "SMSG_PLAY_OBJECT_SOUND".into(),
             ServerPacket::Weather { .. } => "SMSG_WEATHER".into(),
+            ServerPacket::ArpgLoot { .. } => "SMSG_ARPG_LOOT".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

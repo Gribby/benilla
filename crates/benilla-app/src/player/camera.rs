@@ -987,14 +987,23 @@ fn run_arpg_clicks(
     }
     // Which click a left press settles as, latched at the press: the targeting mode can end
     // before the release, and the release must still place what the press aimed. A spell's
-    // targeting click comes first, then a swing (on an enemy, or anywhere with Shift), then the
-    // interact on anything else under the cursor, else a walk.
+    // targeting click comes first, then a drop of ground loot (picked up), then a swing (on an
+    // enemy, or anywhere with Shift), then the interact on anything else under the cursor, else a
+    // walk.
     let enemy = rig.arpg.over_enemy;
     if left_down && !left_taken && !chord {
         if rig.arpg.spell_targeting {
             rig.arpg.press_target();
             rig.arpg.left_selects = true;
             *left_click = Some(PressGesture::new(now));
+        } else if let Some(drop) = rig
+            .arpg
+            .over_loot
+            .filter(|_| !rig.arpg.force_attack && (rig.arpg.over_loot_label || enemy.is_none()))
+        {
+            // A drop's label sits over everything; its glow yields to an enemy standing on it.
+            rig.arpg.press_loot(drop);
+            *left_click = None;
         } else if enemy.is_some() || rig.arpg.force_attack {
             rig.arpg.press_swing(enemy);
             rig.arpg.swing_left = true;

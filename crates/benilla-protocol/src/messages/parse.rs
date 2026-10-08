@@ -512,6 +512,14 @@ fn parse_server_body(
             sound_id: read_u32_le(&mut r)?,
             guid: read_u64_le(&mut r)?,
         },
+        super::arpg::SMSG_ARPG_LOOT => {
+            let (corpse, gold, items) = super::arpg::read_arpg_loot(&mut r)?;
+            ServerPacket::ArpgLoot {
+                corpse,
+                gold,
+                items,
+            }
+        }
         opcode::SMSG_WEATHER => ServerPacket::Weather {
             weather_type: read_u32_le(&mut r)?,
             grade: read_f32_le(&mut r)?,

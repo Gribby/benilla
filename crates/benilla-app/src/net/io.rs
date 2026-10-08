@@ -1029,6 +1029,8 @@ fn writer_loop(
                         intended,
                     } => w.arpg_cast(spell_id, aim, at, intended),
                     ClientCommand::ArpgAim { at, intended } => w.arpg_aim(at, intended),
+                    ClientCommand::ArpgLoot { corpse, slot } => w.arpg_loot(corpse, slot),
+                    ClientCommand::ArpgLootQuery { corpse } => w.arpg_loot_query(corpse),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {
                         w.cast_spell_at_source(spell_id, src)
                     }
