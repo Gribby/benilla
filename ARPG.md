@@ -56,7 +56,7 @@ Next:
 
 ## Building and verifying
 
-Windows (the user's machine): `cargo build --release -p benilla-app`, then run the binary with
+Windows (the user's machine): `cargo build --release -p benilla`, then run `target\release\benilla.exe` with
 `WOW_ARPG=1` and `WOW_DATA` pointing at a 1.12.1 `Data` folder. Use `cargo build`, not
 `cargo test`, on Windows (some upstream tests use `std::os::unix`).
 
