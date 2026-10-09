@@ -82,6 +82,11 @@ fn env_f32(name: &str, default: f32) -> f32 {
         .unwrap_or(default)
 }
 
+/// Present only while the ARPG view is on: for the systems outside the view's own module that
+/// change behaviour in it (a corpse is never opened: its loot lies on the ground, `loot`).
+#[derive(Resource)]
+pub(crate) struct ArpgMode;
+
 /// A press of the Attack key (the action bar's Attack, the ATTACKTARGET binding) for the ARPG view
 /// to apply: it toggles a swing at the enemy under the cursor in place of the stock auto attack,
 /// which would select a target. Present only while the view is on.
@@ -116,6 +121,7 @@ pub(super) fn plugin(app: &mut App) {
     app.insert_resource(ArpgView(pin, cut, cut_radius, xray))
         .init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
+        .insert_resource(ArpgMode)
         .add_systems(
             Update,
             pin_view

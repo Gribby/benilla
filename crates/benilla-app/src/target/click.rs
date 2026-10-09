@@ -225,6 +225,9 @@ pub(crate) struct Dispatch<'w, 's> {
     feedback: Feedback<'w>,
     auto: crate::player::AutoMove<'w, 's>,
     player: Res<'w, crate::player::Player>,
+    /// Fork-only, not 1.12.1: present in the ARPG view, where a corpse's loot lies on the ground
+    /// and the corpse itself is never opened.
+    arpg: Option<Res<'w, crate::player::ArpgMode>>,
 }
 
 /// The Loot walk's stop radius: the arm (`0x611130`) takes the square root (`0x6111ab`) of what
@@ -822,10 +825,12 @@ fn interact(dispatch: &mut Dispatch, press: &PressPick, mut select: Select) {
     // Pickup(8) a live vendor shares. A rider skips the loot leg for the skin leg (`0x60bf98`),
     // silently. Step 0 of [`DeadUnitLeg`] is hoisted for the trace.
     let dead_fork = target.is_some_and(|s| s.0.unit_is_dead() && !s.0.unit_dynflag_dead());
+    // Fork-only, not 1.12.1: in the ARPG view a lootable corpse is not opened (its loot is picked
+    // up off the ground), so the click falls to the skin leg or to nothing.
     let leg = dead_unit_leg(
         self_mounted,
         dead_fork,
-        target.is_some_and(|s| s.0.unit_lootable()),
+        target.is_some_and(|s| s.0.unit_lootable()) && dispatch.arpg.is_none(),
         target.is_some_and(|s| s.0.unit_flags() & cursor_mode::UNIT_FLAG_SKINNABLE != 0),
         dispatch.learned.skinning.is_some(),
     );
