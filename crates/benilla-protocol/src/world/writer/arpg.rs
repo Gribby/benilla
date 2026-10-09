@@ -6,7 +6,9 @@
 //! nothing; cast `u32` spell id, `u8` aim (0 an enemy, 1 an ally), three `f32` WoW world coords and
 //! `u64` intended; aim three `f32` WoW world coords and `u64` intended, the cursor while a cast runs,
 //! which re-aims it; loot `u64` corpse and `u8` loot slot (0xFF the gold), a ground pick-up; loot
-//! query `u64` corpse, which asks for that corpse's ground loot list.
+//! query `u64` corpse, which asks for that corpse's ground loot list; dev loot `u8` quality
+//! (0xFF a random mix), `u8` count, `u8` item level (0 the player's), which a server with
+//! `Arpg.DevTools` on answers by dropping that loot at the player's feet, for testing.
 //! `intended` is the unit under the cursor (0 for none): the server lets it catch
 //! the swing or the spell even when it would not pick it itself (a neutral, a sheep).
 
@@ -26,6 +28,10 @@ const KIND_CAST: u8 = 3;
 const KIND_AIM: u8 = 4;
 const KIND_LOOT: u8 = 5;
 const KIND_LOOT_QUERY: u8 = 6;
+const KIND_DEV_LOOT: u8 = 7;
+
+/// Dev loot's quality byte for a random mix of qualities.
+pub const DEV_LOOT_MIXED: u8 = 0xFF;
 
 /// What an ARPG cast aims at, by the spell's own target word: the server resolves the unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,6 +108,11 @@ pub fn arpg_loot_query_body(corpse: u64) -> Vec<u8> {
     body
 }
 
+/// The dev loot body: `count` items of `quality` (or [`DEV_LOOT_MIXED`]) around item `level`.
+pub fn arpg_dev_loot_body(quality: u8, count: u8, level: u8) -> Vec<u8> {
+    vec![KIND_DEV_LOOT, quality, count, level]
+}
+
 impl WorldWriter {
     /// The hello: this player is on the ARPG client.
     pub fn arpg_hello(&mut self) -> Result<()> {
@@ -142,6 +153,11 @@ impl WorldWriter {
         self.send(CMSG_ARPG_ACTION, &arpg_loot_query_body(corpse))
     }
 
+    /// Ask a dev-tools server to drop test loot at the player's feet.
+    pub fn arpg_dev_loot(&mut self, quality: u8, count: u8, level: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_dev_loot_body(quality, count, level))
+    }
+
     /// Re-aim the running cast at a world point; unanswered.
     pub fn arpg_aim(&mut self, at: [f32; 3], intended: u64) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_aim_body(at, intended))
@@ -163,6 +179,14 @@ mod tests {
         assert_eq!(
             u64::from_le_bytes(body[18..26].try_into().unwrap()),
             0xF130_0000_0000_002A
+        );
+    }
+
+    #[test]
+    fn the_dev_loot_body_is_kind_quality_count_and_level() {
+        assert_eq!(
+            arpg_dev_loot_body(DEV_LOOT_MIXED, 6, 0),
+            vec![7, 0xFF, 6, 0]
         );
     }
 

@@ -594,6 +594,8 @@ fn session_values(world: &World) -> Vec<(&'static str, Option<String>)> {
         let v = world.get_resource::<crate::world_backdrop::RenderScale>();
         out.push(("renderScale", v.map(|r| r.0.to_string())));
     }
+    // Fork-only: the ARPG test-loot button's counter is a trigger, never a setting to keep.
+    out.push((crate::player::CVAR_DEV_LOOT_DROP, None));
     // Fork-only: a `WOW_ARPG_*` variable pins its view setting for the session, unsaved.
     for knob in crate::player::ARPG_KNOBS {
         if let Some(v) = std::env::var(knob.env)

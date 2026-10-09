@@ -997,6 +997,13 @@ pub(crate) enum ClientCommand {
     ArpgLootQuery {
         corpse: u64,
     },
+    /// Fork-only: ask a dev-tools server for test loot at the player's feet: `count` items of
+    /// `quality` (0xFF a mix) around item `level` (0 the player's).
+    ArpgDevLoot {
+        quality: u8,
+        count: u8,
+        level: u8,
+    },
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {
         spell_id: u32,

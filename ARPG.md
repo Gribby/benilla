@@ -47,7 +47,8 @@ Server (`src/game/Arpg/`, plus hooks in `Player`, `Unit`, `Spell`, `SpellEffects
 Kinds: 0 hello (`u8` version), 1 swing start (`u64` intended), 2 swing stop, 3 cast (`u32` spell,
 `u8` aim 0 enemy/1 ally, `f32` x y z WoW coords, `u64` intended), 4 aim (`f32` x y z, `u64`
 intended: re-aims the running cast), 5 loot (`u64` corpse, `u8` loot slot, 0xFF the gold), 6 loot
-query (`u64` corpse). A swing, cast, aim or loot action also counts as the hello (the first hello
+query (`u64` corpse), 7 dev loot (`u8` quality, 0xFF mixed, `u8` count, `u8` item level, 0 the
+player's; only with `Arpg.DevTools = 1`). A swing, cast, aim or loot action also counts as the hello (the first hello
 can arrive while the character still loads). Server to client: `SMSG_ARPG_LOOT` = 0x33D (`u64`
 corpse, `u32` gold, `u8` n, then n × `u8` slot, `u32` item, `u32` display, `u8` quality, `u8`
 count), sent at the kill, after any change, and on a query (`src/game/Arpg/ArpgLoot.{h,cpp}`). Swings strike whoever is in the
@@ -68,6 +69,12 @@ filter (`arpgLootFilter`, the ARPG View page's Loot Labels: All, No Grey (defaul
 Better, Blue and Better) hides lower labels; their glows stay and Alt shows them. Known
 gaps: drops vanish with the corpse (no persistent ground items); no item models yet (weapons and
 shields could lie as their real M2s, everything else a sack).
+
+Test loot: with `Arpg.DevTools = 1` in the server's `mangosd.conf`, the ARPG View page's
+Developer rows (Test Loot Quality, Count, Level) and its **Drop Test Loot** button drop a killed
+creature (`Arpg.DevTools.Creature`, default 721, a rabbit) two yards ahead holding that loot and
+some gold (`Arpg::DropDevLoot`). The button bumps `arpgDevLootDrop`, a session-only CVar the
+client observes (`drop_dev_loot` in `player/arpg.rs`). Off by default: any ARPG player could use it.
 
 Drop rates are the ARPG world's `mangosd.conf` (it hosts no stock players). Grouped loot entries
 ignore the quality rates, and most world greens and blues sit in grouped reference tables, so

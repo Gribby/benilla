@@ -151,6 +151,55 @@ pub(crate) const ARPG_KNOBS: [ArpgKnob; 6] = [
     KNOB_SEE_THROUGH,
 ];
 
+/// Fork-only: the options page's Drop Test Loot button bumps this setting (never saved), and each
+/// bump asks the server for test loot as the dev settings below say.
+pub(crate) const CVAR_DEV_LOOT_DROP: &str = "arpgDevLootDrop";
+/// The test loot's quality: 0 a random mix, else the item quality plus one (1 grey … 6 orange).
+const CVAR_DEV_LOOT_QUALITY: &str = "arpgDevLootQuality";
+/// How many items to drop.
+const CVAR_DEV_LOOT_COUNT: &str = "arpgDevLootCount";
+/// Their item level: 0 the player's own level.
+const CVAR_DEV_LOOT_LEVEL: &str = "arpgDevLootLevel";
+
+/// The dev loot request the settings make: quality byte, count, level.
+fn dev_loot_request(cvars: &crate::cvars::Cvars) -> (u8, u8, u8) {
+    let num = |name, default: f32, max: f32| {
+        cvars
+            .num(name)
+            .filter(|v| v.is_finite())
+            .unwrap_or(default)
+            .round()
+            .clamp(0.0, max) as u8
+    };
+    let quality = match num(CVAR_DEV_LOOT_QUALITY, 0.0, 6.0) {
+        0 => benilla_protocol::world::DEV_LOOT_MIXED,
+        q => q - 1,
+    };
+    (
+        quality,
+        num(CVAR_DEV_LOOT_COUNT, 6.0, 16.0).max(1),
+        num(CVAR_DEV_LOOT_LEVEL, 0.0, 60.0),
+    )
+}
+
+/// The Drop Test Loot button: send the request.
+fn drop_dev_loot(
+    ev: On<crate::cvars::CvarChanged>,
+    cvars: Res<crate::cvars::Cvars>,
+    net: Res<NetCommands>,
+) {
+    if !ev.is(CVAR_DEV_LOOT_DROP) {
+        return;
+    }
+    let (quality, count, level) = dev_loot_request(&cvars);
+    info!("arpg: asking for test loot (quality {quality:#x}, {count} items, level {level})");
+    let _ = net.0.send(ClientCommand::ArpgDevLoot {
+        quality,
+        count,
+        level,
+    });
+}
+
 /// The view's settings as they stand this frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct ArpgView {
@@ -204,6 +253,8 @@ pub(super) fn plugin(app: &mut App) {
     // The corpse loot lying on the ground.
     loot::plugin(app);
     app.add_systems(Startup, install_hud);
+    // The options page's Drop Test Loot button.
+    app.add_observer(drop_dev_loot);
     app.init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
         .insert_resource(ArpgMode)

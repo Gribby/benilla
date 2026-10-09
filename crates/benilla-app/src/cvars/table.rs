@@ -732,6 +732,13 @@ pub(crate) const REGISTERED: &[Registered] = &[
     // The ground loot's label filter (`player::arpg::loot`): 0 all, 1 no greys, 2 no greys or
     // whites, 3 blue and better.
     ours("arpgLootFilter", "1", ARPG_WHY),
+    // The options page's test loot (`player::arpg::drop_dev_loot`, a server with `Arpg.DevTools`):
+    // quality (0 a mix, else quality + 1), count, item level (0 the player's), and the button's
+    // counter, which the session owns so it is never saved.
+    ours("arpgDevLootQuality", "0", ARPG_WHY),
+    ours("arpgDevLootCount", "6", ARPG_WHY),
+    ours("arpgDevLootLevel", "0", ARPG_WHY),
+    ours("arpgDevLootDrop", "0", ARPG_WHY),
     // `lastCharacterIndex` (`0x402d93`, "0" `0x82e570`, category 4, handle `[0x882674]`), help
     // "Last character selected": a 0-based row (the selection cell `[0x83856c]` under `"%d"`), so
     // "0" is the first character. It mirrors [`crate::char_select::Roster::pending_index`].

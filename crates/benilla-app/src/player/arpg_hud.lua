@@ -191,6 +191,9 @@ ARPG_TOOLTIP_CUT_RADIUS = "Indoors and in caves, how far from your character the
     .. "in yards. Geometry farther out keeps its tops."
 ARPG_TOOLTIP_LOOT_FILTER = "Which items on the ground get a name label. Hidden ones still "
     .. "glow and can be picked up, and holding Alt shows every label. Gold always shows."
+ARPG_TOOLTIP_DEV_LOOT = "For testing: Drop Test Loot asks the server for a corpse at your feet "
+    .. "holding this many items of this quality around this item level. Needs Arpg.DevTools = 1 "
+    .. "in the server's mangosd.conf."
 ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
     .. "camera turn see-through."
 
@@ -210,6 +213,16 @@ local ARPG_OPTION_ROWS = {
         5, 120, 1, "%d yd" },
     { "RowLootFilter", "arpgLootFilter", "Loot Labels", "ARPG_TOOLTIP_LOOT_FILTER",
         0, 3, 1, nil, { "All", "No Grey", "Green and Better", "Blue and Better" } },
+    -- Developer: test loot, which a server with Arpg.DevTools = 1 drops at your feet.
+    { "RowDevLootQuality", "arpgDevLootQuality", "Test Loot Quality", "ARPG_TOOLTIP_DEV_LOOT",
+        0, 6, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Orange" } },
+    { "RowDevLootCount", "arpgDevLootCount", "Test Loot Count", "ARPG_TOOLTIP_DEV_LOOT",
+        1, 16, 1, "%d" },
+    { "RowDevLootLevel", "arpgDevLootLevel", "Test Loot Level", "ARPG_TOOLTIP_DEV_LOOT",
+        0, 60, 1, function(v)
+            if v < 0.5 then return "Mine" end
+            return string.format("%d", math.floor(v + 0.5))
+        end },
 }
 
 local function addArpgOptionsPage()
@@ -260,12 +273,25 @@ local function addArpgOptionsPage()
         table.insert(keys, key)
         prev = row
     end
+    -- Drop Test Loot: a child of the last row, so a search hides it with that row. The client
+    -- sends the request when the counter setting moves (arpgDevLootDrop, never saved).
+    local drop = CreateFrame("Button", body:GetName() .. "DevLootDrop", prev,
+        "BenillaOptionsRedButtonTemplate")
+    drop:SetWidth(140)
+    drop:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 37, -10)
+    drop:SetText("Drop Test Loot")
+    drop:SetScript("OnClick", function()
+        PlaySound("igMainMenuOptionCheckBoxOn")
+        SetCVar("arpgDevLootDrop", tostring((tonumber(GetCVar("arpgDevLootDrop")) or 0) + 1))
+    end)
+
     BENILLA_OPTIONS_PAGE_ROWS.Arpg = keys
     table.insert(BENILLA_OPTIONS_CATEGORY_KEYS, "Arpg")
 
     -- The window's readouts know only its own formats; ours carry a printf pattern.
     local formatValue = BenillaOptionsRow_FormatValue
     BenillaOptionsRow_FormatValue = function(row, value)
+        if type(row.arpgFmt) == "function" then return row.arpgFmt(value) end
         if row.arpgFmt then
             -- Whole-number readouts round rather than truncate.
             if string.find(row.arpgFmt, "%%d") then value = math.floor(value + 0.5) end
