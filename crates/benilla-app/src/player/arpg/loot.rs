@@ -40,8 +40,8 @@ const LABEL_RANGE: f32 = 30.0;
 /// The loot filter's setting: 0 shows every label, 1 hides grey ones, 2 grey and white, 3 everything
 /// below blue. The gold always shows.
 const CVAR_LOOT_FILTER: &str = "arpgLootFilter";
-/// The filter with no setting: greys hidden.
-const LOOT_FILTER_DEFAULT: u8 = 1;
+/// The filter with no setting: every label shows.
+const LOOT_FILTER_DEFAULT: u8 = 0;
 /// A clicked drop is picked up once the player is this close to it, flat, in yards. The server
 /// takes it from within 6 yd of the corpse plus both bodies' reach, and drops lie within
 /// `RING_MIN + 2 × RING_STEP` of it, so this is always inside the server's reach.
@@ -107,8 +107,8 @@ struct Look {
 
 fn look(art: usize) -> Look {
     let (glow_radius, glow_alpha, beam_height, beam_alpha) = match art {
-        0 => (0.35, 0.30, 0.0, 0.0),
-        1 => (0.40, 0.45, 0.0, 0.0),
+        0 => (0.40, 0.45, 0.0, 0.0),
+        1 => (0.45, 0.55, 0.0, 0.0),
         2 => (0.50, 0.55, 2.5, 0.30),
         3 => (0.55, 0.60, 4.5, 0.35),
         4 => (0.60, 0.65, 6.5, 0.40),
