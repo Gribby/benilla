@@ -102,6 +102,25 @@ the kit.
 | Book of the Dead | 13353 | Balnazzar, Stratholme | J | Enemies you kill have a 20% chance to rise as a skeleton that fights for you for 20 sec. | Warlock, Priest |
 | Hammer of the Grand Crusader | 18717 | Balnazzar, Stratholme | B | Hammer of Wrath pierces every enemy in its path at 70%. | Paladin |
 
+### Paladin set (Jeff plays one)
+
+Built with the rest. Paladin play is swings with a Seal up plus Judgement, so the uniques hang
+off those, from the first dungeons on.
+
+| Item | Id | Drops from | Kit | Mechanic | Level |
+|---|---|---|---|---|---|
+| Smite's Mighty Hammer | 7230 | Mr. Smite, Deadmines | G | Seal of Righteousness strikes every enemy in front of you; the extras take 50%. | 18 |
+| Taskmaster Axe | 5194 | Sneed, Deadmines | C | Judgement chains to 2 more enemies within 10 yd for 60%. | 18 |
+| Kresh's Back (shield) | 13245 | Kresh, Wailing Caverns | F | Hammer of Justice also stuns 2 more enemies within 8 yd. | 15 |
+| Mograine's Might | 7723 | Scarlet Commander Mograine, Scarlet Monastery | E | Judgement also strikes every enemy within 8 yd of the target for 50%. | ~37 |
+| Hand of Righteousness | 7721 | High Inquisitor Whitemane, Scarlet Monastery | E | Seal of Righteousness strikes burst onto enemies within 5 yd for 35%. | 39 |
+| Hand of Edward the Odd | 2243 | World drop (57+) | C | Holy Shock chains to 2 more enemies within 10 yd for 60%. | 57 |
+| Hammer of the Grand Crusader | 18717 | Balnazzar, Stratholme | B | Hammer of Wrath pierces every enemy in its path at 70%. | 58 |
+| Spinal Reaper | 17104 | Ragnaros, Molten Core | G | Seal of Command strikes every enemy in front of you for 60%. | 60 |
+
+Holy Shock and Seal of Command are talents. The server checks every row against its data when
+the first ARPG player says hello and logs a wrong item or spell id as an error.
+
 ### Raids
 
 | Item | Id | Drops from | Kit | Mechanic (tooltip line) | For |
@@ -203,7 +222,7 @@ Built:
 - Kit K on **Perdition's Blade** (18816): a Sinister Strike kill teleports you behind the
   nearest enemy within 10 yd.
 
-24 of the 27. Test with `.additem <id>` on a GM account, or farm them.
+30 items (24 of the first 27, plus the paladin set). Test with `.additem <id>` on a GM account, or farm them.
 
 Not built yet:
 1. **Ravager**: Whirlwind's pull.
