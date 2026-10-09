@@ -164,14 +164,36 @@ fn vertex(in: Vertex) -> TerrainVsOut {
     return out;
 }
 
+// Fork-only, not 1.12.1: whether the ARPG indoor cut (`benilla_world::cutaway::Cutaway::spares`)
+// spares a point above its plane: a floor-like surface (facing up) stays, so a ramp or a ledge
+// higher than the player is not holed, unless it lies on the sightline from the camera to the
+// player, where it would hide them. Walls and ceilings above the plane always go.
+const ARPG_FLOOR_UP: f32 = 0.6;
+const ARPG_SIGHT_RADIUS: f32 = 3.5;
+const ARPG_SIGHT_DROP: f32 = 1.5;
+fn arpg_cut_spares(world: vec3<f32>, up: f32, plane: f32, centre: vec2<f32>, eye: vec3<f32>) -> bool {
+    if (up < ARPG_FLOOR_UP) {
+        return false;
+    }
+    let p = vec3<f32>(centre.x, plane - ARPG_SIGHT_DROP, centre.y);
+    let pc = eye - p;
+    let t = clamp(dot(world - p, pc) / max(dot(pc, pc), 0.0001), 0.0, 1.0);
+    let d = world - (p + pc * t);
+    return dot(d, d) >= ARPG_SIGHT_RADIUS * ARPG_SIGHT_RADIUS;
+}
+
 @fragment
 fn fragment(in: TerrainVsOut) -> @location(0) vec4<f32> {
     // Fork-only, not 1.12.1: the ARPG cutaway (`benilla_world::cutaway`), as `static_gx.wgsl` cuts
-    // it: a hill above a cave the player stands in is not drawn. Stock leaves the radius 0.
+    // it: a hill above a cave the player stands in is not drawn where it hides the player. The
+    // ground always faces up, so only the part on the camera's sightline goes. Stock leaves the
+    // radius 0.
     let cut_r = wow_light.sh_c16.w;
     if (cut_r > 0.0 && in.world_position.y > wow_light._wmo_fog[1].z) {
         let cut_d = in.world_position.xz - vec2<f32>(wow_light._wmo_fog[1].w, wow_light.fog_params.z);
-        if (dot(cut_d, cut_d) < cut_r * cut_r) {
+        let cut_spared = arpg_cut_spares(in.world_position.xyz, 1.0, wow_light._wmo_fog[1].z,
+            vec2<f32>(wow_light._wmo_fog[1].w, wow_light.fog_params.z), view.world_position.xyz);
+        if (dot(cut_d, cut_d) < cut_r * cut_r && !cut_spared) {
             discard;
         }
     }

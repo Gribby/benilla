@@ -416,6 +416,24 @@ fn vertex(vertex: WowVertex) -> WowVsOut {
     return out;
 }
 
+// Fork-only, not 1.12.1: whether the ARPG indoor cut (`benilla_world::cutaway::Cutaway::spares`)
+// spares a point above its plane: a floor-like surface (facing up) stays, so a ramp or a ledge
+// higher than the player is not holed, unless it lies on the sightline from the camera to the
+// player, where it would hide them. Walls and ceilings above the plane always go.
+const ARPG_FLOOR_UP: f32 = 0.6;
+const ARPG_SIGHT_RADIUS: f32 = 3.5;
+const ARPG_SIGHT_DROP: f32 = 1.5;
+fn arpg_cut_spares(world: vec3<f32>, up: f32, plane: f32, centre: vec2<f32>, eye: vec3<f32>) -> bool {
+    if (up < ARPG_FLOOR_UP) {
+        return false;
+    }
+    let p = vec3<f32>(centre.x, plane - ARPG_SIGHT_DROP, centre.y);
+    let pc = eye - p;
+    let t = clamp(dot(world - p, pc) / max(dot(pc, pc), 0.0001), 0.0, 1.0);
+    let d = world - (p + pc * t);
+    return dot(d, d) >= ARPG_SIGHT_RADIUS * ARPG_SIGHT_RADIUS;
+}
+
 @fragment
 fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
     // The UI model tile's cell clip: the reference gives each `<Model>` pane its widget rect as the
@@ -438,14 +456,22 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
     }
     // Fork-only, not 1.12.1: the ARPG cutaway (`benilla_world::cutaway`) on the WMO surfaces and
     // interior props this path draws (`model_flags.x`, `.z`), as `static_gx.wgsl` cuts the rest of
-    // the static world; units and players are never cut. Stock leaves the radius 0.
+    // the static world. Units and players are never cut: a unit standing indoors takes an
+    // interior material (`.z`) too, so anything with a rig slot (tag bits 19-29) is left whole.
+    // Stock leaves the radius 0.
     let cut_r = wow_light.sh_c16.w;
-    if (cut_r != 0.0 && (m.model_flags.x > 0.5 || m.model_flags.z > 0.5)
+    let cut_rig = (mesh_functions::get_tag(in.instance_index) >> 19u) & 0x7ffu;
+    if (cut_r != 0.0 && cut_rig == 0u && (m.model_flags.x > 0.5 || m.model_flags.z > 0.5)
         && in.world_position.y > wow_light.wmo_fog_params.z) {
         let cut_d = in.world_position.xz - vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z);
         // A negative radius is the outdoor dither: every other pixel, so the player shows through.
         let dither_keep = ((u32(in.position.x) + u32(in.position.y)) & 1u) != 0u;
-        if (dot(cut_d, cut_d) < cut_r * cut_r && (cut_r > 0.0 || !dither_keep)) {
+        let cut_n = in.world_normal;
+        let cut_up = cut_n.y / max(length(cut_n), 0.0001);
+        let cut_spared = cut_r > 0.0 && arpg_cut_spares(in.world_position.xyz, cut_up,
+            wow_light.wmo_fog_params.z, vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z),
+            view.world_position.xyz);
+        if (dot(cut_d, cut_d) < cut_r * cut_r && ((cut_r > 0.0 && !cut_spared) || (cut_r < 0.0 && !dither_keep))) {
             discard;
         }
     }

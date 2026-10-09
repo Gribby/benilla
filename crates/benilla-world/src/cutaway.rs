@@ -2,6 +2,7 @@
 //! player from high above, so indoors and in caves the roof and the upper walls hide everything.
 //! While [`Cutaway::plane`] is set, static world geometry (WMO groups, static doodads, terrain)
 //! above that height and within [`Cutaway::radius`] of the player, on the ground, is not drawn,
+//! except floor-like surfaces off the camera's sightline to the player ([`Cutaway::spares`]),
 //! and the WMO groups inside that cylinder skip portal culling, since the camera now sees rooms
 //! through the cut roof that its portals would hide. Units and players are never cut.
 //!
@@ -16,6 +17,14 @@
 //! Z, so no binding changes.
 
 use bevy::prelude::*;
+
+/// A surface whose normal points at least this far up (its normal's y) is floor-like, which the
+/// indoor cut spares off the sightline ([`Cutaway::spares`]); `ARPG_FLOOR_UP` in the shaders.
+pub const FLOOR_UP: f32 = 0.6;
+/// The sightline the indoor cut always clears, from the camera to this far below the cut plane
+/// (about the player's chest), and its radius, in yards; `ARPG_SIGHT_DROP`, `ARPG_SIGHT_RADIUS`.
+pub const SIGHT_DROP: f32 = 1.5;
+pub const SIGHT_RADIUS: f32 = 3.5;
 
 /// The cutaway this frame; the default draws everything.
 #[derive(Resource, Default, Clone, Copy, PartialEq, Debug)]
@@ -57,6 +66,24 @@ impl Cutaway {
         })
     }
 
+    /// Whether the indoor cut spares a point it would otherwise take, as the shaders'
+    /// `arpg_cut_spares` does: a floor-like surface (its normal's `up` at least [`FLOOR_UP`]) off
+    /// the sightline from `eye` (the camera) to the player stays, so a ramp or a ledge higher than
+    /// the player is not holed; one that would hide the player still goes, as do walls and
+    /// ceilings. A dither spares nothing this way.
+    pub fn spares(&self, point: Vec3, up: f32, eye: Vec3) -> bool {
+        let Some(plane) = self.plane else {
+            return false;
+        };
+        if self.dither || up < FLOOR_UP {
+            return false;
+        }
+        let p = Vec3::new(self.center.x, plane - SIGHT_DROP, self.center.z);
+        let pc = eye - p;
+        let t = ((point - p).dot(pc) / pc.length_squared().max(1e-4)).clamp(0.0, 1.0);
+        (point - (p + pc * t)).length_squared() >= SIGHT_RADIUS * SIGHT_RADIUS
+    }
+
     /// The four light-buffer lanes the shaders read: `[radius, plane, centre x, centre z]`, all
     /// zero (radius 0, off) without a plane. A dither sends the radius negated.
     pub fn lanes(&self) -> [f32; 4] {
@@ -85,6 +112,27 @@ mod tests {
             radius: 20.0,
             dither: false,
         }
+    }
+
+    #[test]
+    fn a_floor_off_the_sightline_is_spared_and_one_on_it_is_not() {
+        let cut = on();
+        // The camera high up off to +x; the player at the origin, chest at 10 - 1.5.
+        let eye = Vec3::new(16.0, 23.0, 0.0);
+        // A ledge 12 high behind the player, away from the camera: kept.
+        assert!(cut.spares(Vec3::new(-8.0, 12.0, 0.0), 1.0, eye));
+        // The same ledge between the camera and the player, on the sightline: cut.
+        let on_line = Vec3::new(8.0, 8.5 + (23.0 - 8.5) * 0.5, 0.0);
+        assert!(!cut.spares(on_line, 1.0, eye));
+        // A wall or a ceiling there is never spared.
+        assert!(!cut.spares(Vec3::new(-8.0, 12.0, 0.0), 0.0, eye));
+        assert!(!cut.spares(Vec3::new(-8.0, 12.0, 0.0), -1.0, eye));
+        // Nor does a dither spare anything this way.
+        let dither = Cutaway {
+            dither: true,
+            ..on()
+        };
+        assert!(!dither.spares(Vec3::new(-8.0, 12.0, 0.0), 1.0, eye));
     }
 
     #[test]
