@@ -32,6 +32,7 @@
 //! The character always faces the cursor: standing, it turns to the aim; walking, it faces within
 //! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
 
+mod champions;
 mod fx;
 mod loot;
 mod tree;
@@ -248,6 +249,7 @@ pub(super) fn plugin(app: &mut App) {
     loot::register_net(app);
     uniques::register_net(app);
     tree::register_net(app);
+    champions::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -261,6 +263,8 @@ pub(super) fn plugin(app: &mut App) {
     loot::plugin(app);
     // The skill tree window's feed and requests.
     tree::plugin(app);
+    // The champions' hover line and rings.
+    champions::plugin(app);
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);

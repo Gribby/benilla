@@ -390,6 +390,8 @@ pub enum ServerPacket {
     ArpgTree(crate::messages::ArpgTree),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_SKILLS`, the player's specialised skills and their trees.
     ArpgSkills(crate::messages::ArpgSkills),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_CHAMPIONS`, the champions and rares near the player.
+    ArpgChampions(Vec<crate::messages::ArpgChampion>),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1364,6 +1366,7 @@ impl ServerPacket {
             ServerPacket::ArpgItemMechanics { .. } => "SMSG_ARPG_ITEM_MECHANICS".into(),
             ServerPacket::ArpgTree(_) => "SMSG_ARPG_TREE".into(),
             ServerPacket::ArpgSkills(_) => "SMSG_ARPG_SKILLS".into(),
+            ServerPacket::ArpgChampions(_) => "SMSG_ARPG_CHAMPIONS".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

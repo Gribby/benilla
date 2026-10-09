@@ -431,6 +431,10 @@ pub enum SessionEvent {
     ArpgTree { tree: crate::messages::ArpgTree },
     /// Fork-only, not 1.12.1: the player's specialised skills (`SMSG_ARPG_SKILLS`).
     ArpgSkills { skills: crate::messages::ArpgSkills },
+    /// Fork-only, not 1.12.1: champions and rares near the player (`SMSG_ARPG_CHAMPIONS`).
+    ArpgChampions {
+        champions: Vec<crate::messages::ArpgChampion>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

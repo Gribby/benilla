@@ -266,6 +266,43 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
     })
 }
 
+/// The champions and rares near the player (cmangos `Arpg/ArpgPacks.h`), each sent once.
+pub const SMSG_ARPG_CHAMPIONS: u16 = 0x0341;
+
+/// A champion or rare: its tier (1 champion, 2 rare), its own name (empty: the creature's), and
+/// its affixes' names.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArpgChampion {
+    pub guid: u64,
+    pub tier: u8,
+    pub name: String,
+    pub affixes: Vec<String>,
+}
+
+/// `SMSG_ARPG_CHAMPIONS`: `u8` count, per champion `u64` guid, `u8` tier, a C string name, `u8`
+/// affix count and a C string each.
+pub fn read_arpg_champions(r: &mut impl io::Read) -> io::Result<Vec<ArpgChampion>> {
+    let n = read_u8(r)?;
+    let mut out = Vec::with_capacity(capacity_hint(n, 64));
+    for _ in 0..n {
+        let guid = read_u64_le(r)?;
+        let tier = read_u8(r)?;
+        let name = read_cstring(r)?;
+        let na = read_u8(r)?;
+        let mut affixes = Vec::with_capacity(capacity_hint(na, 8));
+        for _ in 0..na {
+            affixes.push(read_cstring(r)?);
+        }
+        out.push(ArpgChampion {
+            guid,
+            tier,
+            name,
+            affixes,
+        });
+    }
+    Ok(out)
+}
+
 /// `SMSG_ARPG_LOOT`: the corpse, its gold, and the items.
 pub fn read_arpg_loot(r: &mut impl io::Read) -> io::Result<(u64, u32, Vec<ArpgLootItem>)> {
     let corpse = read_u64_le(r)?;
@@ -399,6 +436,26 @@ mod tests {
             }
         );
         assert!(read_arpg_skills(&mut [2u8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn champions_read_their_tier_name_and_affixes() {
+        let mut body = vec![1];
+        body.extend_from_slice(&0xF130_0000_0000_0042u64.to_le_bytes());
+        body.push(2);
+        body.extend_from_slice(b"Gorefang the Swift\0");
+        body.push(2);
+        body.extend_from_slice(b"Extra Fast\0Vampiric\0");
+        let champions = read_arpg_champions(&mut body.as_slice()).unwrap();
+        assert_eq!(
+            champions,
+            vec![ArpgChampion {
+                guid: 0xF130_0000_0000_0042,
+                tier: 2,
+                name: "Gorefang the Swift".into(),
+                affixes: vec!["Extra Fast".into(), "Vampiric".into()],
+            }]
+        );
     }
 
     #[test]

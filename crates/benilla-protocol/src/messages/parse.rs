@@ -524,6 +524,9 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_SKILLS => {
             ServerPacket::ArpgSkills(super::arpg::read_arpg_skills(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_CHAMPIONS => {
+            ServerPacket::ArpgChampions(super::arpg::read_arpg_champions(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_ITEM_MECHANICS => ServerPacket::ArpgItemMechanics {
             rows: super::arpg::read_arpg_item_mechanics(&mut r)?,
         },

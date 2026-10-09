@@ -63,8 +63,19 @@ one. Settings: `Arpg.Packs` (on), `Arpg.Packs.FollowerPower` (0.55), `Arpg.Packs
 (0.3), `Arpg.Packs.FollowerLoot` (0.5). The ARPG View page's **Form Test Pack** button (with
 `Arpg.DevTools = 1`) makes the nearest mob lead a pack of five; the server log reads
 "ARPG packs: a pack of 5 Kobold Vermin (level 3) fell in 14.2 s; it dealt 312 damage".
-Known gaps: a follower that evades walks back to where it appeared rather than to its leader,
-and champions and rares come in step 2.
+Known gaps: a follower that evades walks back to where it appeared rather than to its leader.
+
+**Built (step 2):** champions and rares, from level 8, in `Arpg/ArpgPacks.cpp`. About 1 pack in 8
+brings two or three champions sharing one affix (two from level 30); about 1 in 40 brings a rare
+with a name of its own and two affixes (three from level 30). Both are extra summons of the
+leader's kind. A champion has 3x health, +30% damage, 3x XP, extra gold and a green or blue; a
+rare 4x health, +50% damage, 5x XP, a blue and a 15% chance at a purple. Nine affixes: Extra
+Strong, Extra Fast, Stone Skin, Fire Enchanted, Cold Enchanted, Vampiric, Thorns, Teleporter,
+Healer; Molten waits for a ground visual. The server sends `SMSG_ARPG_CHAMPIONS` (0x341) for the
+champions within 100 yards; the client (`player/arpg/champions.rs`) colours the hover bar's name
+blue or yellow, lists the affixes under it, and lays a ring of that colour under each one. The
+ARPG View page gains **Champion Pack** and **Rare Pack** dev buttons. Champions in dungeons come
+with step 3.
 
 ## Scaling for one to five players
 

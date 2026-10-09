@@ -57,6 +57,7 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::ArpgItemMechanics { rows } => vec![SessionEvent::ArpgItemMechanics { rows }],
         ServerPacket::ArpgTree(tree) => vec![SessionEvent::ArpgTree { tree }],
         ServerPacket::ArpgSkills(skills) => vec![SessionEvent::ArpgSkills { skills }],
+        ServerPacket::ArpgChampions(champions) => vec![SessionEvent::ArpgChampions { champions }],
         ServerPacket::Weather {
             weather_type,
             grade,

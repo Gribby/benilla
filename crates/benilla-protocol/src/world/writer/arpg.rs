@@ -169,9 +169,10 @@ impl WorldWriter {
         self.send(CMSG_ARPG_ACTION, &arpg_skill_node_body(node, refund))
     }
 
-    /// Dev tools: the nearest mob forms a pack of `size` (0: by level).
-    pub fn arpg_dev_pack(&mut self, size: u8) -> Result<()> {
-        self.send(CMSG_ARPG_ACTION, &[KIND_DEV_PACK, size])
+    /// Dev tools: the nearest mob forms a pack of `size` (0: by level) and `tier` (0 by chance,
+    /// 1 no champions, 2 a champion pack, 3 a rare).
+    pub fn arpg_dev_pack(&mut self, size: u8, tier: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_DEV_PACK, size, tier])
     }
 
     /// Give back every point in an ARPG skill.

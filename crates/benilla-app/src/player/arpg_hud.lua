@@ -25,7 +25,23 @@ name:SetPoint("CENTER", bar, "CENTER", 0, 0)
 local rank = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 rank:SetPoint("BOTTOM", bar, "TOP", 0, 3)
 
+-- A champion's or a rare's affixes, under the bar.
+local affix = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+affix:SetPoint("TOP", bar, "BOTTOM", 0, -3)
+affix:SetTextColor(0.85, 0.85, 0.85)
+
 bar:Hide()
+
+-- The champion or rare under the cursor, which the client sets as the hover moves:
+-- ArpgHud_Champion(tier, name, affixes), tier 1 a champion, 2 a rare; ArpgHud_Champion(0) clears.
+local champ = nil
+function ArpgHud_Champion(tier, champName, affixes)
+    if not tier or tier <= 0 then
+        champ = nil
+    else
+        champ = { tier = tier, name = champName or "", affixes = affixes or "" }
+    end
+end
 
 -- Gold for elites and bosses, silver for rares, as the stock target frame's dragon.
 local RANKS = {
@@ -47,11 +63,29 @@ local function refresh()
     end
     bar:SetMinMaxValues(0, most)
     bar:SetValue(health or 0)
-    name:SetText(UnitName("mouseover"))
-
     local level = UnitLevel("mouseover")
     local label = (level and level > 0) and ("Level " .. level) or "Level ??"
     local special = RANKS[UnitClassification("mouseover") or "normal"]
+    if champ then
+        -- Champions blue, rares yellow, as their rings.
+        local r, g, b, what = 0.30, 0.55, 1.0, "Champion"
+        if champ.tier >= 2 then
+            r, g, b, what = 1.0, 0.85, 0.25, "Rare"
+        end
+        local shown = champ.name
+        if shown == "" then shown = UnitName("mouseover") end
+        name:SetText(shown)
+        name:SetTextColor(r, g, b)
+        rank:SetText(label .. "  " .. what)
+        rank:SetTextColor(r, g, b)
+        affix:SetText(champ.affixes)
+        affix:Show()
+        bar:Show()
+        return
+    end
+    name:SetText(UnitName("mouseover"))
+    name:SetTextColor(1.0, 1.0, 1.0)
+    affix:Hide()
     if special then
         rank:SetText(label .. "  " .. special[1])
         rank:SetTextColor(special[2], special[3], special[4])
@@ -193,7 +227,8 @@ ARPG_TOOLTIP_LOOT_FILTER = "Which items on the ground get a name label. Hidden o
     .. "glow and can be picked up, and holding Alt shows every label. Gold always shows."
 ARPG_TOOLTIP_DEV_LOOT = "For testing: Drop Test Loot asks the server for a corpse at your feet "
     .. "holding this many items of this quality around this item level. Form Test Pack makes the "
-    .. "nearest mob lead a pack of five. Both need Arpg.DevTools = 1 in the server's mangosd.conf."
+    .. "nearest mob lead a pack of five; Champion Pack and Rare Pack bring champions or a rare. "
+    .. "All need Arpg.DevTools = 1 in the server's mangosd.conf."
 ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
     .. "camera turn see-through."
 
@@ -284,18 +319,25 @@ local function addArpgOptionsPage()
         PlaySound("igMainMenuOptionCheckBoxOn")
         SetCVar("arpgDevLootDrop", tostring((tonumber(GetCVar("arpgDevLootDrop")) or 0) + 1))
     end)
-    -- Form Test Pack: the nearest mob forms a full pack (Arpg.DevTools), through the web window's
-    -- action setting (kind 9, the size in the node field).
-    local pack = CreateFrame("Button", body:GetName() .. "DevPack", prev, "BenillaOptionsRedButtonTemplate")
-    pack:SetWidth(140)
-    pack:SetPoint("LEFT", drop, "RIGHT", 10, 0)
-    pack:SetText("Form Test Pack")
-    pack:SetScript("OnClick", function()
-        PlaySound("igMainMenuOptionCheckBoxOn")
-        local n = (tonumber(GetCVar("arpgTreeAction")) or 0) + 1
-        local nonce = n - math.floor(n / 100) * 100
-        SetCVar("arpgTreeAction", tostring(900000 + 5 * 100 + nonce))
-    end)
+    -- Form Test Pack, Champion Pack, Rare Pack: the nearest mob forms a pack of five (Arpg.DevTools),
+    -- through the web window's action setting (kind 9, the node field tier * 100 + size): tier 1
+    -- plain, 2 with champions, 3 with a rare.
+    local function packButton(key, label, tier, anchor, x, y)
+        local b = CreateFrame("Button", body:GetName() .. key, prev, "BenillaOptionsRedButtonTemplate")
+        b:SetWidth(140)
+        b:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, y)
+        b:SetText(label)
+        b:SetScript("OnClick", function()
+            PlaySound("igMainMenuOptionCheckBoxOn")
+            local n = (tonumber(GetCVar("arpgTreeAction")) or 0) + 1
+            local nonce = n - math.floor(n / 100) * 100
+            SetCVar("arpgTreeAction", tostring(900000 + (tier * 100 + 5) * 100 + nonce))
+        end)
+        return b
+    end
+    packButton("DevPack", "Form Test Pack", 1, drop, 150, 0)
+    packButton("DevChampionPack", "Champion Pack", 2, drop, 0, -28)
+    packButton("DevRarePack", "Rare Pack", 3, drop, 150, -28)
 
     BENILLA_OPTIONS_PAGE_ROWS.Arpg = keys
     table.insert(BENILLA_OPTIONS_CATEGORY_KEYS, "Arpg")
