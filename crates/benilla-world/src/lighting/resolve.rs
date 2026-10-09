@@ -375,21 +375,30 @@ pub(super) fn update_time_lighting(
 
 /// The clear colour is the row-7 fog colour, so a fully fogged texel at the far plane meets the
 /// void behind it without a seam.
+///
+/// Fork-only, not 1.12.1: under the ARPG view's indoor cutaway (no sky dome, the camera outside
+/// the cave or instance shell) the void past the walls clears black, as an ARPG dungeon's does,
+/// rather than in the zone's fog colour.
 pub(super) fn apply_sky_backdrop(
     lighting: Option<Res<WowLighting>>,
+    cutaway: Option<Res<crate::cutaway::Cutaway>>,
     mut clear: ResMut<ClearColor>,
     mut last: Local<Option<[f32; 3]>>,
 ) {
     let Some(l) = lighting else {
         return;
     };
-    if *last == Some(l.fog_color) {
+    let indoor_cut = cutaway
+        .as_ref()
+        .is_some_and(|c| c.plane.is_some() && !c.dither);
+    let want = if indoor_cut { [0.0; 3] } else { l.fog_color };
+    if *last == Some(want) {
         return;
     }
-    *last = Some(l.fog_color);
+    *last = Some(want);
     // The buffer holds gamma bytes, so the clear writes the DBC value raw (`linear_rgb` converts
     // nothing); the frame's one decode is the FFXGlow combine.
-    clear.0 = Color::linear_rgb(l.fog_color[0], l.fog_color[1], l.fog_color[2]);
+    clear.0 = Color::linear_rgb(want[0], want[1], want[2]);
 }
 
 #[cfg(test)]
