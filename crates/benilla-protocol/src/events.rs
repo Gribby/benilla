@@ -427,8 +427,10 @@ pub enum SessionEvent {
     /// Fork-only, not 1.12.1: the ARPG server's uniques, `(item id, tooltip line)` each
     /// (`SMSG_ARPG_ITEM_MECHANICS`).
     ArpgItemMechanics { rows: Vec<(u32, String)> },
-    /// Fork-only, not 1.12.1: the player's ARPG skill tree (`SMSG_ARPG_TREE`).
+    /// Fork-only, not 1.12.1: the player's ARPG passive web (`SMSG_ARPG_TREE`).
     ArpgTree { tree: crate::messages::ArpgTree },
+    /// Fork-only, not 1.12.1: the player's specialised skills (`SMSG_ARPG_SKILLS`).
+    ArpgSkills { skills: crate::messages::ArpgSkills },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

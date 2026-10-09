@@ -1014,6 +1014,20 @@ pub(crate) enum ClientCommand {
     },
     /// Fork-only: give the whole ARPG passive web back.
     ArpgTreeRespec,
+    /// Fork-only: put ARPG skill `skill` in specialisation slot `slot` (0 empties it).
+    ArpgSkillSlot {
+        slot: u8,
+        skill: u8,
+    },
+    /// Fork-only: take a rank of ARPG skill tree node `node`, or give one back.
+    ArpgSkillNode {
+        node: u16,
+        refund: bool,
+    },
+    /// Fork-only: give back every point in ARPG skill `skill`.
+    ArpgSkillRespec {
+        skill: u8,
+    },
     /// Fork-only: ask for the ARPG passive web.
     ArpgTreeQuery,
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.

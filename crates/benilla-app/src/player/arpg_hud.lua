@@ -536,7 +536,9 @@ local function webPaint()
         label:SetText(region.name)
         label:SetTextColor(rgb[1], rgb[2], rgb[3], 0.9)
     end
-    f.points:SetText("Points: " .. (treeData.total - treeData.spent) .. " of " .. treeData.total .. " left")
+    if f.tab ~= "skills" then
+        f.points:SetText("Points: " .. (treeData.total - treeData.spent) .. " of " .. treeData.total .. " left")
+    end
 end
 
 -- Zoom by `factor` about canvas point (cx, cy), from its TOPLEFT, y down.
@@ -580,17 +582,31 @@ local function treeBuild()
     edge:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -36)
     edge:SetHeight(1)
     edge:SetTexture(0.9, 0.8, 0.5, 0.35)
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", f, "TOP", 0, -10)
-    title:SetText("Passive Web")
+    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    f.title:SetPoint("TOP", f, "TOP", 0, -10)
+    f.title:SetText("Passive Web")
     f.points = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     f.points:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -13)
-    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 14)
-    hint:SetText("Drag to move, mouse wheel to zoom. Click a node joined to your web to take it; right-click to give one back.")
     local close = CreateFrame("Button", "ArpgTreeFrameClose", f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
-    local respec = CreateFrame("Button", "ArpgTreeFrameRespec", f, "UIPanelButtonTemplate")
+    -- Two tabs: the passive web and the specialised skills.
+    f.tabs = {}
+    for i, tab in ipairs({ { "web", "Passive Web" }, { "skills", "Skills" } }) do
+        local b = CreateFrame("Button", "ArpgTreeFrameTab" .. i, f, "UIPanelButtonTemplate")
+        b:SetWidth(100)
+        b:SetHeight(20)
+        b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -36 - (2 - i) * 104, -8)
+        b:SetText(tab[2])
+        b.tab = tab[1]
+        b:SetScript("OnClick", function() ArpgTree_ShowTab(this.tab) end)
+        f.tabs[i] = b
+    end
+    f.webPane = CreateFrame("Frame", "ArpgTreeWebPane", f)
+    f.webPane:SetAllPoints(f)
+    local hint = f.webPane:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 14)
+    hint:SetText("Drag to move, mouse wheel to zoom. Click a node joined to your web to take it; right-click to give one back.")
+    local respec = CreateFrame("Button", "ArpgTreeFrameRespec", f.webPane, "UIPanelButtonTemplate")
     respec:SetWidth(90)
     respec:SetHeight(22)
     respec:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 9)
@@ -598,7 +614,7 @@ local function treeBuild()
     respec:SetScript("OnClick", function() treeAsk(2) end)
 
     -- The viewport clips the canvas, which holds the lines, labels and node buttons.
-    local view = CreateFrame("ScrollFrame", "ArpgTreeView", f)
+    local view = CreateFrame("ScrollFrame", "ArpgTreeView", f.webPane)
     view:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -38)
     view:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 38)
     f.canvasW, f.canvasH = width - 8, height - 76
@@ -674,13 +690,373 @@ local function treeRedraw()
     webLayout()
 end
 
+-- ── The Skills tab ──
+-- The server owns the skills (Arpg/ArpgSkills.h) and hands them to ArpgSkills_Update. Five slots
+-- open by level; a skill in a slot takes points in its tree (click a node, right-click to give a
+-- rank back). Taking a skill out of its slot gives its points back.
+
+local SKILL_KIND_NAME = { [1] = "Modifier", [2] = "Transformer", [3] = "Synergy", [4] = "Capstone" }
+local SKILL_KIND_RGB = {
+    [1] = { 0.55, 0.65, 0.80 },
+    [2] = { 0.902, 0.8, 0.502 },
+    [3] = { 0.35, 0.80, 0.75 },
+    [4] = { 1.0, 0.5, 0.0 },
+}
+local SKILL_COL_W, SKILL_ROW_H, SKILL_NODE = 150, 92, 40
+local skillsData, skillSel, slotSel = nil, nil, 1
+
+local function skillById(id)
+    if not skillsData then return nil end
+    for _, k in ipairs(skillsData.skills) do
+        if k.id == id then return k end
+    end
+    return nil
+end
+
+-- The slot a skill sits in, or nil.
+local function skillSlot(id)
+    for i, slot in ipairs(skillsData.slots) do
+        if slot.skill == id then return i end
+    end
+    return nil
+end
+
+local function skillRank(k, id)
+    if id == 0 then return 1 end
+    for _, n in ipairs(k.nodes) do
+        if n.id == id then return n.rank end
+    end
+    return 0
+end
+
+-- Why a rank cannot go into node `n` of skill `k` now, or nil when it can.
+local function skillBlocked(k, n)
+    if not skillSlot(k.id) then return "Specialise " .. k.name .. " in a slot first" end
+    if n.rank >= n.max then return "Fully learned" end
+    if skillRank(k, n.parent) == 0 then return "Needs a rank in the node above" end
+    if k.spent >= k.cap then return k.name .. " has all " .. k.cap .. " points it can take" end
+    if skillsData.spent >= skillsData.total then return "No skill points left" end
+    return nil
+end
+
+local function skillShowTip(button)
+    local n, k = button.node, button.skill
+    if not n or not k then return end
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+    GameTooltip:SetText(n.name, 1, 1, 1)
+    local rgb = SKILL_KIND_RGB[n.kind] or SKILL_KIND_RGB[1]
+    GameTooltip:AddLine((SKILL_KIND_NAME[n.kind] or "") .. "   Rank " .. n.rank .. "/" .. n.max, rgb[1], rgb[2], rgb[3])
+    GameTooltip:AddLine(n.text, 1, 0.82, 0, 1)
+    local blocked = skillBlocked(k, n)
+    if blocked then
+        GameTooltip:AddLine(blocked, 1, 0.13, 0.13)
+    else
+        GameTooltip:AddLine("Click to learn", 0, 1, 0)
+    end
+    if n.rank > 0 then GameTooltip:AddLine("Right-click to give a rank back", 0.5, 0.8, 1) end
+    GameTooltip:Show()
+end
+
+local function skillMakeNode(parent, i)
+    local b = CreateFrame("Button", "ArpgSkillNode" .. i, parent)
+    b.border = b:CreateTexture(nil, "BACKGROUND")
+    b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -3, 3)
+    b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 3, -3)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints(b)
+    b.rank = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.rank:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 4, -4)
+    b.label = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    b.label:SetPoint("TOP", b, "BOTTOM", 0, -5)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnEnter", function() skillShowTip(this) end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnClick", function()
+        local n, k = this.node, this.skill
+        if not n or not k or n.kind == 0 then return end
+        if arg1 == "RightButton" then
+            if n.rank > 0 then treeAsk(7, n.id) end
+        elseif not skillBlocked(k, n) then
+            treeAsk(6, n.id)
+        end
+    end)
+    return b
+end
+
+local function skillMakeRow(parent, name, width)
+    local b = CreateFrame("Button", name, parent)
+    b:SetWidth(width)
+    b:SetHeight(36)
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints(b)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetWidth(30)
+    b.icon:SetHeight(30)
+    b.icon:SetPoint("LEFT", b, "LEFT", 3, 0)
+    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    b.text:SetPoint("TOPLEFT", b, "TOPLEFT", 40, -4)
+    b.text:SetJustifyH("LEFT")
+    b.sub = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    b.sub:SetPoint("BOTTOMLEFT", b, "BOTTOMLEFT", 40, 5)
+    b.sub:SetJustifyH("LEFT")
+    b.glow = b:CreateTexture(nil, "HIGHLIGHT")
+    b.glow:SetAllPoints(b)
+    b.glow:SetTexture(1, 1, 1, 0.08)
+    return b
+end
+
+local function skillsBuild(f)
+    if f.skillPane then return f.skillPane end
+    local p = CreateFrame("Frame", "ArpgSkillPane", f)
+    p:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -38)
+    p:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 4)
+    p:Hide()
+    local slotsLabel = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    slotsLabel:SetPoint("TOPLEFT", p, "TOPLEFT", 12, -8)
+    slotsLabel:SetText("Slots")
+    p.slots = {}
+    for i = 1, 5 do
+        local row = skillMakeRow(p, "ArpgSkillSlot" .. i, 240)
+        row:SetPoint("TOPLEFT", p, "TOPLEFT", 10, -26 - (i - 1) * 40)
+        row.index = i
+        row:SetScript("OnClick", function()
+            slotSel = this.index
+            local slot = skillsData and skillsData.slots[this.index]
+            if slot and slot.skill ~= 0 then skillSel = slot.skill end
+            ArpgSkills_Redraw()
+        end)
+        p.slots[i] = row
+    end
+    local skillsLabel = p:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    skillsLabel:SetPoint("TOPLEFT", p, "TOPLEFT", 12, -232)
+    skillsLabel:SetText("Skills")
+    p.rows = {}
+    for i = 1, 8 do
+        local row = skillMakeRow(p, "ArpgSkillRow" .. i, 240)
+        row:SetPoint("TOPLEFT", p, "TOPLEFT", 10, -250 - (i - 1) * 40)
+        row:SetScript("OnClick", function()
+            skillSel = this.skillId
+            ArpgSkills_Redraw()
+        end)
+        p.rows[i] = row
+    end
+    local function button(name, label, x)
+        local b = CreateFrame("Button", name, p, "UIPanelButtonTemplate")
+        b:SetWidth(110)
+        b:SetHeight(22)
+        b:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", x, 6)
+        b:SetText(label)
+        return b
+    end
+    -- Put the shown skill in the chosen slot (or the first open, empty one).
+    p.put = button("ArpgSkillPut", "Specialise", -244)
+    p.put:SetScript("OnClick", function()
+        if not skillsData or not skillSel then return end
+        local slot = skillsData.slots[slotSel]
+        local target = nil
+        if slot and slot.level <= skillsData.level then target = slotSel end
+        if not target or (skillsData.slots[target].skill ~= 0 and skillsData.slots[target].skill ~= skillSel) then
+            for i, s in ipairs(skillsData.slots) do
+                if s.skill == 0 and s.level <= skillsData.level then target = i break end
+            end
+        end
+        if target then treeAsk(5, (target - 1) * 100 + skillSel) end
+    end)
+    p.take = button("ArpgSkillTake", "Take Out", -128)
+    p.take:SetScript("OnClick", function()
+        local slot = skillSel and skillSlot(skillSel)
+        if slot then treeAsk(5, (slot - 1) * 100) end
+    end)
+    p.respec = button("ArpgSkillRespec", "Respec Skill", -12)
+    p.respec:SetScript("OnClick", function()
+        if skillSel then treeAsk(8, skillSel) end
+    end)
+    -- The tree, right of the lists.
+    p.tree = CreateFrame("Frame", "ArpgSkillTree", p)
+    p.tree:SetPoint("TOPLEFT", p, "TOPLEFT", 270, -8)
+    p.tree:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -8, 36)
+    local shade = p.tree:CreateTexture(nil, "BACKGROUND")
+    shade:SetAllPoints(p.tree)
+    shade:SetTexture(1, 1, 1, 0.03)
+    p.treeTitle = p.tree:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    p.treeTitle:SetPoint("TOPLEFT", p.tree, "TOPLEFT", 12, -10)
+    p.treeText = p.tree:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    p.treeText:SetPoint("TOPLEFT", p.tree, "TOPLEFT", 12, -32)
+    p.treeText:SetJustifyH("LEFT")
+    p.nodes, p.lines, p.branches = {}, {}, {}
+    f.skillPane = p
+    return p
+end
+
+local function skillsPaint()
+    local f = treeFrame
+    if not f or not skillsData then return end
+    local p = skillsBuild(f)
+    if f.tab == "skills" then
+        f.points:SetText("Skill points: " .. (skillsData.total - skillsData.spent) .. " of " .. skillsData.total .. " left")
+    end
+    if not skillSel or not skillById(skillSel) then
+        local first = skillsData.skills[1]
+        skillSel = first and first.id
+    end
+    for i, row in ipairs(p.slots) do
+        local slot = skillsData.slots[i]
+        if slot then
+            local k = skillById(slot.skill)
+            local open = slot.level <= skillsData.level
+            if k then
+                row.icon:SetTexture(k.icon ~= "" and k.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+                row.text:SetText(k.name)
+                row.sub:SetText("Slot " .. i .. "   " .. k.spent .. "/" .. k.cap .. " points")
+            else
+                row.icon:SetTexture("Interface\\Buttons\\UI-EmptySlot")
+                row.text:SetText(open and "Empty" or "Locked")
+                row.sub:SetText(open and ("Slot " .. i) or ("Opens at level " .. slot.level))
+            end
+            row.icon:SetDesaturated(not open and 1 or nil)
+            row.bg:SetTexture(1, 0.82, 0, i == slotSel and 0.18 or 0.05)
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+    for i, row in ipairs(p.rows) do
+        local k = skillsData.skills[i]
+        if k then
+            row.skillId = k.id
+            row.icon:SetTexture(k.icon ~= "" and k.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            row.text:SetText(k.name)
+            local slot = skillSlot(k.id)
+            row.sub:SetText(slot and ("In slot " .. slot) or "Not specialised")
+            row.bg:SetTexture(1, 1, 1, k.id == skillSel and 0.16 or 0.04)
+            row:Show()
+        else
+            row:Hide()
+        end
+    end
+
+    -- The shown skill's tree: the root on top, a column per branch, a row per depth.
+    local k = skillById(skillSel)
+    for _, b in pairs(p.nodes) do b:Hide() end
+    for _, T in pairs(p.lines) do T:Hide() end
+    for _, l in pairs(p.branches) do l:Hide() end
+    if not k then return end
+    p.treeTitle:SetText(k.name .. "   " .. k.spent .. "/" .. k.cap)
+    p.treeText:SetText(k.text)
+    -- The tree's size from the window's own (set, not anchored), as its layout may not have run yet.
+    local width, height = f:GetWidth() - 286, f:GetHeight() - 86
+    local left = (width - 2 * SKILL_COL_W) / 2
+    local function at(col, row)
+        return left + col * SKILL_COL_W, 92 + row * SKILL_ROW_H
+    end
+    local all = { { id = 0, kind = 0, col = 1, row = 0, parent = -1, max = 0, rank = 1, icon = k.icon, name = k.name, text = k.text } }
+    for _, n in ipairs(k.nodes) do tinsert(all, n) end
+    local pos = {}
+    for i, n in ipairs(all) do
+        local b = p.nodes[i]
+        if not b then
+            b = skillMakeNode(p.tree, i)
+            p.nodes[i] = b
+        end
+        local x, y = at(n.col, n.row)
+        pos[n.id] = { x, y }
+        local size = n.kind == 4 and SKILL_NODE + 8 or (n.kind == 0 and SKILL_NODE + 12 or SKILL_NODE)
+        b:SetWidth(size)
+        b:SetHeight(size)
+        b:ClearAllPoints()
+        b:SetPoint("CENTER", p.tree, "TOPLEFT", x, -y)
+        b.node, b.skill = n, k
+        b.icon:SetTexture(n.icon ~= "" and n.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+        b.label:SetText(n.kind == 0 and "" or n.name)
+        local rgb = SKILL_KIND_RGB[n.kind] or { 1, 0.82, 0 }
+        local blocked = n.kind ~= 0 and skillBlocked(k, n)
+        local lit = n.kind == 0 or n.rank > 0 or not blocked
+        b.icon:SetDesaturated(not lit and 1 or nil)
+        if n.kind == 0 then
+            b.border:SetTexture(1, 0.82, 0, 1)
+            b.rank:SetText("")
+        else
+            b.border:SetTexture(rgb[1], rgb[2], rgb[3], lit and 0.95 or 0.35)
+            b.rank:SetText(n.rank .. "/" .. n.max)
+            if n.rank >= n.max then
+                b.rank:SetTextColor(1, 0.82, 0)
+            elseif n.rank > 0 then
+                b.rank:SetTextColor(0, 1, 0)
+            else
+                b.rank:SetTextColor(0.8, 0.8, 0.8)
+            end
+        end
+        b:Show()
+    end
+    local li = 0
+    for _, n in ipairs(k.nodes) do
+        local from, to = pos[n.parent], pos[n.id]
+        if from and to then
+            li = li + 1
+            local T = p.lines[li]
+            if not T then
+                T = p.tree:CreateTexture(nil, "BORDER")
+                T:SetTexture(WEB_LINE_TEX)
+                p.lines[li] = T
+            end
+            if n.rank > 0 then
+                T:SetVertexColor(1, 0.8, 0.3, 1)
+            else
+                T:SetVertexColor(0.35, 0.35, 0.4, 0.9)
+            end
+            webLine(T, p.tree, from[1], height - from[2], to[1], height - to[2], 8)
+            T:Show()
+        end
+    end
+    for i, name in ipairs(k.branches) do
+        local l = p.branches[i]
+        if not l then
+            l = p.tree:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            p.branches[i] = l
+        end
+        local x, y = at(i - 1, 1)
+        l:ClearAllPoints()
+        l:SetPoint("BOTTOM", p.tree, "TOPLEFT", x, -(y - SKILL_NODE / 2 - 14))
+        l:SetText(name)
+        l:Show()
+    end
+end
+
+function ArpgSkills_Redraw()
+    skillsPaint()
+end
+
+function ArpgSkills_Update(skills)
+    skillsData = skills
+    if treeFrame and treeFrame:IsVisible() and treeFrame.tab == "skills" then skillsPaint() end
+end
+
+function ArpgTree_ShowTab(tab)
+    local f = treeBuild()
+    f.tab = tab
+    for _, b in ipairs(f.tabs) do
+        if b.tab == tab then b:Disable() else b:Enable() end
+    end
+    if tab == "skills" then
+        f.title:SetText("Skills")
+        f.webPane:Hide()
+        skillsBuild(f):Show()
+        skillsPaint()
+    else
+        f.title:SetText("Passive Web")
+        if f.skillPane then f.skillPane:Hide() end
+        f.webPane:Show()
+        treeRedraw()
+    end
+end
+
 function ArpgTree_Update(tree)
     treeData = tree
-    if treeFrame and treeFrame:IsVisible() then treeRedraw() end
+    if treeFrame and treeFrame:IsVisible() and treeFrame.tab ~= "skills" then treeRedraw() end
 end
 
 function ArpgTree_Toggle()
-    if not treeData then
+    if not treeData and not skillsData then
         treeAsk(3)
         DEFAULT_CHAT_FRAME:AddMessage("The passive web has not arrived from the server yet.")
         return
@@ -689,8 +1065,19 @@ function ArpgTree_Toggle()
     if f:IsVisible() then
         f:Hide()
     else
-        treeRedraw()
         f:Show()
+        ArpgTree_ShowTab(f.tab or (treeData and "web" or "skills"))
+    end
+end
+
+-- Spells without ranks: the spellbook shows each spell without its "Rank N".
+if SpellButton_UpdateButton then
+    local stockUpdateButton = SpellButton_UpdateButton
+    SpellButton_UpdateButton = function()
+        stockUpdateButton()
+        local sub = this and getglobal(this:GetName() .. "SubSpellName")
+        local text = sub and sub:GetText()
+        if text and string.find(text, "^Rank %d+$") then sub:SetText("") end
     end
 end
 

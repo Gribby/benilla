@@ -4,11 +4,16 @@
 //! HUD addon's web window (`ArpgTree_Update` in `arpg_hud.lua`), which the talent key opens in
 //! place of the talent frame.
 //!
+//! The same window's Skills tab shows the specialised skills and their trees
+//! (`SMSG_ARPG_SKILLS`, cmangos `Arpg/ArpgSkills.h`), handed over as `ArpgSkills_Update`.
+//!
 //! The window answers through one session-only setting, `arpgTreeAction`: a number, `kind *
 //! 100000 + node * 100 + nonce` with the nonce under 100 so a repeat still moves it (kind 1 take,
-//! 2 respec, 3 query, 4 give back), which [`on_tree_action`] turns into a `ClientCommand`.
+//! 2 respec, 3 query, 4 give back; 5 slot, its node `slot * 100 + skill`; 6 take a skill rank,
+//! 7 give one back, 8 respec a skill, its node the skill), which [`on_tree_action`] turns into a
+//! `ClientCommand`.
 
-use benilla_protocol::messages::ArpgTree;
+use benilla_protocol::messages::{ArpgSkills, ArpgTree};
 use benilla_protocol::{SessionEvent, SessionEventKind};
 use benilla_ui::script::UiScript;
 
@@ -27,12 +32,29 @@ pub(crate) struct ArpgTreeState {
     generation: u64,
     /// The VM and generation last handed to the window.
     pushed: Option<(u64, u64)>,
+    skills: Option<ArpgSkills>,
+    skills_generation: u64,
+    skills_pushed: Option<(u64, u64)>,
 }
 
 /// Registered whatever the view, so every session event kind has its owner.
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgTreeState>()
-        .net_handler(SessionEventKind::ArpgTree, on_tree);
+        .net_handler(SessionEventKind::ArpgTree, on_tree)
+        .net_handler(SessionEventKind::ArpgSkills, on_skills);
+}
+
+fn on_skills(In(ev): In<SessionEvent>, mut state: ResMut<ArpgTreeState>) {
+    if let SessionEvent::ArpgSkills { skills } = ev {
+        info!(
+            "arpg: skills, {} of {} points spent, {} skill(s)",
+            skills.points_spent,
+            skills.points_total,
+            skills.skills.len()
+        );
+        state.skills = Some(skills);
+        state.skills_generation += 1;
+    }
 }
 
 fn on_tree(In(ev): In<SessionEvent>, mut state: ResMut<ArpgTreeState>) {
@@ -123,31 +145,102 @@ fn tree_chunk(tree: &ArpgTree, icon: impl Fn(u32) -> Option<String>) -> String {
     )
 }
 
+/// The Lua chunk that hands `skills` to the window, as [`tree_chunk`] does the web.
+fn skills_chunk(skills: &ArpgSkills, icon: impl Fn(u32) -> Option<String>) -> String {
+    let icon_of = |id: u32| lua_str(&(if id == 0 { None } else { icon(id) }).unwrap_or_default());
+    let slots: Vec<String> = skills
+        .slots
+        .iter()
+        .map(|s| format!("{{level={},skill={}}}", s.level, s.skill))
+        .collect();
+    let list: Vec<String> = skills
+        .skills
+        .iter()
+        .map(|k| {
+            let branches: Vec<String> = k.branches.iter().map(|b| lua_str(b)).collect();
+            let nodes: Vec<String> = k
+                .nodes
+                .iter()
+                .map(|n| {
+                    format!(
+                        "{{id={},kind={},col={},row={},parent={},max={},rank={},icon={},name={},text={}}}",
+                        n.id,
+                        n.kind,
+                        n.column,
+                        n.row,
+                        n.parent,
+                        n.max_rank,
+                        n.rank,
+                        icon_of(n.icon_spell),
+                        lua_str(&n.name),
+                        lua_str(&n.text),
+                    )
+                })
+                .collect();
+            format!(
+                "{{id={},icon={},name={},text={},spent={},cap={},branches={{{}}},nodes={{{}}}}}",
+                k.id,
+                icon_of(k.icon_spell),
+                lua_str(&k.name),
+                lua_str(&k.text),
+                k.spent,
+                k.cap,
+                branches.join(","),
+                nodes.join(",\n"),
+            )
+        })
+        .collect();
+    format!(
+        "if not ArpgSkills_Update then return false end\n\
+         ArpgSkills_Update({{total={},spent={},level={},slots={{{}}},skills={{{}}}}})\n\
+         return true",
+        skills.points_total,
+        skills.points_spent,
+        skills.level,
+        slots.join(","),
+        list.join(",\n"),
+    )
+}
+
 /// Hand the window the newest tree, once per tree and VM (a reloaded UI is a new VM).
 fn push_tree(
     script: Option<NonSendMut<UiScript>>,
     mut state: ResMut<ArpgTreeState>,
     spells: Option<Res<crate::ui_action::Spells>>,
 ) {
-    let (Some(script), Some(tree)) = (script, state.tree.as_ref()) else {
+    let Some(script) = script else {
         return;
     };
-    let mark = (script.session(), state.generation);
-    if state.pushed == Some(mark) {
-        return;
-    }
-    let chunk = tree_chunk(tree, |id| {
+    let icon = |id: u32| {
         spells
             .as_deref()
             .and_then(|s| s.catalog.get(id))
             .and_then(|d| d.icon.clone())
-    });
-    match script.eval::<bool>(&chunk) {
-        Ok(true) => state.pushed = Some(mark),
-        Ok(false) => {}
-        Err(e) => {
-            warn!("arpg: the tree window refused the tree: {e}");
-            state.pushed = Some(mark);
+    };
+    let mark = (script.session(), state.generation);
+    if let Some(tree) = state.tree.as_ref().filter(|_| state.pushed != Some(mark)) {
+        match script.eval::<bool>(&tree_chunk(tree, icon)) {
+            Ok(true) => state.pushed = Some(mark),
+            Ok(false) => {}
+            Err(e) => {
+                warn!("arpg: the tree window refused the tree: {e}");
+                state.pushed = Some(mark);
+            }
+        }
+    }
+    let mark = (script.session(), state.skills_generation);
+    if let Some(skills) = state
+        .skills
+        .as_ref()
+        .filter(|_| state.skills_pushed != Some(mark))
+    {
+        match script.eval::<bool>(&skills_chunk(skills, icon)) {
+            Ok(true) => state.skills_pushed = Some(mark),
+            Ok(false) => {}
+            Err(e) => {
+                warn!("arpg: the tree window refused the skills: {e}");
+                state.skills_pushed = Some(mark);
+            }
         }
     }
 }
@@ -159,6 +252,9 @@ enum TreeAction {
     Respec,
     Query,
     Refund(u16),
+    Slot { slot: u8, skill: u8 },
+    SkillNode { node: u16, refund: bool },
+    SkillRespec(u8),
 }
 
 fn parse_action(value: &str) -> Option<TreeAction> {
@@ -172,6 +268,22 @@ fn parse_action(value: &str) -> Option<TreeAction> {
         4 => u16::try_from(code % 100_000 / 100)
             .ok()
             .map(TreeAction::Refund),
+        5 => {
+            let field = code % 100_000 / 100;
+            Some(TreeAction::Slot {
+                slot: u8::try_from(field / 100).ok()?,
+                skill: u8::try_from(field % 100).ok()?,
+            })
+        }
+        6 | 7 => u16::try_from(code % 100_000 / 100)
+            .ok()
+            .map(|node| TreeAction::SkillNode {
+                node,
+                refund: code / 100_000 == 7,
+            }),
+        8 => u8::try_from(code % 100_000 / 100)
+            .ok()
+            .map(TreeAction::SkillRespec),
         _ => None,
     }
 }
@@ -186,6 +298,11 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
         Some(TreeAction::Respec) => ClientCommand::ArpgTreeRespec,
         Some(TreeAction::Query) => ClientCommand::ArpgTreeQuery,
         Some(TreeAction::Refund(node)) => ClientCommand::ArpgTreeRefund { node },
+        Some(TreeAction::Slot { slot, skill }) => ClientCommand::ArpgSkillSlot { slot, skill },
+        Some(TreeAction::SkillNode { node, refund }) => {
+            ClientCommand::ArpgSkillNode { node, refund }
+        }
+        Some(TreeAction::SkillRespec(skill)) => ClientCommand::ArpgSkillRespec { skill },
         None => return,
     };
     let _ = net.0.send(command);
@@ -194,7 +311,9 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use benilla_protocol::messages::{ArpgTreeNode, ArpgTreeRegion};
+    use benilla_protocol::messages::{
+        ArpgSkill, ArpgSkillNode, ArpgSkillSlot, ArpgTreeNode, ArpgTreeRegion,
+    };
 
     #[test]
     fn actions_parse_and_junk_does_not() {
@@ -203,8 +322,84 @@ mod tests {
         assert_eq!(parse_action("200003"), Some(TreeAction::Respec));
         assert_eq!(parse_action("300001"), Some(TreeAction::Query));
         assert_eq!(parse_action("408811"), Some(TreeAction::Refund(88)));
+        assert_eq!(
+            parse_action("520305"),
+            Some(TreeAction::Slot { slot: 2, skill: 3 })
+        );
+        assert_eq!(
+            parse_action("630101"),
+            Some(TreeAction::SkillNode {
+                node: 301,
+                refund: false
+            })
+        );
+        assert_eq!(
+            parse_action("730102"),
+            Some(TreeAction::SkillNode {
+                node: 301,
+                refund: true
+            })
+        );
+        assert_eq!(parse_action("800403"), Some(TreeAction::SkillRespec(4)));
         assert_eq!(parse_action("0"), None);
         assert_eq!(parse_action("spend"), None);
+    }
+
+    #[test]
+    fn the_skills_chunk_hands_the_window_slots_skills_and_nodes() {
+        let skills = ArpgSkills {
+            points_total: 40,
+            points_spent: 2,
+            level: 21,
+            slots: vec![ArpgSkillSlot { level: 1, skill: 3 }],
+            skills: vec![ArpgSkill {
+                id: 3,
+                icon_spell: 20271,
+                name: "Judgement".into(),
+                text: "Unleash your Seal.".into(),
+                spent: 2,
+                cap: 20,
+                branches: vec!["Chain".into()],
+                nodes: vec![ArpgSkillNode {
+                    id: 301,
+                    kind: 2,
+                    column: 0,
+                    row: 1,
+                    parent: 0,
+                    max_rank: 3,
+                    rank: 2,
+                    icon_spell: 20186,
+                    name: "Chain of Judgement".into(),
+                    text: "Chains.".into(),
+                }],
+            }],
+        };
+        let chunk = skills_chunk(&skills, |_| Some("Interface\\Icons\\Spell_Holy".into()));
+        let script = UiScript::new().unwrap();
+        script
+            .run("function ArpgSkills_Update(t) GOT = t end")
+            .unwrap();
+        assert!(script.eval::<bool>(&chunk).unwrap());
+        assert_eq!(script.eval::<u32>("return GOT.level").unwrap(), 21);
+        assert_eq!(script.eval::<u32>("return GOT.slots[1].skill").unwrap(), 3);
+        assert_eq!(
+            script
+                .eval::<String>("return GOT.skills[1].nodes[1].name")
+                .unwrap(),
+            "Chain of Judgement"
+        );
+        assert_eq!(
+            script
+                .eval::<u32>("return GOT.skills[1].nodes[1].rank")
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            script
+                .eval::<String>("return GOT.skills[1].branches[1]")
+                .unwrap(),
+            "Chain"
+        );
     }
 
     #[test]

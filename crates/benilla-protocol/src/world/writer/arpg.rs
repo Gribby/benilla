@@ -34,6 +34,10 @@ const KIND_TREE_SPEND: u8 = 8;
 const KIND_TREE_RESPEC: u8 = 9;
 const KIND_TREE_QUERY: u8 = 10;
 const KIND_TREE_REFUND: u8 = 11;
+const KIND_SKILL_SLOT: u8 = 12;
+const KIND_SKILL_SPEND: u8 = 13;
+const KIND_SKILL_REFUND: u8 = 14;
+const KIND_SKILL_RESPEC: u8 = 15;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -125,6 +129,22 @@ pub fn arpg_tree_spend_body(node: u16) -> Vec<u8> {
     body
 }
 
+/// The skill slot body: `skill` into `slot` (0 empties it).
+pub fn arpg_skill_slot_body(slot: u8, skill: u8) -> Vec<u8> {
+    vec![KIND_SKILL_SLOT, slot, skill]
+}
+
+/// A skill node body: a rank into `node`, or `refund` one back.
+pub fn arpg_skill_node_body(node: u16, refund: bool) -> Vec<u8> {
+    let mut body = vec![if refund {
+        KIND_SKILL_REFUND
+    } else {
+        KIND_SKILL_SPEND
+    }];
+    body.extend_from_slice(&node.to_le_bytes());
+    body
+}
+
 /// The web give-back body: `node`'s point back.
 pub fn arpg_tree_refund_body(node: u16) -> Vec<u8> {
     let mut body = vec![KIND_TREE_REFUND];
@@ -136,6 +156,21 @@ impl WorldWriter {
     /// Take a node of the ARPG passive web.
     pub fn arpg_tree_spend(&mut self, node: u16) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_tree_spend_body(node))
+    }
+
+    /// Put an ARPG skill in a specialisation slot.
+    pub fn arpg_skill_slot(&mut self, slot: u8, skill: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_skill_slot_body(slot, skill))
+    }
+
+    /// Take a rank of an ARPG skill tree node, or give one back.
+    pub fn arpg_skill_node(&mut self, node: u16, refund: bool) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_skill_node_body(node, refund))
+    }
+
+    /// Give back every point in an ARPG skill.
+    pub fn arpg_skill_respec(&mut self, skill: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_SKILL_RESPEC, skill])
     }
 
     /// Give a node of the ARPG passive web back.
@@ -225,6 +260,9 @@ mod tests {
     fn the_tree_spend_body_is_kind_and_node() {
         assert_eq!(arpg_tree_spend_body(0x0102), vec![8, 0x02, 0x01]);
         assert_eq!(arpg_tree_refund_body(0x0102), vec![11, 0x02, 0x01]);
+        assert_eq!(arpg_skill_slot_body(2, 3), vec![12, 2, 3]);
+        assert_eq!(arpg_skill_node_body(301, false), vec![13, 0x2D, 0x01]);
+        assert_eq!(arpg_skill_node_body(301, true), vec![14, 0x2D, 0x01]);
     }
 
     #[test]

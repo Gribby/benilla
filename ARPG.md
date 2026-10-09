@@ -31,6 +31,7 @@ Client (`crates/`):
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
 | Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |
 | Passive web window (talent key), fed by `SMSG_ARPG_TREE` 0x33F (version 2), take/give back/respec through `arpgTreeAction` | `benilla-app/src/player/arpg/tree.rs`, `arpg_hud.lua` |
+| Skills tab of the same window: specialisation slots and skill trees, fed by `SMSG_ARPG_SKILLS` 0x340, slot/take/give back/respec through `arpgTreeAction`; the spellbook hides "Rank N" | `benilla-app/src/player/arpg/tree.rs`, `arpg_hud.lua` |
 | Uniques: the server's item lines (`SMSG_ARPG_ITEM_MECHANICS` 0x33E), the pale gold tooltip line, the gold label border and beam core | `benilla-app/src/player/arpg/uniques.rs`, `ui_items/feed.rs`, `benilla-ui/src/script/tooltip_item/render.rs`, `loot.rs` |
 
 Floating damage numbers are stock benilla (`combat_text`).

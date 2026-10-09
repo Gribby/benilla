@@ -4514,6 +4514,41 @@ fn the_arpg_web_window_takes_a_joined_node() {
     assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
 }
 
+/// Fork-only: the web window's Skills tab shows the slots and the chosen skill's tree, and takes a
+/// rank in a specialised skill's open node through `arpgTreeAction`.
+#[test]
+fn the_arpg_skills_tab_takes_a_rank() {
+    benilla_formats::wow_data_or_skip!();
+    let s = harness();
+    s.register_cvars(crate::cvars::registered_pairs());
+    s.run(include_str!("../player/arpg_hud.lua")).unwrap();
+    s.run(
+        "ArpgSkills_Update({total=4,spent=0,level=12,\
+           slots={{level=1,skill=3},{level=10,skill=0},{level=20,skill=0}},\
+           skills={{id=3,icon=\"\",name=\"Judgement\",text=\"Judge.\",spent=0,cap=20,branches={\"Chain\"},\
+             nodes={{id=301,kind=2,col=0,row=1,parent=0,max=3,rank=0,icon=\"\",name=\"Chain\",text=\"Chains.\"},\
+                    {id=302,kind=1,col=0,row=2,parent=301,max=3,rank=0,icon=\"\",name=\"Echo\",text=\"More.\"}}}}})",
+    )
+    .unwrap();
+    s.run("ArpgTree_Toggle() ArpgTree_ShowTab(\"skills\")")
+        .unwrap();
+    assert!(s.frame_visible("ArpgSkillPane"));
+    // The node below an unranked one asks for nothing; the open one takes a rank.
+    s.run("ArpgSkillNode3:Click()").unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgTreeAction\")")
+            .unwrap(),
+        "0"
+    );
+    s.run("ArpgSkillNode2:Click()").unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgTreeAction\")")
+            .unwrap(),
+        "630101"
+    );
+    assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
+}
+
 /// Fork-only: the ARPG HUD addon adds an "ARPG View" page whose sliders write their settings at
 /// once, read back on a refresh, and reset to the table's defaults.
 #[test]

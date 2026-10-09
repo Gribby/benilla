@@ -138,6 +138,134 @@ pub fn read_arpg_tree(r: &mut impl io::Read) -> io::Result<ArpgTree> {
     })
 }
 
+/// The player's specialised skills and their trees (cmangos `Arpg/ArpgSkills.h`), sent after the
+/// hello and every change.
+pub const SMSG_ARPG_SKILLS: u16 = 0x0340;
+
+/// One specialisation slot: the level it opens at and the skill in it (0: empty).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArpgSkillSlot {
+    pub level: u8,
+    pub skill: u8,
+}
+
+/// One node of a skill's tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArpgSkillNode {
+    /// The skill's id times 100 plus the node's number.
+    pub id: u16,
+    /// 1 modifier, 2 transformer, 3 synergy, 4 capstone.
+    pub kind: u8,
+    pub column: u8,
+    pub row: u8,
+    /// The node above it; 0 the skill itself.
+    pub parent: u16,
+    pub max_rank: u8,
+    pub rank: u8,
+    pub icon_spell: u32,
+    pub name: String,
+    pub text: String,
+}
+
+/// A skill that can be specialised, with its tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArpgSkill {
+    pub id: u8,
+    pub icon_spell: u32,
+    pub name: String,
+    pub text: String,
+    /// Points in its tree, and the most it takes.
+    pub spent: u8,
+    pub cap: u8,
+    pub branches: Vec<String>,
+    pub nodes: Vec<ArpgSkillNode>,
+}
+
+/// Every skill the class can specialise, the slots, and the points.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgSkills {
+    pub points_total: u16,
+    pub points_spent: u16,
+    /// The character's level, which the slots open by.
+    pub level: u8,
+    pub slots: Vec<ArpgSkillSlot>,
+    pub skills: Vec<ArpgSkill>,
+}
+
+/// `SMSG_ARPG_SKILLS`: `u8` version (1), `u16` points total and spent, `u8` level; `u8` slot count,
+/// per slot `u8` level and skill; `u8` skill count, per skill `u8` id, `u32` icon spell, C strings
+/// name and text, `u8` spent and cap, `u8` branch count and a C string each, `u8` node count, per
+/// node `u16` id, `u8` kind, column and row, `u16` parent, `u8` max rank and rank, `u32` icon
+/// spell, C strings name and text.
+pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
+    let version = read_u8(r)?;
+    if version != 1 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("ARPG skills version {version}, this client reads 1"),
+        ));
+    }
+    let points_total = read_u16_le(r)?;
+    let points_spent = read_u16_le(r)?;
+    let level = read_u8(r)?;
+    let ns = read_u8(r)?;
+    let mut slots = Vec::with_capacity(capacity_hint(ns, 8));
+    for _ in 0..ns {
+        slots.push(ArpgSkillSlot {
+            level: read_u8(r)?,
+            skill: read_u8(r)?,
+        });
+    }
+    let nk = read_u8(r)?;
+    let mut skills = Vec::with_capacity(capacity_hint(nk, 16));
+    for _ in 0..nk {
+        let id = read_u8(r)?;
+        let icon_spell = read_u32_le(r)?;
+        let name = read_cstring(r)?;
+        let text = read_cstring(r)?;
+        let spent = read_u8(r)?;
+        let cap = read_u8(r)?;
+        let nb = read_u8(r)?;
+        let mut branches = Vec::with_capacity(capacity_hint(nb, 8));
+        for _ in 0..nb {
+            branches.push(read_cstring(r)?);
+        }
+        let nn = read_u8(r)?;
+        let mut nodes = Vec::with_capacity(capacity_hint(nn, 32));
+        for _ in 0..nn {
+            nodes.push(ArpgSkillNode {
+                id: read_u16_le(r)?,
+                kind: read_u8(r)?,
+                column: read_u8(r)?,
+                row: read_u8(r)?,
+                parent: read_u16_le(r)?,
+                max_rank: read_u8(r)?,
+                rank: read_u8(r)?,
+                icon_spell: read_u32_le(r)?,
+                name: read_cstring(r)?,
+                text: read_cstring(r)?,
+            });
+        }
+        skills.push(ArpgSkill {
+            id,
+            icon_spell,
+            name,
+            text,
+            spent,
+            cap,
+            branches,
+            nodes,
+        });
+    }
+    Ok(ArpgSkills {
+        points_total,
+        points_spent,
+        level,
+        slots,
+        skills,
+    })
+}
+
 /// `SMSG_ARPG_LOOT`: the corpse, its gold, and the items.
 pub fn read_arpg_loot(r: &mut impl io::Read) -> io::Result<(u64, u32, Vec<ArpgLootItem>)> {
     let corpse = read_u64_le(r)?;
@@ -214,6 +342,63 @@ mod tests {
         assert!(tree.nodes[0].taken);
         assert_eq!(tree.links, vec![(1, 2)]);
         assert!(read_arpg_tree(&mut [1u8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn skills_read_their_slots_skills_and_nodes() {
+        let mut body = vec![1];
+        body.extend_from_slice(&40u16.to_le_bytes());
+        body.extend_from_slice(&3u16.to_le_bytes());
+        body.push(21);
+        body.push(2);
+        body.extend_from_slice(&[1, 3, 10, 0]);
+        body.push(1);
+        body.push(3);
+        body.extend_from_slice(&20271u32.to_le_bytes());
+        body.extend_from_slice(b"Judgement\0Unleash your Seal.\0");
+        body.extend_from_slice(&[3, 20, 1]);
+        body.extend_from_slice(b"Chain\0");
+        body.push(1);
+        body.extend_from_slice(&301u16.to_le_bytes());
+        body.extend_from_slice(&[2, 0, 1]);
+        body.extend_from_slice(&0u16.to_le_bytes());
+        body.extend_from_slice(&[3, 2]);
+        body.extend_from_slice(&20186u32.to_le_bytes());
+        body.extend_from_slice(b"Chain of Judgement\0Chains.\0");
+        let skills = read_arpg_skills(&mut body.as_slice()).unwrap();
+        assert_eq!(
+            (skills.points_total, skills.points_spent, skills.level),
+            (40, 3, 21)
+        );
+        assert_eq!(
+            skills.slots,
+            vec![
+                ArpgSkillSlot { level: 1, skill: 3 },
+                ArpgSkillSlot {
+                    level: 10,
+                    skill: 0
+                }
+            ]
+        );
+        let judgement = &skills.skills[0];
+        assert_eq!((judgement.id, judgement.spent, judgement.cap), (3, 3, 20));
+        assert_eq!(judgement.branches, vec!["Chain".to_string()]);
+        assert_eq!(
+            judgement.nodes[0],
+            ArpgSkillNode {
+                id: 301,
+                kind: 2,
+                column: 0,
+                row: 1,
+                parent: 0,
+                max_rank: 3,
+                rank: 2,
+                icon_spell: 20186,
+                name: "Chain of Judgement".into(),
+                text: "Chains.".into(),
+            }
+        );
+        assert!(read_arpg_skills(&mut [2u8].as_slice()).is_err());
     }
 
     #[test]

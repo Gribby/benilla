@@ -206,7 +206,8 @@ plain gear. Tomes (a third drop type) aren't needed.
 
 - **A skill is one spell with no "Rank N".** The spellbook shows one Judgement; trainers no
   longer teach spells. A class's skills unlock at the level vanilla first gives them, for
-  free; a talent-granted spell at its talent row's level (Consecration at 20; built in phase 1).
+  free; a talent-granted spell at its talent row's level (Consecration at 6, the paladin's one
+  exception). Built: phase 1 gives the talent spells, phase 2 the trainer spells.
 - **Base power follows your level smoothly.** The server takes vanilla's rank data for your level
   and blends between the two ranks either side of it, so damage and mana cost climb a little every
   level instead of jumping at rank 2, 3, 4.
@@ -277,7 +278,7 @@ hit any creature type** for ARPG players (their undead-and-demon limit is a raid
 | Strike | Melee, Physical | The held swing | The left-click |
 | Seals | Seal, Holy, Melee | All Seals, as one skill | Swing empowerment |
 | Judgement | Spell, Holy | Judgement | Burst, chaining |
-| Consecration | Spell, Holy, Area, Ground | Consecration (free at 20, its talent row) | Ground control |
+| Consecration | Spell, Holy, Area, Ground | Consecration (free at 6) | Ground control |
 | Hammer of Justice | Spell, Control | Hammer of Justice | Stun, or a thrown hammer |
 | Exorcism | Spell, Holy | Exorcism | Single-target nuke |
 | Holy Shock | Spell, Holy, Heal | Holy Shock (baseline at 40) | Damage-or-heal |
@@ -479,7 +480,7 @@ and its capstones (Avenger, Martyr's Ward, Dawnbringer, Purifying Light) move to
 in phase 2. Their server hooks stay. The talent-granted spells (Consecration, Seal of Command,
 Blessing of Kings at 20; Blessing of Sanctuary, Divine Favor, Sanctity Aura at 30; Holy Shock,
 Holy Shield, Repentance at 40) come free at the level their talent row needs, as "Spells without
-ranks" plans.
+ranks" plans; Consecration comes at 6.
 
 ### Example builds at 60
 
@@ -539,12 +540,41 @@ for capstones and hooks:
 1. **Tags, attributes and the web.** Built: tag bonuses, the five attributes' ARPG effects, the
    paladin web with its small nodes, notables and keystones, boss-kill points, and the web
    window. It replaced the first tree.
-2. **Skill specialisation and spells without ranks.** Slots by level, the skill point pool, rank
-   handling, and the paladin's five most-wanted skill trees (Strike, Seals, Judgement,
-   Consecration, Hammer of Justice).
+2. **Skill specialisation and spells without ranks.** Built: slots by level, the skill point
+   pool, the first pass at spells without ranks, and the paladin's five most-wanted skill trees
+   (Strike, Seals, Judgement, Consecration, Hammer of Justice). See "What phase 2 built" below.
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
 5. **Other classes**, one at a time, starting with whichever Jeff plays next.
+
+### What phase 2 built
+
+- **Slots and points** as "Specialisation" says: five slots at 1/10/20/30/40, two points a level
+  from 2 to 51, 20 at most in one skill. The window's Skills tab (the talent key) lists the slots
+  and the skills; Specialise puts the shown skill in the chosen slot (or the first open one),
+  Take Out empties its slot and gives its points back. A skill moved between slots keeps them.
+- **Not yet:** a slotted skill isn't placed on a bar; spells stay on the stock action bar. The
+  ARPG bar (left click, right click, 1 to 4) is a UI step of its own. Capstones are open:
+  nothing seals them until Codex pages drop (phase 3).
+- **Spells without ranks, first pass:** an ARPG character gets every spell its class trainers
+  teach, free, at the trainer's level (rank 2 of a spell at rank 2's level); the server's
+  spellbook shows only a chain's top rank, the client keeps the bar on it, and the spellbook
+  hides "Rank N". Tooltips still show it. The smooth blend between ranks is still to come.
+- **The five trees** are the tables above, with these differences:
+  - Strike: Momentum gives +1/2/3% swing damage per hit in a row (5 at most); Whirling
+    Strikes hits all around at 75%; Stagger casts Dazed (a slow) rather than a 1 sec daze.
+  - Seals: Seal of Command is already free at 20, so Commanding Seal is +10% Seal of Command
+    damage per rank, and Relentless sits under Command Arc. Zeal is +10% attack speed per rank
+    while Seal of the Crusader is on; the Seal's own damage loss stays.
+  - Hammer of Justice: it's a skillshot for ARPG players already, so Hurled Hammer adds 10 yards
+    of range. Ricochet bounces free copies of the stun. Blessed Hammer throws a holy hammer at each
+    of the three nearest enemies within 15 yards for half your attack power (no spiral yet).
+    Holy Hammer is 30/45/60% of attack power as Holy damage.
+  - Walking Consecration, Hallowed Ground and Steadfast check once a second.
+- **How it's built:** `Arpg/ArpgSkills.{h,cpp}` holds the skills and trees as data; a node is a
+  spell modifier (sent to the client like a talent's, so cooldowns and ranges agree), a uniques
+  kit row, or a keystone rank a hook reads (`Arpg/ArpgCharacter.cpp`). Saved in
+  `character_arpg_skill` and `character_arpg_skill_node`; wire in `ARPG.md`.
 
 ## Open questions for Jeff
 
