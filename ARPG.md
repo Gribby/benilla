@@ -93,7 +93,7 @@ Next:
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
 - Phase 3: more and denser mobs (server spawn scaling), mob packs, dodge/evade movement skill,
   potions on hotkeys, real item models on the ground.
-- Itemisation: see `docs/ARPG-ITEMISATION.md`; the named-item uniques: `docs/ARPG-UNIQUES.md`.
+- Itemisation: see `docs/ARPG-ITEMISATION.md`; the named-item uniques: `docs/ARPG-UNIQUES.md`; skill trees: `docs/ARPG-SKILL-TREES.md` (paladin first).
 - Phase 4: vanilla raids as weekly-lockout solo ARPG dungeons (scaled bosses, trash density,
   pacing like vanilla's raid week).
 
