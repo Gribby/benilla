@@ -34,8 +34,10 @@
 
 mod fx;
 mod loot;
+mod tree;
 mod uniques;
 
+pub(crate) use tree::CVAR_TREE_ACTION;
 pub(crate) use uniques::{ArpgUniques, UNIQUE_RGB};
 
 use super::camera::CAM_PITCH_LIMIT;
@@ -245,6 +247,7 @@ pub(super) fn plugin(app: &mut App) {
     // The ground loot's wire half, whatever the view: every session event kind needs an owner.
     loot::register_net(app);
     uniques::register_net(app);
+    tree::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -256,6 +259,8 @@ pub(super) fn plugin(app: &mut App) {
     fx::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
+    // The skill tree window's feed and requests.
+    tree::plugin(app);
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);

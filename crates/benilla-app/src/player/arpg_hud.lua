@@ -302,3 +302,204 @@ local function addArpgOptionsPage()
 end
 
 addArpgOptionsPage()
+
+-- ── The ARPG skill tree window ──
+-- The server owns the tree (Arpg/ArpgTree.h): the client hands each layout it sends to
+-- ArpgTree_Update. The talent key and the talent micro button open this window in place of the
+-- talent frame; a click spends a point, Respec refunds them all (free, out of combat). Requests go
+-- back through the session-only setting arpgTreeAction, as a number.
+
+local TREE_GATES = { 0, 5, 10, 20 }
+local TREE_KINDS = {
+    [0] = { "Passive", 0.55, 0.62, 0.75 },
+    [1] = { "Skill", 1.0, 0.82, 0.0 },
+    [2] = { "Modifier", 0.902, 0.8, 0.502 },
+    [3] = { "Keystone", 1.0, 0.5, 0.0 },
+}
+local TREE_NODE, TREE_COL, TREE_ROW = 40, 64, 84
+local treeData, treeFrame, treeNonce = nil, nil, 0
+
+-- kind 1 spend, 2 respec, 3 query: kind * 100000 + node * 100 + a nonce under 100.
+local function treeAsk(kind, node)
+    treeNonce = treeNonce + 1
+    if treeNonce >= 100 then treeNonce = 1 end
+    SetCVar("arpgTreeAction", tostring(kind * 100000 + (node or 0) * 100 + treeNonce))
+end
+
+local function treeSpentIn(branch)
+    local spent = 0
+    for _, n in ipairs(treeData.nodes) do
+        if n.branch == branch then spent = spent + n.rank end
+    end
+    return spent
+end
+
+-- Why a point cannot go into `n` now, or nil when it can.
+local function treeBlocked(n)
+    if n.rank >= n.max then return "Fully learned" end
+    if treeData.spent >= treeData.total then return "No points left" end
+    local gate = TREE_GATES[n.tier] or 0
+    if treeSpentIn(n.branch) < gate then
+        return "Requires " .. gate .. " points in " .. (treeData.branches[n.branch + 1] or "this branch")
+    end
+    return nil
+end
+
+local function treeShowTip(button)
+    local n = button.node
+    if not n then return end
+    local kind = TREE_KINDS[n.kind] or TREE_KINDS[0]
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+    GameTooltip:SetText(n.name, 1, 1, 1)
+    GameTooltip:AddLine(kind[1] .. "   Rank " .. n.rank .. "/" .. n.max, kind[2], kind[3], kind[4])
+    GameTooltip:AddLine(n.text, 1, 0.82, 0, 1)
+    local blocked = treeBlocked(n)
+    if blocked then
+        GameTooltip:AddLine(blocked, 1, 0.13, 0.13)
+    else
+        GameTooltip:AddLine("Click to learn", 0, 1, 0)
+    end
+    GameTooltip:Show()
+end
+
+local function treeMakeButton(parent, name)
+    local b = CreateFrame("Button", name, parent)
+    b:SetWidth(TREE_NODE)
+    b:SetHeight(TREE_NODE)
+    b.border = b:CreateTexture(nil, "BACKGROUND")
+    b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -3, 3)
+    b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 3, -3)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints(b)
+    b.rank = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    b.rank:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 2, -2)
+    b:SetScript("OnEnter", function() treeShowTip(this) end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:SetScript("OnClick", function()
+        if this.node and not treeBlocked(this.node) then
+            treeAsk(1, this.node.id)
+        end
+    end)
+    return b
+end
+
+local function treeBuild()
+    if treeFrame then return treeFrame end
+    local f = CreateFrame("Frame", "ArpgTreeFrame", UIParent)
+    f:SetWidth(3 * 230 + 40)
+    f:SetHeight(4 * TREE_ROW + 110)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+    f:SetFrameStrata("DIALOG")
+    f:EnableMouse(true)
+    f:Hide()
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(f)
+    bg:SetTexture(0.04, 0.035, 0.05, 0.94)
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", f, "TOP", 0, -12)
+    title:SetText("Skill Tree")
+    f.points = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.points:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -16)
+    local close = CreateFrame("Button", "ArpgTreeFrameClose", f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    local respec = CreateFrame("Button", "ArpgTreeFrameRespec", f, "UIPanelButtonTemplate")
+    respec:SetWidth(90)
+    respec:SetHeight(22)
+    respec:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+    respec:SetText("Respec")
+    respec:SetScript("OnClick", function() treeAsk(2) end)
+    f.columns, f.buttons = {}, {}
+    for b = 1, 3 do
+        local col = CreateFrame("Frame", nil, f)
+        col:SetWidth(220)
+        col:SetHeight(4 * TREE_ROW + 30)
+        col:SetPoint("TOPLEFT", f, "TOPLEFT", 20 + (b - 1) * 230, -44)
+        local shade = col:CreateTexture(nil, "BACKGROUND")
+        shade:SetAllPoints(col)
+        shade:SetTexture(1, 1, 1, 0.04)
+        col.label = col:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        col.label:SetPoint("TOP", col, "TOP", 0, -6)
+        f.columns[b] = col
+    end
+    if UISpecialFrames then tinsert(UISpecialFrames, "ArpgTreeFrame") end
+    treeFrame = f
+    return f
+end
+
+local function treeRedraw()
+    if not treeData then return end
+    local f = treeBuild()
+    f.points:SetText("Points: " .. (treeData.total - treeData.spent) .. " of " .. treeData.total .. " left")
+    for b = 1, 3 do
+        local col = f.columns[b]
+        local name = treeData.branches[b]
+        if name then
+            col.label:SetText(name .. "  (" .. treeSpentIn(b - 1) .. ")")
+            col:Show()
+        else
+            col:Hide()
+        end
+    end
+    for _, button in pairs(f.buttons) do button:Hide() end
+    for _, n in ipairs(treeData.nodes) do
+        local col = f.columns[n.branch + 1]
+        if col then
+            local button = f.buttons[n.id]
+            if not button then
+                button = treeMakeButton(col, "ArpgTreeNode" .. n.id)
+                f.buttons[n.id] = button
+            end
+            button.node = n
+            button:ClearAllPoints()
+            button:SetPoint("TOPLEFT", col, "TOPLEFT", 22 + n.column * TREE_COL, -30 - (n.tier - 1) * TREE_ROW)
+            button.icon:SetTexture(n.icon ~= "" and n.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            local kind = TREE_KINDS[n.kind] or TREE_KINDS[0]
+            local blocked = treeBlocked(n)
+            local open = n.rank > 0 or not blocked or blocked == "Fully learned"
+            if open then
+                button.icon:SetVertexColor(1, 1, 1)
+                button.border:SetTexture(kind[2], kind[3], kind[4], 0.9)
+            else
+                button.icon:SetVertexColor(0.35, 0.35, 0.35)
+                button.border:SetTexture(0.25, 0.25, 0.25, 0.9)
+            end
+            button.rank:SetText(n.rank .. "/" .. n.max)
+            if n.rank >= n.max then
+                button.rank:SetTextColor(1, 0.82, 0)
+            elseif n.rank > 0 then
+                button.rank:SetTextColor(0, 1, 0)
+            else
+                button.rank:SetTextColor(0.8, 0.8, 0.8)
+            end
+            button:Show()
+        end
+    end
+end
+
+function ArpgTree_Update(tree)
+    treeData = tree
+    if treeFrame and treeFrame:IsVisible() then treeRedraw() end
+end
+
+function ArpgTree_Toggle()
+    if not treeData then
+        treeAsk(3)
+        DEFAULT_CHAT_FRAME:AddMessage("The skill tree has not arrived from the server yet.")
+        return
+    end
+    local f = treeBuild()
+    if f:IsVisible() then
+        f:Hide()
+    else
+        treeRedraw()
+        f:Show()
+    end
+end
+
+-- The talent key and the talent micro button open the tree instead.
+ToggleTalentFrame = ArpgTree_Toggle
+
+-- A level gives a point: ask for the fresh count.
+local treeEvents = CreateFrame("Frame")
+treeEvents:RegisterEvent("PLAYER_LEVEL_UP")
+treeEvents:SetScript("OnEvent", function() treeAsk(3) end)

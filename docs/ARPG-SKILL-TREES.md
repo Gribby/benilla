@@ -1,6 +1,6 @@
 # ARPG skill trees: a new tree per class
 
-Design, not built. Jeff's call (`ARPG-ITEMISATION.md`, "Decisions so far"): ARPG players get a new
+The paladin tree is built (see "How it's built"). Jeff's call (`ARPG-ITEMISATION.md`, "Decisions so far"): ARPG players get a new
 tree per class in place of vanilla's talents. This doc sets the framework every class shares, then
 the paladin tree in full, since that's the class Jeff is testing. The other classes get a sketch
 each, to be filled in the same way.
@@ -35,16 +35,16 @@ to find.
 
 ## Points and pacing
 
-- **One point per level from 10 to 60: 51 points**, exactly vanilla's budget. Items, mobs and
-  raids were tuned against characters with 51 talents' worth of power, so keeping the total keeps
-  vanilla's balance as a floor.
-- **Three branches of about 20 points each, with three tiers per branch.** A tier opens at 5 and
-  10 points spent in that branch, the keystone at 20. That's vanilla's own pacing (a tier every 5),
-  compressed so a branch can be finished by about level 45 and the last points go to a second
-  branch.
-- **Respec:** free outside combat while the player stands at a rested spot (an inn or a city). Diablo
-  respecs are cheap because experimenting is the fun. Vanilla's rising gold cost is about a raid
-  economy that doesn't exist here.
+Jeff's calls: the tree replaces talents, points are generous, respecs are free, and the three
+paladin keystones stand.
+
+- **One point per level past the first: 59 at 60.** The paladin tree holds 71 ranks, so a level 60
+  fills two branches and part of a third. Points beyond vanilla's 51 are extra power. That's fine
+  for a solo ARPG, and it's the first thing to trim if the tuning feels loose.
+- **Three branches with three tiers and a keystone each.** A tier opens at 5 and 10 points spent in
+  its branch, the keystone at 20. A talent rank or a taught spell also waits for the level vanilla
+  gives that spell at (Holy Shock at 40), so a low-level character can't skip ahead of its spells.
+- **Respec:** free, any time out of combat.
 
 ## The paladin tree
 
@@ -81,7 +81,7 @@ The paladin who doesn't need a healer: control the pack, punish anything that hi
 | 2 | Holy Shield | Skill | 1 | Teaches Holy Shield (vanilla's 31-point talent, here at 10 points) |
 | 3 | Blessing of Sanctuary | Skill | 1 | Teaches it: blocked damage hurts the attacker (vanilla's) |
 | 3 | Radiant Shield | Modifier | 1 | Holy Shield's holy damage bursts onto every enemy within 5 yd of the one it hits, at 50% (kit E) |
-| Key | **Martyr's Ward** | Keystone | 1 | Retribution Aura's damage is doubled and it hits every enemy within 10 yd once a second while you're in combat, not only those that hit you. Standing in a pack is the plan. |
+| Key | **Martyr's Ward** | Keystone | 1 | While you're in combat, Retribution Aura also strikes every enemy within 10 yd once a second, for double its damage. Standing in a pack is the plan. |
 
 ### Branch 3: Lightbringer (holy caster, from Holy)
 
@@ -109,39 +109,48 @@ The ranged paladin: holy damage at range, sustain from healing spells.
 - **Lightbringer 20 + Crusader:** Dawnbringer and Holy Shock at range, Judgement chaining in
   melee when something reaches you.
 
-## How it gets built
+## How it's built
 
-### Server (cmangos)
+### Server (cmangos, `src/game/Arpg/ArpgTree.{h,cpp}`)
 
-- **The tree is data in code**, as the uniques are (`Arpg/ArpgTree.cpp`): branches, tiers,
-  nodes, each node's kind, ranks, and what it gives (a talent spell id per rank, a spell to teach,
-  a kit row, or a keystone id).
-- **Saved per character** in a new `character_arpg_tree` table (guid, node, rank), loaded at login.
+- **The tree is data in code**, as the uniques are: per node its branch, tier, column, kind, ranks,
+  and what it gives. Talents are named, not numbered ("Conviction"): the server finds the class's
+  talent by its rank 1 spell's name and teaches its rank N spell. Modifier and keystone spells are
+  named too and resolved at first use; a name the data lacks logs an "ARPG tree:" error.
+- **Saved per character** in `character_arpg_tree` (guid, node, rank), which the server creates
+  if it's missing, so there's no SQL to run. Loaded at login, before the character's spells.
 - **Applying a node:**
-  - Passive: `learnSpell(rank spell)`, exactly as vanilla learns a talent rank.
-  - Skill: `learnSpell(spell)`.
-  - Modifier: a row the uniques' lookup also reads (`WornMechanic` becomes "worn or learned").
-  - Keystone: a flag the keystone's own hook checks.
-- **Vanilla talents for an ARPG player:** reset to zero and the talent window refuses to spend
-  (`CMSG_LEARN_TALENT` is ignored for ARPG players). The tree takes their place. A stock-client
-  player on the same server keeps vanilla talents untouched.
-- **Packets:** `CMSG_ARPG_ACTION` kind 8, "spend" (`u16` node); kind 9, "respec"; and
-  `SMSG_ARPG_TREE` (the tree's layout once, then the spent points), so the client draws whatever the
-  server defines and a new node needs no client release.
+  - Passive: teaches the talent's rank N spell (dropping lower ranks).
+  - Skill: teaches the talent's spell.
+  - Modifier: a uniques-kit row the uniques' lookup also reads (`WornMechanic` is now "worn or
+    learned", the larger count winning).
+  - Keystone: a flag its hook checks. Avenger is in the Judgement script (`Paladin.cpp`), Martyr's
+    Ward pulses from the ARPG swing update, Dawnbringer runs from the heal path, and Purifying
+    Light from the creature-type checks in `Spell.cpp`.
+- **Vanilla talents for an ARPG player:** a character with vanilla talents spent has them reset,
+  free, at its first ARPG hello. The talent window learns nothing for an ARPG player. Spells the
+  tree teaches are kept out of vanilla's talent-point accounting, so a level-up never resets them.
+  A stock-client player keeps vanilla talents untouched.
+- **Wire:** `CMSG_ARPG_ACTION` kind 8 spend (`u16` node), 9 respec, 10 query; `SMSG_ARPG_TREE`
+  (0x33F) after the hello and every spend or respec: points, branch names, and per node its
+  place, kind, ranks, icon spell, name and text. The client draws whatever the server defines, so
+  a new node needs no client release.
 
 ### Client (benilla)
 
-- **A tree window:** the ARPG HUD addon gets a panel, toggled by the talent key (N) in ARPG mode.
-  Three columns, one per branch, tiers as rows, nodes as buttons with rank pips. Tooltip per
-  node, Spend on click, Respec button when allowed.
-- **Laid out from the server's packet:** the client holds no tree data of its own.
+- `player/arpg/tree.rs` takes the server's tree and hands it to the ARPG HUD addon's window
+  (`ArpgTree_Update` in `arpg_hud.lua`), with each node's icon path from the client's spell data.
+- **The window:** the talent key (N) and the talent micro button open it in place of the talent
+  frame. Three columns, one per branch, tiers as rows. A node shows its icon, its rank, a border in
+  its kind's colour (keystones orange, modifiers the unique gold), and is greyed while locked. Hover
+  for the tooltip; click to learn; Respec refunds everything.
+- The window's requests go back through the session-only setting `arpgTreeAction`, a number
+  (kind × 100000 + node × 100 + a nonce).
 
-### Build order
+### Next
 
-1. The framework with the Crusader branch only: storage, the spend and respec packets, passives
-   and modifiers, the window. Test it on Jeff's paladin.
-2. Bulwark and Lightbringer branches; the three keystones (each is a small hook of its own).
-3. Other classes, one at a time, with the same framework.
+1. Play the paladin tree and tune it.
+2. The other classes, one at a time, with the same framework (a table of nodes each).
 
 ## Other classes, in a line each
 
@@ -161,11 +170,5 @@ modifiers on its core skills, one keystone per branch.
 
 ## Open questions for Jeff
 
-- **Replace or add?** This design replaces vanilla talents for ARPG players, which is the cleaner
-  ARPG. The alternative keeps vanilla talents and adds a smaller ARPG tree on top. It's simpler to
-  build but makes for two systems to balance.
-- **51 points, or more?** Keeping vanilla's budget keeps balance. A Diablo-style long tail (a
-  point per level past 60 through a paragon-like track) is the obvious endgame hook later.
-- **Free respec at rested spots,** or always free, or a cost?
-- **Keystones:** do Avenger, Martyr's Ward and Dawnbringer feel like the right three paladin
-  fantasies?
+- A paragon-style track past 60 (more points for XP at max level) would give the tree a long
+  tail. Worth doing once the endgame takes shape.

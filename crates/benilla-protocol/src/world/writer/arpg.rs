@@ -8,7 +8,8 @@
 //! which re-aims it; loot `u64` corpse and `u8` loot slot (0xFF the gold), a ground pick-up; loot
 //! query `u64` corpse, which asks for that corpse's ground loot list; dev loot `u8` quality
 //! (0xFF a random mix), `u8` count, `u8` item level (0 the player's), which a server with
-//! `Arpg.DevTools` on answers by dropping that loot at the player's feet, for testing.
+//! `Arpg.DevTools` on answers by dropping that loot at the player's feet, for testing; tree spend
+//! `u16` node, tree respec and tree query (nothing more), the ARPG skill tree's.
 //! `intended` is the unit under the cursor (0 for none): the server lets it catch
 //! the swing or the spell even when it would not pick it itself (a neutral, a sheep).
 
@@ -29,6 +30,9 @@ const KIND_AIM: u8 = 4;
 const KIND_LOOT: u8 = 5;
 const KIND_LOOT_QUERY: u8 = 6;
 const KIND_DEV_LOOT: u8 = 7;
+const KIND_TREE_SPEND: u8 = 8;
+const KIND_TREE_RESPEC: u8 = 9;
+const KIND_TREE_QUERY: u8 = 10;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -113,7 +117,29 @@ pub fn arpg_dev_loot_body(quality: u8, count: u8, level: u8) -> Vec<u8> {
     vec![KIND_DEV_LOOT, quality, count, level]
 }
 
+/// The tree spend body: a point into `node`.
+pub fn arpg_tree_spend_body(node: u16) -> Vec<u8> {
+    let mut body = vec![KIND_TREE_SPEND];
+    body.extend_from_slice(&node.to_le_bytes());
+    body
+}
+
 impl WorldWriter {
+    /// Spend a point in an ARPG skill tree node.
+    pub fn arpg_tree_spend(&mut self, node: u16) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_tree_spend_body(node))
+    }
+
+    /// Refund the ARPG skill tree.
+    pub fn arpg_tree_respec(&mut self) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_TREE_RESPEC])
+    }
+
+    /// Ask for the ARPG skill tree.
+    pub fn arpg_tree_query(&mut self) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_TREE_QUERY])
+    }
+
     /// The hello: this player is on the ARPG client.
     pub fn arpg_hello(&mut self) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_hello_body())
@@ -180,6 +206,11 @@ mod tests {
             u64::from_le_bytes(body[18..26].try_into().unwrap()),
             0xF130_0000_0000_002A
         );
+    }
+
+    #[test]
+    fn the_tree_spend_body_is_kind_and_node() {
+        assert_eq!(arpg_tree_spend_body(0x0102), vec![8, 0x02, 0x01]);
     }
 
     #[test]

@@ -1004,6 +1004,14 @@ pub(crate) enum ClientCommand {
         count: u8,
         level: u8,
     },
+    /// Fork-only: spend a point in ARPG skill tree node `node`.
+    ArpgTreeSpend {
+        node: u16,
+    },
+    /// Fork-only: refund the ARPG skill tree.
+    ArpgTreeRespec,
+    /// Fork-only: ask for the ARPG skill tree.
+    ArpgTreeQuery,
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {
         spell_id: u32,

@@ -596,6 +596,7 @@ fn session_values(world: &World) -> Vec<(&'static str, Option<String>)> {
     }
     // Fork-only: the ARPG test-loot button's counter is a trigger, never a setting to keep.
     out.push((crate::player::CVAR_DEV_LOOT_DROP, None));
+    out.push((crate::player::CVAR_TREE_ACTION, None));
     // Fork-only: a `WOW_ARPG_*` variable pins its view setting for the session, unsaved.
     for knob in crate::player::ARPG_KNOBS {
         if let Some(v) = std::env::var(knob.env)
