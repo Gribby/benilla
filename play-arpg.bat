@@ -3,10 +3,13 @@ rem Start the benilla ARPG client. Double-click this file, or make a desktop sho
 rem   play-arpg.bat          start the client (builds it first if it has never been built)
 rem   play-arpg.bat update   pull the latest code from GitHub, rebuild, then start
 rem
-rem WOW_DATA is the WoW 1.12.1 client's Data folder. Change the line below if yours moves, or
-rem set WOW_DATA in Windows' environment variables to override it.
+rem WOW_DATA is the WoW 1.12.1 client's Data folder. If yours moves, put
+rem   set "WOW_DATA=X:\your\WoW\Data"
+rem in arpg-local.bat beside this file (git ignores it), or set it in Windows' environment.
 setlocal
 cd /d "%~dp0"
+rem arpg-local.bat (git ignores it) may set WOW_DATA for this machine.
+if exist "%~dp0arpg-local.bat" call "%~dp0arpg-local.bat"
 if not defined WOW_DATA set "WOW_DATA=D:\WoWclient\World of Warcraft\Data"
 set "WOW_ARPG=1"
 
