@@ -8,6 +8,8 @@
 //! out around the corpse, always in the same place for the same loot slot. A left click on a
 //! label or a glow walks to it and picks it up (`ClientCommand::ArpgLoot`); walking onto the gold
 //! picks it up. Labels show within [`LABEL_RANGE`] of the player, and all of them with Alt held.
+//! The loot filter (`arpgLootFilter`, the options window's ARPG View page) hides the labels of
+//! the low qualities ([`label_shown`]); their glows stay, and Alt still shows them.
 //! A corpse that despawns or streams out takes its drops with it.
 
 use std::collections::HashMap;
@@ -33,6 +35,11 @@ const GOLD_ART: usize = 7;
 
 /// Labels show for drops this close to the player, in yards; Alt shows every one on screen.
 const LABEL_RANGE: f32 = 30.0;
+/// The loot filter's setting: 0 shows every label, 1 hides grey ones, 2 grey and white, 3 everything
+/// below blue. The gold always shows.
+const CVAR_LOOT_FILTER: &str = "arpgLootFilter";
+/// The filter with no setting: greys hidden.
+const LOOT_FILTER_DEFAULT: u8 = 1;
 /// A clicked drop is picked up once the player is this close to it, flat, in yards. The server
 /// takes it from within 6 yd of the corpse plus both bodies' reach, and drops lie within
 /// `RING_MIN + 2 × RING_STEP` of it, so this is always inside the server's reach.
@@ -603,6 +610,15 @@ fn label_text(kind: &DropKind, name: Option<&str>) -> String {
     }
 }
 
+/// Whether a drop's label shows under loot filter `filter` (see [`CVAR_LOOT_FILTER`]); Alt held
+/// shows everything.
+fn label_shown(kind: &DropKind, filter: u8, alt: bool) -> bool {
+    match kind {
+        DropKind::Gold(_) => true,
+        DropKind::Item(item) => alt || item.quality >= filter.min(3),
+    }
+}
+
 /// Draw the labels, nearest the camera last so they paint on top, pushed up off each other so
 /// a pile of drops stays readable, and remember their boxes for the hover.
 #[allow(clippy::too_many_arguments)]
@@ -613,6 +629,7 @@ fn draw_labels(
     items: Res<crate::items::Items>,
     net: Res<NetCommands>,
     rig: Res<CameraControl>,
+    cvars: Option<Res<crate::cvars::Cvars>>,
     camera: Query<(&Camera, &Transform), With<WorldCamera>>,
     mut atlas: Option<ResMut<UiFontAtlas>>,
     mut quads: ResMut<UiQuads>,
@@ -627,6 +644,11 @@ fn draw_labels(
         return;
     };
     let all = keys.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
+    let filter = cvars
+        .as_ref()
+        .and_then(|c| c.num(CVAR_LOOT_FILTER))
+        .filter(|v| v.is_finite())
+        .map_or(LOOT_FILTER_DEFAULT, |v| v.round().clamp(0.0, 3.0) as u8);
     let px = (viewport.y / 768.0 * 13.0).clamp(11.0, 24.0);
     let pad = Vec2::new(px * 0.4, px * 0.2);
 
@@ -636,6 +658,7 @@ fn draw_labels(
         .0
         .iter()
         .filter(|(_, d)| all || flat_distance(player.pos, d.pos) <= LABEL_RANGE)
+        .filter(|(_, d)| label_shown(&d.kind, filter, all))
         .filter_map(|(k, d)| {
             crate::ui_pass::project_overlay(cam, &cam_tf, d.pos + Vec3::Y * LABEL_LIFT, viewport)
                 .map(|screen| (*k, d, screen))
@@ -863,6 +886,31 @@ mod tests {
         );
         assert_eq!(label_text(&DropKind::Item(item), None), "... (3)");
         assert_eq!(label_text(&DropKind::Gold(250), None), "2s 50c");
+    }
+
+    #[test]
+    fn the_filter_hides_low_labels_but_never_the_gold_and_alt_shows_all() {
+        let of = |quality| {
+            DropKind::Item(ArpgLootItem {
+                slot: 0,
+                item_id: 1,
+                display_id: 0,
+                quality,
+                count: 1,
+            })
+        };
+        // Off: everything.
+        assert!(label_shown(&of(0), 0, false));
+        // Greys hidden: white and up show.
+        assert!(!label_shown(&of(0), 1, false));
+        assert!(label_shown(&of(1), 1, false));
+        // Blue and better only.
+        assert!(!label_shown(&of(2), 3, false));
+        assert!(label_shown(&of(3), 3, false));
+        assert!(label_shown(&of(5), 3, false));
+        // The gold always, and Alt overrides.
+        assert!(label_shown(&DropKind::Gold(5), 3, false));
+        assert!(label_shown(&of(0), 3, true));
     }
 
     #[test]

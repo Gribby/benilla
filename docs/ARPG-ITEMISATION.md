@@ -147,11 +147,19 @@ Changes worth considering later, in order:
 4. **Skill-changing uniques**, starting with Pierce and Chain on skillshots: we own that code.
 5. **Raid scaling**, boss by boss, starting with Molten Core.
 
+## Decisions so far
+
+- **Named blues and purples get unique interactions** with specific spells, rather than random
+  affixes. Jeff's examples: a blue staff that adds one projectile to every skillshot; fireballs
+  that burst into fragments after hitting. That is step 4 (skill-changing uniques) applied to
+  vanilla's named items: each gets a hand-picked mechanic, granted as an equip aura and read in
+  `ArpgCombat.cpp`.
+- **Skill trees: a new ARPG tree per class**, replacing vanilla talents for ARPG players.
+- **Mob packs: denser spawns led by champions** with bonus loot.
+- Order of work: loot (drop rates, filter: done), then skill trees, then mob packs.
+
 ## Open questions for Jeff
 
-- Should vanilla's named blues and purples (dungeon and raid drops) also roll affixes, or stay
-  exactly as authored? Rolling them changes BiS lists; leaving them alone keeps vanilla's
-  identity.
 - Item level beyond 60? An ARPG endgame usually wants an endless long tail. Vanilla stops at 60
   and Naxxramas. Options:
   - A level 60 "paragon" track: account-wide small bonuses per extra XP bar.

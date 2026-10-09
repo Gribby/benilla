@@ -63,9 +63,17 @@ cast runs and hit neutral wild creatures, and ground loot (phase 3's first item)
 Ground loot today: grey and white drops glow faintly with no beam; green, blue, purple and orange
 glow brighter with a beam that grows with the quality (`look()` in `loot.rs`). Labels show within
 30 yd, all of them with Alt. The server drops the group loot rules for ARPG players (their loot is
-free for all, nothing waits on a roll) and binds nothing to them, on pickup, equip or use. Known
+free for all, nothing waits on a roll) and binds nothing to them, on pickup, equip or use. The loot
+filter (`arpgLootFilter`, the ARPG View page's Loot Labels: All, No Grey (default), Green and
+Better, Blue and Better) hides lower labels; their glows stay and Alt shows them. Known
 gaps: drops vanish with the corpse (no persistent ground items); no item models yet (weapons and
 shields could lie as their real M2s, everything else a sack).
+
+Drop rates are the ARPG world's `mangosd.conf` (it hosts no stock players). Grouped loot entries
+ignore the quality rates, and most world greens and blues sit in grouped reference tables, so
+`Rate.Drop.Item.Referenced` is the main lever for them; the quality rates act on direct entries
+(most greys and whites). Starting values: Poor 0.6, Normal 1, Uncommon 2, Rare 2, Epic 1.5,
+Referenced 3, Money 2.
 
 Next:
 - Camera (banked by Jeff, after gameplay): the height cut fails in multi-storey instances

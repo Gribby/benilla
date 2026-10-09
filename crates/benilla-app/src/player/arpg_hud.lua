@@ -189,11 +189,13 @@ ARPG_TOOLTIP_CUT_HEIGHT = "Indoors and in caves, walls and ceilings more than th
     .. "above your feet are cut away. Lower shows more of the room; higher keeps more walls."
 ARPG_TOOLTIP_CUT_RADIUS = "Indoors and in caves, how far from your character the cut reaches, "
     .. "in yards. Geometry farther out keeps its tops."
+ARPG_TOOLTIP_LOOT_FILTER = "Which items on the ground get a name label. Hidden ones still "
+    .. "glow and can be picked up, and holding Alt shows every label. Gold always shows."
 ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
     .. "camera turn see-through."
 
--- `cvar`, the label, the tooltip global, then a slider's min, max, step and readout format; a row
--- with no range is a checkbox.
+-- `cvar`, the label, the tooltip global, then a slider's min, max, step and readout format (or,
+-- with no format, a named stop per step); a row with no range is a checkbox.
 local ARPG_OPTION_ROWS = {
     { "RowSeeThrough", "arpgSeeThrough", "See-Through Outdoors", "ARPG_TOOLTIP_SEE_THROUGH" },
     { "RowCameraDistance", "arpgCameraDistance", "Camera Distance", "ARPG_TOOLTIP_CAMERA_DISTANCE",
@@ -206,6 +208,8 @@ local ARPG_OPTION_ROWS = {
         1.5, 10, 0.1, "%.1f yd" },
     { "RowCutRadius", "arpgCutRadius", "Cutaway Radius", "ARPG_TOOLTIP_CUT_RADIUS",
         5, 120, 1, "%d yd" },
+    { "RowLootFilter", "arpgLootFilter", "Loot Labels", "ARPG_TOOLTIP_LOOT_FILTER",
+        0, 3, 1, nil, { "All", "No Grey", "Green and Better", "Blue and Better" } },
 }
 
 local function addArpgOptionsPage()
@@ -236,8 +240,8 @@ local function addArpgOptionsPage()
 
     local keys, prev = {}, nil
     for _, spec in ipairs(ARPG_OPTION_ROWS) do
-        local key, cvar, label, tip, minv, maxv, step, fmt =
-            spec[1], spec[2], spec[3], spec[4], spec[5], spec[6], spec[7], spec[8]
+        local key, cvar, label, tip, minv, maxv, step, fmt, stops =
+            spec[1], spec[2], spec[3], spec[4], spec[5], spec[6], spec[7], spec[8], spec[9]
         local template = "BenillaOptionsCheckboxRowTemplate"
         if minv then template = "BenillaOptionsSliderRowTemplate" end
         local row = CreateFrame("Frame", body:GetName() .. key, body, template)
@@ -250,7 +254,7 @@ local function addArpgOptionsPage()
         end
         BenillaOptionsRow_OnLoad(row, cvar, label, tip)
         if minv then
-            BenillaOptionsSliderRow_Setup(row, minv, maxv, step, "arpg")
+            BenillaOptionsSliderRow_Setup(row, minv, maxv, step, "arpg", stops)
             row.arpgFmt = fmt
         end
         table.insert(keys, key)

@@ -96,8 +96,8 @@ const fn deviates(
 
 /// A row the reference has no counterpart for.
 /// Why the ARPG fork's rows leave the reference: it has no fixed top-down view to tune.
-const ARPG_WHY: &str = "benilla's own (ARPG fork) — 1.12 has no fixed top-down view, cutaway or \
-     see-through to tune";
+const ARPG_WHY: &str = "benilla's own (ARPG fork) — 1.12 has no fixed top-down view, cutaway, \
+     see-through or ground loot to tune";
 
 const fn ours(name: &'static str, default: &'static str, why: &'static str) -> Registered {
     Registered {
@@ -729,6 +729,9 @@ pub(crate) const REGISTERED: &[Registered] = &[
     ours("arpgCutHeight", "2.8", ARPG_WHY),
     ours("arpgCutRadius", "30", ARPG_WHY),
     ours("arpgSeeThrough", "1", ARPG_WHY),
+    // The ground loot's label filter (`player::arpg::loot`): 0 all, 1 no greys, 2 no greys or
+    // whites, 3 blue and better.
+    ours("arpgLootFilter", "1", ARPG_WHY),
     // `lastCharacterIndex` (`0x402d93`, "0" `0x82e570`, category 4, handle `[0x882674]`), help
     // "Last character selected": a 0-based row (the selection cell `[0x83856c]` under `"%d"`), so
     // "0" is the first character. It mirrors [`crate::char_select::Roster::pending_index`].
