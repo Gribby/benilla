@@ -153,7 +153,7 @@ Changes worth considering later, in order:
   affixes. Jeff's examples: a blue staff that adds one projectile to every skillshot; fireballs
   that burst into fragments after hitting. That is step 4 (skill-changing uniques) applied to
   vanilla's named items: each gets a hand-picked mechanic, granted as an equip aura and read in
-  `ArpgCombat.cpp`.
+  `ArpgCombat.cpp`. The designed list and the mechanic kit: `ARPG-UNIQUES.md`.
 - **Skill trees: a new ARPG tree per class**, replacing vanilla talents for ARPG players.
 - **Mob packs: denser spawns led by champions** with bonus loot.
 - Order of work: loot (drop rates, filter: done), then skill trees, then mob packs.
