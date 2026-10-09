@@ -57,7 +57,7 @@ cast runs and hit neutral wild creatures, and ground loot (phase 3's first item)
 Ground loot today: grey and white drops glow faintly with no beam; green, blue, purple and orange
 glow brighter with a beam that grows with the quality (`look()` in `loot.rs`). Labels show within
 30 yd, all of them with Alt. The server drops the group loot rules for ARPG players (their loot is
-free for all, nothing waits on a roll) and binds nothing on pickup (bind on equip is stock). Known
+free for all, nothing waits on a roll) and binds nothing to them, on pickup, equip or use. Known
 gaps: drops vanish with the corpse (no persistent ground items); no item models yet (weapons and
 shields could lie as their real M2s, everything else a sack).
 
