@@ -1,15 +1,34 @@
 # ARPG uniques: named items that change how spells work
 
-Design, not built yet. Jeff's call (see `ARPG-ITEMISATION.md`, "Decisions so far"): vanilla's named
-blues and purples keep their stats and gain one hand-picked interaction with a specific spell or
+Partly built: the first slice is in (see "Built so far"). Jeff's call (see `ARPG-ITEMISATION.md`,
+"Decisions so far"): vanilla's named blues and purples keep their stats and gain one hand-picked interaction with a specific spell or
 attack, Diablo-unique style. Generic greens and blues get random affixes later; these items are
 the chase.
 
 Item ids, levels and sources below come from classic-db (`ClassicDB_1_12_1_z2815`).
 
+## Colour
+
+Jeff's call: an item's name keeps its vanilla quality colour, so its tier reads at a glance (a
+level 23 blue never looks like a raid purple, and nothing looks like Thunderfury's orange). Being
+a unique is shown by a second colour, the client's seventh quality colour, "Artifact" pale gold
+(`e6cc80`), which no 1.12 item wears:
+
+- **Tooltip:** the mechanic line, "Unique: …", in pale gold under the item's own lines.
+- **Ground:** a gold border round the label, and a thin gold core inside a taller beam.
+
+| Kind | Name colour | Extra |
+|---|---|---|
+| Junk to legendary | Vanilla grey/white/green/blue/purple/orange | None |
+| Random affixes (later) | Its own | Affix lines in its own colour, as vanilla's "of the Bear" |
+| Uniques | Its own (blue or purple) | Pale gold mechanic line, label border, beam core |
+| Tier set pieces | Purple | Possibly a set colour later |
+
+If a gold accent turns out too quiet in play, the beam carries more: thicker or pulsing.
+
 ## Rules for every unique
 
-- **One mechanic per item**, written as one tooltip line in orange under the item's own stats. The
+- **One mechanic per item**, written as one tooltip line in pale gold under the item's own stats. The
   vanilla stats and procs stay exactly as they are.
 - **Spell-specific beats generic.** "Fireball bursts into fragments" makes a build; "+5% damage"
   doesn't. Each mechanic names one spell (every rank) or one attack.
@@ -101,11 +120,14 @@ around it: they were ARPG items before there was an ARPG.
 
 ### Server (cmangos)
 
-- **Data:** a fork table in the world database, `arpg_item_mechanic`, filled from a fork SQL
-  file: `item`, `kit` (A to K), `spell` (rank 1 of the spell; 0 for a swing or auto shot), `n`,
-  `value` (radius, angle, range or chance, by kit), `pct`, `text` (the tooltip line).
-- **Which mechanics a player has:** when an ARPG player equips or unequips an item, the server
-  rebuilds that player's list from what they wear. Hooks read the list, never the items.
+- **Data:** a table in code, `Arpg::Uniques()` in `src/game/Arpg/ArpgUniques.cpp`: `item`, `kit`,
+  `spell` (rank 1 of the spell; 0 for a swing or auto shot), `n`, `value` (angle, reach, radius
+  or chance, by kit), `pct`, `text` (the tooltip line). A database table was the first idea, but a
+  table in code needs no SQL install, can't be wiped by a database reinstall, and the server is
+  rebuilt for every mechanic anyway. A new item is one line there.
+- **Which mechanics a player has:** read from what they wear when a mechanic could fire (19
+  slots against a short table), so equipping needs no bookkeeping. Two items touching the same
+  spell with the same kit: the one with more projectiles or fragments applies.
 - **Matching a spell:** any rank counts. The hook compares the cast spell's first rank
   (`SpellMgr::GetFirstSpellInChain`) with the row's `spell`.
 - **Hooks (most already exist from the ARPG combat work):**
@@ -118,23 +140,25 @@ around it: they were ARPG items before there was an ARPG.
   | Aura apply and `Unit::Kill` | F, J, K |
   | Cast finish | I |
 
-- **Added hits:** the main hit's final damage is taken after it lands, and each added hit deals
-  that × `pct` as the same school, through the ordinary spell damage path (armour, resistances,
-  absorbs and combat log all work). It has no other effects of its own, except where the line
-  says so ("and slows"), which applies the spell's own slow aura.
-- **What the player sees:** an added projectile or fragment is a cosmetic missile of the same spell
-  from the source point to its end point. On the client, a world-point missile is how ground
-  spells already show; whether benilla draws a missile for a pure visual is the first thing to
-  check when building A and D.
+- **Added projectiles (kit A)** are real casts of the same spell (`Spell::SetArpgSecondary`):
+  free, no cooldown, flying their own line beside the main one and never picking the unit the
+  main shot took. They carry the spell's full effects (Frostbolt's slow), but their damage is
+  `pct` of the normal hit, they never crit and they set off no procs. They show as ordinary
+  missiles of that spell.
+- **Fragments (kit D)** are direct damage: `pct` of what the main hit dealt (after mitigation),
+  to up to `n` enemies within `value` yards behind the target in a 90° cone, through the ordinary
+  spell damage path (resistances, absorbs and the combat log work). They have no other effects
+  and no missile yet: the hits show as damage numbers. A shard visual flying from the target is
+  the follow-up (client side: the damage log names the spell and the target).
 
 ### Client (benilla)
 
-- **Tooltip line:** the server sends the whole table once, after the hello (a new
-  `SMSG_ARPG_ITEM_MECHANICS`: item id and text per row, a few kilobytes). The client keeps it per
-  session and adds the orange line to any matching item's tooltip, on the ground label's hover as
-  well.
-- **Ground loot:** a drop with a mechanic gets an orange edge on its label and a taller beam, so a
-  unique stands out even when it's a blue.
+- **Tooltip line:** the server sends the whole table after every hello
+  (`SMSG_ARPG_ITEM_MECHANICS`, a few hundred bytes). The client keeps it
+  (`player/arpg/uniques.rs`) and the item tooltip feed adds the pale gold "Unique: …" line to
+  any matching item (`ItemTemplateView::arpg_unique`, drawn in `tooltip_item/render.rs`).
+- **Ground loot:** a unique's label gets a gold border and its beam a thin, taller gold core
+  (`player/arpg/loot.rs`), so it stands out even as a blue.
 
 ### Balance guard rails
 
@@ -145,23 +169,29 @@ around it: they were ARPG items before there was an ARPG.
   That's acceptable, since raids are being retuned for solo play anyway (`ARPG-ITEMISATION.md`
   step 5).
 
-## The first slice to build
+## Built so far, and next
 
-1. The table, the per-player list, the item-mechanics packet and the tooltip line.
-2. Kit A (extra projectiles) and kit D (fragments): Jeff's two examples. Prototype them on
-   **Emberstone Staff** (Deadmines, easy to farm or add with `.additem 5201`) and **Staff of
-   Dominance** (`.additem 18842`).
-3. Kits C (chain) and G (arc). Between them they cover the most items in this list.
-4. The rest in any order. Each new item is then a data row plus a playtest.
+Built (first slice):
+- The table, the hello-time `SMSG_ARPG_ITEM_MECHANICS` (0x33E: `u8` count, then `u32` item and
+  a C string per row), the tooltip line and the ground accent.
+- Kit A on **Emberstone Staff** (5201, Fireball +1) and **Quillshooter** (10567, Arcane Shot +2).
+- Kit D on **Staff of Dominance** (18842, Fireball 5 fragments), **Rod of the Sleepwalker** (1155,
+  Wrath 3 motes) and **Staff of Jordan** (873, Frostbolt 4 shards; the slow on shards waits for
+  a later pass, so its line doesn't promise it).
+
+Test with `.additem 5201`, `.additem 18842` and the rest (a GM account), or farm them.
+
+Next:
+1. The fragment visual (a shard missile from the target outward).
+2. Kits C (chain) and G (arc). Between them they cover the most items in this list.
+3. The rest in any order. Each new item is then a table row plus a playtest.
 
 The Drop Test Loot tool rolls random items. A "drop this item id" field on the same page would
 make testing a unique quicker than the GM command; it's a small addition.
 
 ## Open questions for Jeff
 
-- Should uniques show their mechanic in their **name** too (an orange "Emberstone Staff" in place
-  of the blue), or only on the tooltip line?
-- Should a few **new** orange uniques exist alongside these: items that don't exist in vanilla,
+- Should a few **new** uniques exist alongside these: items that don't exist in vanilla,
   as world drops from champion packs?
-- Should two uniques stack if they touch the same spell (two Fireball items), or should only the
-  best apply?
+- Should two uniques stack if they touch the same spell (two Fireball items)? For now only the
+  best applies.

@@ -54,6 +54,7 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
             gold,
             items,
         }],
+        ServerPacket::ArpgItemMechanics { rows } => vec![SessionEvent::ArpgItemMechanics { rows }],
         ServerPacket::Weather {
             weather_type,
             grade,

@@ -381,6 +381,11 @@ pub enum ServerPacket {
         gold: u32,
         items: Vec<crate::messages::ArpgLootItem>,
     },
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_ITEM_MECHANICS`, the ARPG server's uniques: item id and
+    /// tooltip line ([`crate::messages::arpg`]).
+    ArpgItemMechanics {
+        rows: Vec<(u32, String)>,
+    },
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1352,6 +1357,7 @@ impl ServerPacket {
             ServerPacket::PlayObjectSound { .. } => "SMSG_PLAY_OBJECT_SOUND".into(),
             ServerPacket::Weather { .. } => "SMSG_WEATHER".into(),
             ServerPacket::ArpgLoot { .. } => "SMSG_ARPG_LOOT".into(),
+            ServerPacket::ArpgItemMechanics { .. } => "SMSG_ARPG_ITEM_MECHANICS".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

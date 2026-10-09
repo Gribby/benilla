@@ -91,6 +91,9 @@ pub struct ItemTemplateView {
     /// `RandomProperty` (template `+0x1b8`): the item can roll a suffix, so a template tooltip
     /// prints `<Random enchantment>` (`0x52cc33`).
     pub random_property: u32,
+    /// Fork-only, not 1.12.1: an ARPG unique's mechanic line (the benilla ARPG server's
+    /// `SMSG_ARPG_ITEM_MECHANICS`), printed in the Artifact colour under the trigger lines.
+    pub arpg_unique: Option<String>,
 }
 
 /// The player state the tooltip's red lines and the usable gate compare against.

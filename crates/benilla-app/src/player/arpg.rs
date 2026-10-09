@@ -34,6 +34,9 @@
 
 mod fx;
 mod loot;
+mod uniques;
+
+pub(crate) use uniques::{ArpgUniques, UNIQUE_RGB};
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -241,6 +244,7 @@ pub(crate) struct ArpgAttackKey(pub(crate) bool);
 pub(super) fn plugin(app: &mut App) {
     // The ground loot's wire half, whatever the view: every session event kind needs an owner.
     loot::register_net(app);
+    uniques::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);

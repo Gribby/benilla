@@ -27,6 +27,9 @@ pub(super) const GOLD: [f32; 4] = [1.0, 210.0 / 255.0, 0.0, 1.0];
 pub(super) const GRAY: [f32; 4] = [128.0 / 255.0, 128.0 / 255.0, 128.0 / 255.0, 1.0];
 /// An equipped set member's cream, `0xc0d368` (ffffff97, written at `0x529050`).
 pub(super) const CREAM: [f32; 4] = [1.0, 1.0, 151.0 / 255.0, 1.0];
+/// Fork-only, not 1.12.1: an ARPG unique's mechanic line, the Artifact quality colour (e6cc80).
+pub(super) const ARPG_UNIQUE: [f32; 4] =
+    [QUALITY_RGB[6][0], QUALITY_RGB[6][1], QUALITY_RGB[6][2], 1.0];
 
 /// InventoryType to the slot line's key: the builder's 30-entry table `0x83ddb0`, indexed by
 /// `[record+0x2c]` (`0x52c103`); entries 0 and 29 are the empty string `0x882748`, here `None`. A

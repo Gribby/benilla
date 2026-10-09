@@ -545,6 +545,11 @@ pub(super) fn render_view(
         let Some(prefix) = get(key) else { continue };
         addw((format!("{prefix} {text}"), GREEN))?;
     }
+    // Fork-only, not 1.12.1: an ARPG unique's mechanic, in the Artifact colour (quality 6,
+    // `e6cc80`) that no 1.12 item wears.
+    if let Some(text) = &v.arpg_unique {
+        addw((format!("Unique: {text}"), ARPG_UNIQUE))?;
+    }
     if let Some(charges) = charges_phrase(v.charges.max(0) as u32, &get) {
         add((charges, WHITE))?;
     }

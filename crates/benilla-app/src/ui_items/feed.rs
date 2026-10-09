@@ -249,6 +249,8 @@ fn template_view(
         sell_price: t.sell_price,
         item_set: t.item_set,
         random_property: t.random_property,
+        // Fork-only: the ARPG unique's line is the feed's to add, by item id.
+        arpg_unique: None,
     }
 }
 
@@ -393,6 +395,14 @@ pub(super) fn feed_random_properties(
 /// The item-tooltip feed: every template that lands is pushed unprompted, so the first hover never
 /// misses, as the reference reads one item cache synchronously; a read of an unresolved id records
 /// a miss, which queries it here.
+/// `GetItemInfo`'s `itemType` and `itemTexture` sources, and (fork-only) the ARPG uniques' lines:
+/// one system parameter under Bevy's limit.
+type ItemLooks<'w> = (
+    Option<Res<'w, super::ItemClasses>>,
+    Option<Res<'w, ItemDisplays>>,
+    Option<Res<'w, crate::player::ArpgUniques>>,
+);
+
 pub(super) fn feed_item_stats(
     script: Option<NonSendMut<UiScript>>,
     mut items: ResMut<Items>,
@@ -409,9 +419,8 @@ pub(super) fn feed_item_stats(
     area_names: Option<Res<crate::ui_quest_log::QuestHeaderNamesRes>>,
     factions: Option<Res<crate::target::Factions>>,
     sub_classes: Option<Res<super::ItemSubClasses>>,
-    // `GetItemInfo`'s `itemType` and `itemTexture`.
-    classes: Option<Res<super::ItemClasses>>,
-    icons: Option<Res<ItemDisplays>>,
+    // `GetItemInfo`'s `itemType` and `itemTexture`, and (fork-only) the ARPG uniques' lines.
+    (classes, icons, uniques): ItemLooks,
     mut pending: Local<crate::ui_script::VmMemo<std::collections::HashSet<u32>>>,
     mut mod_sensitive: Local<crate::ui_script::VmMemo<HashSet<u32>>>,
     mut last_home: Local<crate::ui_script::VmMemo<Option<String>>>,
@@ -445,6 +454,11 @@ pub(super) fn feed_item_stats(
 
     pending.extend(items.take_fresh());
     pending.extend(script.take_item_stat_asks());
+    // A fresh uniques table re-feeds every held view, so a tooltip shown before it arrived gains
+    // its line.
+    if uniques.as_ref().is_some_and(|u| u.is_changed()) {
+        pending.extend(items.cached_template_ids());
+    }
     if spell_mods.is_changed() || reads_changed {
         pending.extend(mod_sensitive.iter().copied());
     }
@@ -479,23 +493,26 @@ pub(super) fn feed_item_stats(
                 } else {
                     mod_sensitive.remove(&id);
                 }
-                Some((
-                    id,
-                    template_view(
-                        &t,
-                        spell_res,
-                        Some(&spell_mods),
-                        &skill,
-                        skill_catalog,
-                        home_area,
-                        &|| gender,
-                        factions.as_deref().map(|f| f.catalog()),
-                        sub_classes.as_deref().map(|s| &s.0),
-                        classes.as_deref().map(|c| &c.0),
-                        icons.as_deref(),
-                        &get,
-                    ),
-                ))
+                let mut view = template_view(
+                    &t,
+                    spell_res,
+                    Some(&spell_mods),
+                    &skill,
+                    skill_catalog,
+                    home_area,
+                    &|| gender,
+                    factions.as_deref().map(|f| f.catalog()),
+                    sub_classes.as_deref().map(|s| &s.0),
+                    classes.as_deref().map(|c| &c.0),
+                    icons.as_deref(),
+                    &get,
+                );
+                // Fork-only: an ARPG unique's mechanic line.
+                view.arpg_unique = uniques
+                    .as_deref()
+                    .and_then(|u| u.line(id))
+                    .map(str::to_string);
+                Some((id, view))
             })
             .collect()
     };

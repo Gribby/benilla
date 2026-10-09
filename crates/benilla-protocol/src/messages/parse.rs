@@ -520,6 +520,9 @@ fn parse_server_body(
                 items,
             }
         }
+        super::arpg::SMSG_ARPG_ITEM_MECHANICS => ServerPacket::ArpgItemMechanics {
+            rows: super::arpg::read_arpg_item_mechanics(&mut r)?,
+        },
         opcode::SMSG_WEATHER => ServerPacket::Weather {
             weather_type: read_u32_le(&mut r)?,
             grade: read_f32_le(&mut r)?,

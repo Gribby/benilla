@@ -3,7 +3,7 @@
 
 use std::io;
 
-use crate::wire::{capacity_hint, read_u32_le, read_u64_le, read_u8};
+use crate::wire::{capacity_hint, read_cstring, read_u32_le, read_u64_le, read_u8};
 
 /// What a corpse holds for this player, shown on the ground around it: `u64` corpse, `u32` gold,
 /// `u8` count, then per item `u8` loot slot, `u32` item id, `u32` display id, `u8` quality,
@@ -24,6 +24,21 @@ pub struct ArpgLootItem {
     /// 0 poor (grey) to 5 legendary.
     pub quality: u8,
     pub count: u8,
+}
+
+/// The uniques' tooltip lines (cmangos `Arpg/ArpgUniques.h`), sent after every hello: `u8` count,
+/// then per row `u32` item id and a C string, the line the item's tooltip shows.
+pub const SMSG_ARPG_ITEM_MECHANICS: u16 = 0x033E;
+
+/// `SMSG_ARPG_ITEM_MECHANICS`: `(item id, tooltip line)` per unique.
+pub fn read_arpg_item_mechanics(r: &mut impl io::Read) -> io::Result<Vec<(u32, String)>> {
+    let n = read_u8(r)?;
+    let mut rows = Vec::with_capacity(capacity_hint(n, 255));
+    for _ in 0..n {
+        let item = read_u32_le(r)?;
+        rows.push((item, read_cstring(r)?));
+    }
+    Ok(rows)
 }
 
 /// `SMSG_ARPG_LOOT`: the corpse, its gold, and the items.
@@ -47,6 +62,23 @@ pub fn read_arpg_loot(r: &mut impl io::Read) -> io::Result<(u64, u32, Vec<ArpgLo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_uniques_read_as_item_and_line_pairs() {
+        let mut body = vec![2];
+        body.extend_from_slice(&5201u32.to_le_bytes());
+        body.extend_from_slice(b"Fireball launches 1 extra fireball.\0");
+        body.extend_from_slice(&18842u32.to_le_bytes());
+        body.extend_from_slice(b"Fireball bursts.\0");
+        let rows = read_arpg_item_mechanics(&mut body.as_slice()).unwrap();
+        assert_eq!(
+            rows,
+            vec![
+                (5201, "Fireball launches 1 extra fireball.".to_string()),
+                (18842, "Fireball bursts.".to_string())
+            ]
+        );
+    }
 
     #[test]
     fn a_loot_list_reads_the_corpse_gold_and_items() {

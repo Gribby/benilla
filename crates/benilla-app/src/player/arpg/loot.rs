@@ -8,6 +8,8 @@
 //! out around the corpse, always in the same place for the same loot slot. A left click on a
 //! label or a glow walks to it and picks it up (`ClientCommand::ArpgLoot`); walking onto the gold
 //! picks it up. Labels show within [`LABEL_RANGE`] of the player, and all of them with Alt held.
+//! A unique (`super::uniques`) also wears the unique colour: a thin gold core inside a taller
+//! beam, and a gold border round its label.
 //! The loot filter (`arpgLootFilter`, the options window's ARPG View page) hides the labels of
 //! the low qualities ([`label_shown`]); their glows stay, and Alt still shows them.
 //! A corpse that despawns or streams out takes its drops with it.
@@ -64,6 +66,15 @@ const GOLDEN_ANGLE: f32 = 2.399_963;
 const GLOW_LIFT: f32 = 0.06;
 /// The beam's radius, in yards.
 const BEAM_RADIUS: f32 = 0.09;
+/// A unique's gold beam core: this share of the beam's radius, this much taller, and never
+/// shorter than [`UNIQUE_CORE_MIN`] yards.
+const UNIQUE_CORE_RADIUS: f32 = 0.45;
+const UNIQUE_CORE_TALLER: f32 = 1.3;
+const UNIQUE_CORE_MIN: f32 = 6.0;
+/// The art index whose colour is the unique colour: the Artifact quality's.
+const UNIQUE_ART: usize = 6;
+/// A unique's label border, in screen pixels.
+const UNIQUE_BORDER: f32 = 1.5;
 /// The label sits this far above the drop, in yards.
 const LABEL_LIFT: f32 = 0.5;
 
@@ -301,6 +312,7 @@ fn apply_lists(
     mut loot_art: ResMut<LootArt>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    uniques: Option<Res<super::ArpgUniques>>,
     mut commands: Commands,
 ) {
     for list in lists.read() {
@@ -391,6 +403,23 @@ fn apply_lists(
                         .id(),
                 );
             }
+            if let Some(core) = unique_core(&kind, lk, uniques.as_deref()) {
+                visuals.push(
+                    commands
+                        .spawn((
+                            Mesh3d(beam_mesh.clone()),
+                            MeshMaterial3d(beam_mats[UNIQUE_ART].clone()),
+                            Transform::from_translation(pos + Vec3::Y * (core * 0.5)).with_scale(
+                                Vec3::new(
+                                    BEAM_RADIUS * UNIQUE_CORE_RADIUS,
+                                    core,
+                                    BEAM_RADIUS * UNIQUE_CORE_RADIUS,
+                                ),
+                            ),
+                        ))
+                        .id(),
+                );
+            }
             ground.0.insert(
                 key,
                 GroundDrop {
@@ -415,6 +444,20 @@ fn apply_lists(
             despawn_all(&mut commands, &drop.visuals);
         }
     }
+}
+
+/// Whether `kind` is a unique, by the server's table.
+fn is_unique(kind: &DropKind, uniques: Option<&super::ArpgUniques>) -> bool {
+    match kind {
+        DropKind::Item(item) => uniques.is_some_and(|u| u.line(item.item_id).is_some()),
+        DropKind::Gold(_) => false,
+    }
+}
+
+/// The height of a unique's gold beam core over a drop of look `lk`, or `None` for a drop that
+/// is not a unique.
+fn unique_core(kind: &DropKind, lk: Look, uniques: Option<&super::ArpgUniques>) -> Option<f32> {
+    is_unique(kind, uniques).then(|| (lk.beam_height * UNIQUE_CORE_TALLER).max(UNIQUE_CORE_MIN))
 }
 
 fn despawn_all(commands: &mut Commands, entities: &[Entity]) {
@@ -629,7 +672,10 @@ fn draw_labels(
     items: Res<crate::items::Items>,
     net: Res<NetCommands>,
     rig: Res<CameraControl>,
-    cvars: Option<Res<crate::cvars::Cvars>>,
+    (cvars, uniques): (
+        Option<Res<crate::cvars::Cvars>>,
+        Option<Res<super::ArpgUniques>>,
+    ),
     camera: Query<(&Camera, &Transform), With<WorldCamera>>,
     mut atlas: Option<ResMut<UiFontAtlas>>,
     mut quads: ResMut<UiQuads>,
@@ -722,6 +768,19 @@ fn draw_labels(
             q.rect.max += shift;
         }
         let hovered = rig.arpg.over_loot == Some(key);
+        // A unique's gold border, under the box.
+        if is_unique(&ground_drop.kind, uniques.as_deref()) {
+            let g = super::UNIQUE_RGB;
+            quads.overlays.push(UiQuad {
+                rect: Rect {
+                    min: boxed.min - Vec2::splat(UNIQUE_BORDER),
+                    max: boxed.max + Vec2::splat(UNIQUE_BORDER),
+                },
+                z_key: Z_LABEL_BG,
+                color: [g[0], g[1], g[2], 0.95],
+                ..default()
+            });
+        }
         quads.overlays.push(UiQuad {
             rect: boxed,
             z_key: Z_LABEL_BG,
@@ -886,6 +945,29 @@ mod tests {
         );
         assert_eq!(label_text(&DropKind::Item(item), None), "... (3)");
         assert_eq!(label_text(&DropKind::Gold(250), None), "2s 50c");
+    }
+
+    #[test]
+    fn a_unique_gets_a_gold_core_taller_than_its_beam() {
+        let item = |item_id| {
+            DropKind::Item(ArpgLootItem {
+                slot: 0,
+                item_id,
+                display_id: 0,
+                quality: 3,
+                count: 1,
+            })
+        };
+        let mut uniques = super::super::ArpgUniques::default();
+        uniques
+            .0
+            .insert(5201, "Fireball launches 1 extra fireball.".into());
+        let lk = look(3);
+        let core = unique_core(&item(5201), lk, Some(&uniques)).unwrap();
+        assert!(core > lk.beam_height && core >= UNIQUE_CORE_MIN);
+        assert_eq!(unique_core(&item(25), lk, Some(&uniques)), None);
+        assert_eq!(unique_core(&item(5201), lk, None), None);
+        assert!(!is_unique(&DropKind::Gold(5), Some(&uniques)));
     }
 
     #[test]

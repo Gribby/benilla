@@ -30,6 +30,7 @@ Client (`crates/`):
 | Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
 | Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |
+| Uniques: the server's item lines (`SMSG_ARPG_ITEM_MECHANICS` 0x33E), the pale gold tooltip line, the gold label border and beam core | `benilla-app/src/player/arpg/uniques.rs`, `ui_items/feed.rs`, `benilla-ui/src/script/tooltip_item/render.rs`, `loot.rs` |
 
 Floating damage numbers are stock benilla (`combat_text`).
 
