@@ -189,14 +189,29 @@ Built:
 - Kit E on **Cookie's Stirring Rod** (5198, wand splash) and **Mograine's Might** (7723,
   Judgement splash).
 - Kit G on **Night Reaver** (1318, Heroic Strike) and **Felstriker** (12590, Eviscerate).
+- Kit B on **Witching Stave** (1484, Shadow Bolt pierces 1), **Bow of Searing Arrows** (2825,
+  Auto Shot pierces all) and **Hammer of the Grand Crusader** (18717, Hammer of Wrath pierces
+  all). Pierce hits fly on from the struck unit like fragments.
+- Kit F on **Venomstrike** (6469, Serpent Sting), **Living Root** (6631, Entangling Roots),
+  **Hypnotic Blade** (7714, Polymorph): free copies of the spell land on the nearest enemies
+  when it lands. **Lok'amir il Romathis** (19360): Shadow Word: Pain copies onto every enemy
+  near its target when that dies.
+- Kit H on **Meteor Shard** (6220, Sinister Strike shard along your facing, no missile yet).
+- Kit I on **Azuresong Mageblade** (17103, every 3rd Frostbolt echoes half a second later).
+- Kit J on **Book of the Dead** (13353): a 20% chance on any kill that a Skeleton (creature 6412,
+  set to your level and faction) rises at the corpse and fights for 20 sec.
+- Kit K on **Perdition's Blade** (18816): a Sinister Strike kill teleports you behind the
+  nearest enemy within 10 yd.
 
-13 of the 27. Test with `.additem <id>` on a GM account, or farm them.
+24 of the 27. Test with `.additem <id>` on a GM account, or farm them.
 
-Next:
-1. Kit F (spread: Venomstrike, Living Root, Hypnotic Blade, Lok'amir) and kit B (pierce: Witching
-   Stave, Bow of Searing Arrows, Hammer of the Grand Crusader).
-2. Kits H (shockwave), I (echo), J (raise), K (step) and Ravager's pull.
-3. The shard slow on Staff of Jordan.
+Not built yet:
+1. **Ravager**: Whirlwind's pull.
+2. **Bonereaver's Edge**: a swing hitting 3+ enemies sends a shockwave. ARPG swings strike one
+   enemy today, so this waits for swing cleave, or its line changes to a plain shockwave.
+3. **Striker's Mark**: Multi-Shot as a fan. Multi-Shot is a chain-target spell, not a skillshot,
+   so kit A doesn't catch it; it needs Multi-Shot itself made a fan of skillshots.
+4. The shard slow on Staff of Jordan, and a missile for the Meteor Shard shard.
 
 The Drop Test Loot tool rolls random items. A "drop this item id" field on the same page would
 make testing a unique quicker than the GM command; it's a small addition.
