@@ -145,11 +145,16 @@ around it: they were ARPG items before there was an ARPG.
   main shot took. They carry the spell's full effects (Frostbolt's slow), but their damage is
   `pct` of the normal hit, they never crit and they set off no procs. They show as ordinary
   missiles of that spell.
-- **Fragments (kit D)** are direct damage: `pct` of what the main hit dealt (after mitigation),
-  to up to `n` enemies within `value` yards behind the target in a 90° cone, through the ordinary
-  spell damage path (resistances, absorbs and the combat log work). They have no other effects
-  and no missile yet: the hits show as damage numbers. A shard visual flying from the target is
-  the follow-up (client side: the damage log names the spell and the target).
+- **Fragments (kit D) and chain jumps (kit C)** are direct damage: `pct` of what the main hit
+  dealt (after mitigation), through the ordinary spell damage path (armour, resistances, absorbs
+  and the combat log work), with no other effects. They fly: the server sends a cosmetic
+  `SMSG_SPELL_GO` of the spell from the unit they leave to the one they reach, so the client
+  draws the missile (a fireball from the struck mob to the one behind it), and the hit lands when
+  that missile arrives (`Spell.dbc` speed). A chain picks its next jump when it lands.
+- **Bursts (kit E) and arcs (kit G)** land at once, with no missile: a burst hits everything near
+  the target, an arc everything else in the swing's 120° and reach.
+- **Which spell a row covers:** any rank of it, and any spell named after it (each Arcane
+  Missiles missile, each Judgement), so a row names one spell for all its ranks and parts.
 
 ### Client (benilla)
 
@@ -171,20 +176,27 @@ around it: they were ARPG items before there was an ARPG.
 
 ## Built so far, and next
 
-Built (first slice):
+Built:
 - The table, the hello-time `SMSG_ARPG_ITEM_MECHANICS` (0x33E: `u8` count, then `u32` item and
   a C string per row), the tooltip line and the ground accent.
 - Kit A on **Emberstone Staff** (5201, Fireball +1) and **Quillshooter** (10567, Arcane Shot +2).
+- Kit C on **Freezing Shard** (10572, wand bolts chain twice), **Illusionary Rod** (7713, each
+  Arcane Missiles missile jumps once), **Whitemane's Chapeau** (7720, Smite chains twice) and
+  **Ramstein's Lightning Bolts** (13515, Lightning Bolt chains twice).
 - Kit D on **Staff of Dominance** (18842, Fireball 5 fragments), **Rod of the Sleepwalker** (1155,
   Wrath 3 motes) and **Staff of Jordan** (873, Frostbolt 4 shards; the slow on shards waits for
   a later pass, so its line doesn't promise it).
+- Kit E on **Cookie's Stirring Rod** (5198, wand splash) and **Mograine's Might** (7723,
+  Judgement splash).
+- Kit G on **Night Reaver** (1318, Heroic Strike) and **Felstriker** (12590, Eviscerate).
 
-Test with `.additem 5201`, `.additem 18842` and the rest (a GM account), or farm them.
+15 of the 27. Test with `.additem <id>` on a GM account, or farm them.
 
 Next:
-1. The fragment visual (a shard missile from the target outward).
-2. Kits C (chain) and G (arc). Between them they cover the most items in this list.
-3. The rest in any order. Each new item is then a table row plus a playtest.
+1. Kit F (spread: Venomstrike, Living Root, Hypnotic Blade, Lok'amir) and kit B (pierce: Witching
+   Stave, Bow of Searing Arrows, Hammer of the Grand Crusader).
+2. Kits H (shockwave), I (echo), J (raise), K (step) and Ravager's pull.
+3. The shard slow on Staff of Jordan.
 
 The Drop Test Loot tool rolls random items. A "drop this item id" field on the same page would
 make testing a unique quicker than the GM command; it's a small addition.
