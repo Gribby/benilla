@@ -25,6 +25,9 @@ pub const FLOOR_UP: f32 = 0.6;
 /// (about the player's chest), and its radius, in yards; `ARPG_SIGHT_DROP`, `ARPG_SIGHT_RADIUS`.
 pub const SIGHT_DROP: f32 = 1.5;
 pub const SIGHT_RADIUS: f32 = 3.5;
+/// A floor-like surface more than this far above the cut plane, in yards, is a storey overhead
+/// (Naxxramas' upper floors), not a ramp, and is cut like a ceiling; `ARPG_FLOOR_RISE`.
+pub const FLOOR_RISE: f32 = 3.0;
 
 /// The cutaway this frame; the default draws everything.
 #[derive(Resource, Default, Clone, Copy, PartialEq, Debug)]
@@ -69,13 +72,13 @@ impl Cutaway {
     /// Whether the indoor cut spares a point it would otherwise take, as the shaders'
     /// `arpg_cut_spares` does: a floor-like surface (its normal's `up` at least [`FLOOR_UP`]) off
     /// the sightline from `eye` (the camera) to the player stays, so a ramp or a ledge higher than
-    /// the player is not holed; one that would hide the player still goes, as do walls and
-    /// ceilings. A dither spares nothing this way.
+    /// the player is not holed; one that would hide the player still goes, as do walls,
+    /// ceilings and any floor more than [`FLOOR_RISE`] over the plane (a storey above). A dither spares nothing this way.
     pub fn spares(&self, point: Vec3, up: f32, eye: Vec3) -> bool {
         let Some(plane) = self.plane else {
             return false;
         };
-        if self.dither || up < FLOOR_UP {
+        if self.dither || up < FLOOR_UP || point.y > plane + FLOOR_RISE {
             return false;
         }
         let p = Vec3::new(self.center.x, plane - SIGHT_DROP, self.center.z);
@@ -133,6 +136,8 @@ mod tests {
             ..on()
         };
         assert!(!dither.spares(Vec3::new(-8.0, 12.0, 0.0), 1.0, eye));
+        // A floor a storey up, off the sightline, goes like a ceiling.
+        assert!(!cut.spares(Vec3::new(-8.0, 10.0 + FLOOR_RISE + 1.0, 0.0), 1.0, eye));
     }
 
     #[test]

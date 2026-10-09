@@ -171,8 +171,10 @@ fn vertex(in: Vertex) -> TerrainVsOut {
 const ARPG_FLOOR_UP: f32 = 0.6;
 const ARPG_SIGHT_RADIUS: f32 = 3.5;
 const ARPG_SIGHT_DROP: f32 = 1.5;
+// A floor this far over the plane is a storey above, not a ramp: it goes too.
+const ARPG_FLOOR_RISE: f32 = 3.0;
 fn arpg_cut_spares(world: vec3<f32>, up: f32, plane: f32, centre: vec2<f32>, eye: vec3<f32>) -> bool {
-    if (up < ARPG_FLOOR_UP) {
+    if (up < ARPG_FLOOR_UP || world.y > plane + ARPG_FLOOR_RISE) {
         return false;
     }
     let p = vec3<f32>(centre.x, plane - ARPG_SIGHT_DROP, centre.y);
