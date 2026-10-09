@@ -56,10 +56,10 @@ cast runs and hit neutral wild creatures, and ground loot (phase 3's first item)
 
 Ground loot today: grey and white drops glow faintly with no beam; green, blue, purple and orange
 glow brighter with a beam that grows with the quality (`look()` in `loot.rs`). Labels show within
-30 yd, all of them with Alt. Known gaps: under group, need-before-greed or master loot an item at
-or over the loot threshold is held for a roll only the loot window starts, so it is not on the
-ground (open the corpse as in stock); drops vanish with the corpse (no persistent ground items);
-no item models yet (weapons and shields could lie as their real M2s, everything else a sack).
+30 yd, all of them with Alt. The server drops the group loot rules for ARPG players (their loot is
+free for all, nothing waits on a roll) and binds nothing on pickup (bind on equip is stock). Known
+gaps: drops vanish with the corpse (no persistent ground items); no item models yet (weapons and
+shields could lie as their real M2s, everything else a sack).
 
 Next:
 - Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
