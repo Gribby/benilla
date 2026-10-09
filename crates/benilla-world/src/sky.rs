@@ -220,22 +220,32 @@ fn follow_camera(
 /// Hide the dome for the debug toggle, under a WMO skybox (its MOSB model replaces the gradient)
 /// and while submerged: the reference's submerged test (`0x6812a4`) skips `CSky::Render`
 /// (`0x6d4940`) whole. The skybox gate is its weight: below 0.99 the dome still draws under the
-/// crossfading skybox ([`crate::skybox::SkyboxWeight`]).
+/// crossfading skybox ([`crate::skybox::SkyboxWeight`]). Fork-only, not 1.12.1: also while the
+/// ARPG indoor cut is on ([`crate::cutaway::Cutaway`]): the camera looks down past the cut walls
+/// at the space outside a cave or a building, which the dome would fill with its below-horizon
+/// fog colour, and black reads as the void it is.
 fn apply_sky_visibility(
     debug: Res<DebugState>,
     skybox: Res<crate::skybox::SkyboxWeight>,
     underwater: Res<crate::liquid::Underwater>,
+    cutaway: Option<Res<crate::cutaway::Cutaway>>,
     mut dome: Query<&mut Visibility, With<Sky>>,
 ) {
     let Ok(mut vis) = dome.single_mut() else {
         return;
     };
-    let want =
-        if debug.lighting.disable_sky_dome || skybox.replaces_celestial() || underwater.0.any() {
-            Visibility::Hidden
-        } else {
-            Visibility::Visible
-        };
+    let indoor_cut = cutaway
+        .as_ref()
+        .is_some_and(|c| c.plane.is_some() && !c.dither);
+    let want = if debug.lighting.disable_sky_dome
+        || skybox.replaces_celestial()
+        || underwater.0.any()
+        || indoor_cut
+    {
+        Visibility::Hidden
+    } else {
+        Visibility::Visible
+    };
     if *vis != want {
         *vis = want;
     }
