@@ -175,3 +175,100 @@ orbDriver:SetScript("OnUpdate", function()
         refreshOrbs()
     end
 end)
+
+-- ── The options window's ARPG page ──
+-- benilla's options window (BenillaOptionsFrame) gains an "ARPG View" category under its own
+-- header, built from the window's own row templates, so its rows store, refresh, search and reset
+-- like every other page. Each slider writes its setting at once, and the client reads the settings
+-- every frame, so the camera and the cut move as the thumb does. A bare VM has no window: skip.
+
+ARPG_TOOLTIP_CAMERA_YAW = "Turns the camera around your character, in degrees."
+ARPG_TOOLTIP_CAMERA_PITCH = "How steeply the camera looks down, in degrees: 90 is straight down."
+ARPG_TOOLTIP_CAMERA_DISTANCE = "How far the camera sits from your character, in yards."
+ARPG_TOOLTIP_CUT_HEIGHT = "Indoors and in caves, walls and ceilings more than this many yards "
+    .. "above your feet are cut away. Lower shows more of the room; higher keeps more walls."
+ARPG_TOOLTIP_CUT_RADIUS = "Indoors and in caves, how far from your character the cut reaches, "
+    .. "in yards. Geometry farther out keeps its tops."
+ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
+    .. "camera turn see-through."
+
+-- `cvar`, the label, the tooltip global, then a slider's min, max, step and readout format; a row
+-- with no range is a checkbox.
+local ARPG_OPTION_ROWS = {
+    { "RowSeeThrough", "arpgSeeThrough", "See-Through Outdoors", "ARPG_TOOLTIP_SEE_THROUGH" },
+    { "RowCameraDistance", "arpgCameraDistance", "Camera Distance", "ARPG_TOOLTIP_CAMERA_DISTANCE",
+        5, 50, 1, "%d yd" },
+    { "RowCameraPitch", "arpgCameraPitch", "Camera Pitch", "ARPG_TOOLTIP_CAMERA_PITCH",
+        20, 89, 1, "%d deg" },
+    { "RowCameraYaw", "arpgCameraYaw", "Camera Yaw", "ARPG_TOOLTIP_CAMERA_YAW",
+        0, 360, 5, "%d deg" },
+    { "RowCutHeight", "arpgCutHeight", "Cutaway Height", "ARPG_TOOLTIP_CUT_HEIGHT",
+        1.5, 10, 0.1, "%.1f yd" },
+    { "RowCutRadius", "arpgCutRadius", "Cutaway Radius", "ARPG_TOOLTIP_CUT_RADIUS",
+        5, 120, 1, "%d yd" },
+}
+
+local function addArpgOptionsPage()
+    if not BenillaOptionsFrame or not BENILLA_OPTIONS_PAGE_ROWS
+        or not BENILLA_OPTIONS_CATEGORY_KEYS or BENILLA_OPTIONS_PAGE_ROWS.Arpg then
+        return
+    end
+    local list = BenillaOptionsFrameCategoryList
+    local header = CreateFrame("Frame", "BenillaOptionsFrameCategoryListHeaderArpg", list,
+        "BenillaOptionsCategoryHeaderTemplate")
+    header:SetPoint("TOPLEFT", "BenillaOptionsFrameCategoryListRowAudio", "BOTTOMLEFT", 0, -22)
+    getglobal(header:GetName() .. "Label"):SetText("ARPG")
+    local entry = CreateFrame("Button", "BenillaOptionsFrameCategoryListRowArpg", list,
+        "BenillaOptionsCategoryRowTemplate")
+    entry:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -2)
+    BenillaOptionsCategoryRow_OnLoad(entry, "Arpg", "ARPG View")
+
+    local body = CreateFrame("Frame", "BenillaOptionsFrameContainerBodyArpg",
+        BenillaOptionsFrameContainerBody)
+    body:SetPoint("TOPLEFT", BenillaOptionsFrameContainerBody, "TOPLEFT", 0, 0)
+    body:SetPoint("BOTTOMRIGHT", BenillaOptionsFrameContainerBody, "BOTTOMRIGHT", 0, 0)
+    body:Hide()
+    -- A search's heading over our matches, as the window has one per page.
+    local head = CreateFrame("Button", "BenillaOptionsFrameContainerBodySearchHeadArpg",
+        BenillaOptionsFrameContainerBody, "BenillaOptionsSearchHeadTemplate")
+    head.categoryKey = "Arpg"
+    getglobal(head:GetName() .. "Label"):SetText("ARPG View")
+
+    local keys, prev = {}, nil
+    for _, spec in ipairs(ARPG_OPTION_ROWS) do
+        local key, cvar, label, tip, minv, maxv, step, fmt =
+            spec[1], spec[2], spec[3], spec[4], spec[5], spec[6], spec[7], spec[8]
+        local template = "BenillaOptionsCheckboxRowTemplate"
+        if minv then template = "BenillaOptionsSliderRowTemplate" end
+        local row = CreateFrame("Frame", body:GetName() .. key, body, template)
+        if prev then
+            row:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -9)
+            row:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, -9)
+        else
+            row:SetPoint("TOPLEFT", body, "TOPLEFT", 10, -12)
+            row:SetPoint("TOPRIGHT", body, "TOPRIGHT", -20, -12)
+        end
+        BenillaOptionsRow_OnLoad(row, cvar, label, tip)
+        if minv then
+            BenillaOptionsSliderRow_Setup(row, minv, maxv, step, "arpg")
+            row.arpgFmt = fmt
+        end
+        table.insert(keys, key)
+        prev = row
+    end
+    BENILLA_OPTIONS_PAGE_ROWS.Arpg = keys
+    table.insert(BENILLA_OPTIONS_CATEGORY_KEYS, "Arpg")
+
+    -- The window's readouts know only its own formats; ours carry a printf pattern.
+    local formatValue = BenillaOptionsRow_FormatValue
+    BenillaOptionsRow_FormatValue = function(row, value)
+        if row.arpgFmt then
+            -- Whole-number readouts round rather than truncate.
+            if string.find(row.arpgFmt, "%%d") then value = math.floor(value + 0.5) end
+            return string.format(row.arpgFmt, value)
+        end
+        return formatValue(row, value)
+    end
+end
+
+addArpgOptionsPage()

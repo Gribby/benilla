@@ -2,11 +2,12 @@
 //! orbits behind the character, and this fork replaces that with one pose, so the switch is off
 //! by default and stock behaviour is untouched.
 //!
-//! `WOW_ARPG_PITCH` (degrees looking down, default 55), `WOW_ARPG_YAW` (degrees, default 45) and
-//! `WOW_ARPG_DIST` (yards, default 28) shape the pose. Indoors and in caves the camera does not
-//! collide; walls and ceilings above `WOW_ARPG_CUT` yards over the feet (default 2.8) are cut away
-//! instead (`benilla_world::cutaway`). Outdoors, roofs, awnings and tree crowns between the player
-//! and the camera draw see-through instead (a dither; `WOW_ARPG_XRAY=0` turns it off).
+//! The pitch (degrees looking down, default 55), yaw (degrees, default 45) and distance (yards,
+//! default 28) shape the pose. Indoors and in caves the camera does not collide; walls and ceilings
+//! more than the cut height over the feet (default 2.8 yd) are cut away instead
+//! (`benilla_world::cutaway`). Outdoors, roofs, awnings and tree crowns between the player and the
+//! camera draw see-through instead (a dither). Each is a saved setting the options window's ARPG
+//! page moves live ([`ARPG_KNOBS`]); its `WOW_ARPG_*` variable seeds it for one session.
 //!
 //! A unit the player hits flashes white (`fx`), and the character turns to a new facing quickly
 //! rather than snapping ([`TURN_RATE`]).
@@ -60,26 +61,120 @@ impl ArpgPin {
             distance: distance.clamp(5.0, CAM_DIST_MAX),
         }
     }
+}
 
-    /// The pose the environment asks for, `None` with `WOW_ARPG` unset, empty, `0` or `off`.
-    fn from_env() -> Option<Self> {
-        let on = std::env::var("WOW_ARPG").is_ok_and(|v| !matches!(v.trim(), "" | "0" | "off"));
-        on.then(|| {
-            Self::new(
-                env_f32("WOW_ARPG_YAW", 45.0),
-                env_f32("WOW_ARPG_PITCH", 55.0),
-                env_f32("WOW_ARPG_DIST", 28.0),
-            )
-        })
+/// Whether `WOW_ARPG` turns the view on: set, and not empty, `0` or `off`.
+fn arpg_env_on() -> bool {
+    std::env::var("WOW_ARPG").is_ok_and(|v| !matches!(v.trim(), "" | "0" | "off"))
+}
+
+/// Fork-only, not 1.12.1: one of the view's tunables, a saved setting (a CVar) that the in-game
+/// options' ARPG page moves and the view reads every frame, so a slider acts at once. Its
+/// environment variable, when set, seeds the setting for the session instead
+/// (`crate::cvars::session_values`), which then is not saved.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ArpgKnob {
+    pub(crate) cvar: &'static str,
+    pub(crate) env: &'static str,
+    default: f32,
+    min: f32,
+    max: f32,
+}
+
+impl ArpgKnob {
+    /// The value to use now: the setting, else the default, inside the knob's range.
+    fn read(&self, cvars: Option<&crate::cvars::Cvars>) -> f32 {
+        cvars
+            .and_then(|c| c.num(self.cvar))
+            .filter(|v| v.is_finite())
+            .unwrap_or(self.default)
+            .clamp(self.min, self.max)
     }
 }
 
-fn env_f32(name: &str, default: f32) -> f32 {
-    std::env::var(name)
-        .ok()
-        .and_then(|v| v.trim().parse::<f32>().ok())
-        .filter(|v| v.is_finite())
-        .unwrap_or(default)
+/// The camera's turn about the player, in degrees.
+const KNOB_YAW: ArpgKnob = ArpgKnob {
+    cvar: "arpgCameraYaw",
+    env: "WOW_ARPG_YAW",
+    default: 45.0,
+    min: -360.0,
+    max: 360.0,
+};
+/// How far the camera looks down, in degrees.
+const KNOB_PITCH: ArpgKnob = ArpgKnob {
+    cvar: "arpgCameraPitch",
+    env: "WOW_ARPG_PITCH",
+    default: 55.0,
+    min: 20.0,
+    max: 89.0,
+};
+/// The camera's distance from the player, in yards.
+const KNOB_DISTANCE: ArpgKnob = ArpgKnob {
+    cvar: "arpgCameraDistance",
+    env: "WOW_ARPG_DIST",
+    default: 28.0,
+    min: 5.0,
+    max: CAM_DIST_MAX,
+};
+/// Indoors, the height over the feet above which walls and ceilings are cut, in yards.
+const KNOB_CUT_HEIGHT: ArpgKnob = ArpgKnob {
+    cvar: "arpgCutHeight",
+    env: "WOW_ARPG_CUT",
+    default: CUT_HEIGHT,
+    min: 1.5,
+    max: 10.0,
+};
+/// Indoors, how far from the feet the cut reaches, in yards.
+const KNOB_CUT_RADIUS: ArpgKnob = ArpgKnob {
+    cvar: "arpgCutRadius",
+    env: "WOW_ARPG_CUT_RADIUS",
+    default: CUT_RADIUS,
+    min: 5.0,
+    max: 120.0,
+};
+/// Outdoors, whether what stands between the player and the camera dithers (1) or not (0).
+const KNOB_SEE_THROUGH: ArpgKnob = ArpgKnob {
+    cvar: "arpgSeeThrough",
+    env: "WOW_ARPG_XRAY",
+    default: 1.0,
+    min: 0.0,
+    max: 1.0,
+};
+
+/// Every view tunable, for the session seeding in `crate::cvars`.
+pub(crate) const ARPG_KNOBS: [ArpgKnob; 6] = [
+    KNOB_YAW,
+    KNOB_PITCH,
+    KNOB_DISTANCE,
+    KNOB_CUT_HEIGHT,
+    KNOB_CUT_RADIUS,
+    KNOB_SEE_THROUGH,
+];
+
+/// The view's settings as they stand this frame.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ArpgView {
+    pin: ArpgPin,
+    /// The indoor cut's height above the feet and its radius, in yards.
+    cut_height: f32,
+    cut_radius: f32,
+    /// Whether outdoor occluders dither.
+    see_through: bool,
+}
+
+impl ArpgView {
+    fn read(cvars: Option<&crate::cvars::Cvars>) -> Self {
+        Self {
+            pin: ArpgPin::new(
+                KNOB_YAW.read(cvars),
+                KNOB_PITCH.read(cvars),
+                KNOB_DISTANCE.read(cvars),
+            ),
+            cut_height: KNOB_CUT_HEIGHT.read(cvars),
+            cut_radius: KNOB_CUT_RADIUS.read(cvars),
+            see_through: KNOB_SEE_THROUGH.read(cvars) >= 0.5,
+        }
+    }
 }
 
 /// Present only while the ARPG view is on: for the systems outside the view's own module that
@@ -93,33 +188,23 @@ pub(crate) struct ArpgMode;
 #[derive(Resource, Default)]
 pub(crate) struct ArpgAttackKey(pub(crate) bool);
 
-/// The pose to hold while the view is on, the cutaway's height above the feet and radius, and
-/// whether outdoor occluders dither (`WOW_ARPG_XRAY`).
-#[derive(Resource)]
-struct ArpgView(ArpgPin, f32, f32, bool);
-
 /// Hand the rig its pose; a no-op unless `WOW_ARPG` is on.
 pub(super) fn plugin(app: &mut App) {
     // The ground loot's wire half, whatever the view: every session event kind needs an owner.
     loot::register_net(app);
-    let Some(pin) = ArpgPin::from_env() else {
+    if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
         return;
-    };
+    }
     // The enemy under the cursor, for the swing and the hover bar; no selection.
     crate::target::arpg_soft::plugin(app);
     // The struck unit's white flash.
     fx::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
-    let cut = env_f32("WOW_ARPG_CUT", CUT_HEIGHT).clamp(1.5, 10.0);
-    let cut_radius = env_f32("WOW_ARPG_CUT_RADIUS", CUT_RADIUS).clamp(5.0, 120.0);
     app.add_systems(Startup, install_hud);
-    // `WOW_ARPG_XRAY=0` turns the outdoor see-through off.
-    let xray = std::env::var("WOW_ARPG_XRAY").map_or(true, |v| v.trim() != "0");
-    app.insert_resource(ArpgView(pin, cut, cut_radius, xray))
-        .init_resource::<crate::spell::ArpgCastAim>()
+    app.init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
         .insert_resource(ArpgMode)
         .add_systems(
@@ -221,11 +306,11 @@ const DEFAULT_REACH: f32 = 1.5;
 /// With the cursor on a panel or the sky, a cast aims this far ahead of the facing, in yards.
 const BLIND_AIM: f32 = 10.0;
 /// Indoors, static geometry this far above the feet is cut away, in yards: above any player's
-/// head (`WOW_ARPG_CUT` overrides).
+/// head ([`KNOB_CUT_HEIGHT`] moves it).
 const CUT_HEIGHT: f32 = 2.8;
-/// The cutaway reaches this far from the feet on the ground, in yards (`WOW_ARPG_CUT_RADIUS`
-/// overrides): past the camera's own footprint (28 yd out at 55° is 16 yd across), so nothing
-/// between it and the player stands, while distant hills, trees and roofs keep their tops.
+/// The cutaway reaches this far from the feet on the ground, in yards ([`KNOB_CUT_RADIUS`] moves
+/// it): past the camera's own footprint (28 yd out at 55° is 16 yd across), so nothing between it
+/// and the player stands, while distant hills, trees and roofs keep their tops.
 const CUT_RADIUS: f32 = 30.0;
 /// Outdoors, the see-through dither ([`benilla_world::cutaway::Cutaway::dither`]): a disc this far
 /// toward the camera from the feet, this wide, over this height above them, in yards. It covers
@@ -464,7 +549,7 @@ type ArpgRooms<'w, 's> = (
 /// wish changes. A walk to a point ends any Click-to-Move approach or `/follow`, as a movement key
 /// does.
 fn pin_view(
-    view: Res<ArpgView>,
+    cvars: Option<Res<crate::cvars::Cvars>>,
     picks: ArpgPicks,
     keys: Res<ButtonInput<KeyCode>>,
     player: Res<Player>,
@@ -481,21 +566,22 @@ fn pin_view(
 ) {
     let (hovered, object, occlusion, enemy_hover, spell_targeting, over_panel, stores, me) = picks;
     let (room, instances, wmos) = rooms;
-    if rig.arpg_pin != Some(view.0) {
-        rig.arpg_pin = Some(view.0);
+    let view = ArpgView::read(cvars.as_deref());
+    if rig.arpg_pin != Some(view.pin) {
+        rig.arpg_pin = Some(view.pin);
     }
     // Indoors (a WMO room or a cave), the walls, ceiling and any hill above the head are cut away
     // around the player.
     let indoor = room.0.filter(|r| room_is_indoor(*r, &instances, &wmos));
     let fresh = match indoor {
         Some(_) => benilla_world::cutaway::Cutaway {
-            plane: Some(player.pos.y + view.1),
+            plane: Some(player.pos.y + view.cut_height),
             center: player.pos,
-            radius: view.2,
+            radius: view.cut_radius,
             dither: false,
         },
         // Outdoors, whatever stands between the player and the camera goes see-through.
-        None if view.3 => xray_cut(player.pos, view.0.yaw),
+        None if view.see_through => xray_cut(player.pos, view.pin.yaw),
         None => benilla_world::cutaway::Cutaway::default(),
     };
     if *cutaway != fresh {
@@ -1062,6 +1148,32 @@ mod tests {
         assert!((pin.pitch + 55.0_f32.to_radians()).abs() < 1.0e-6);
         assert!((pin.yaw - std::f32::consts::FRAC_PI_4).abs() < 1.0e-6);
         assert_eq!(pin.distance, 28.0);
+    }
+
+    #[test]
+    fn each_knob_defaults_as_its_setting_row_does() {
+        for knob in ARPG_KNOBS {
+            let row = crate::cvars::REGISTERED
+                .iter()
+                .find(|r| r.name == knob.cvar)
+                .unwrap_or_else(|| panic!("{} is not a registered setting", knob.cvar));
+            let default: f32 = row.default.parse().unwrap();
+            assert_eq!(default, knob.default, "{}", knob.cvar);
+            assert!(
+                (knob.min..=knob.max).contains(&knob.default),
+                "{}",
+                knob.cvar
+            );
+        }
+    }
+
+    #[test]
+    fn with_no_settings_the_view_is_the_default_pose() {
+        let view = ArpgView::read(None);
+        assert_eq!(view.pin, ArpgPin::new(45.0, 55.0, 28.0));
+        assert_eq!(view.cut_height, CUT_HEIGHT);
+        assert_eq!(view.cut_radius, CUT_RADIUS);
+        assert!(view.see_through);
     }
 
     #[test]

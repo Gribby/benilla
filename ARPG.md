@@ -27,14 +27,20 @@ Client (`crates/`):
 | Wire format | `benilla-protocol/src/world/writer/arpg.rs` |
 | Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
 | Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
-| Hover health bar + health/power orbs (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
+| Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
 | Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |
 
 Floating damage numbers are stock benilla (`combat_text`).
 
-Env knobs: `WOW_ARPG_PITCH`, `WOW_ARPG_YAW`, `WOW_ARPG_DIST`, `WOW_ARPG_CUT` (2.8),
-`WOW_ARPG_CUT_RADIUS` (30), `WOW_ARPG_MAGNET` (3), `WOW_ARPG_XRAY` (`0` turns the dither off).
+View settings: Esc → Options → **ARPG View** (the page the ARPG HUD addon adds to benilla's
+options window) has sliders for camera distance, pitch and yaw, the indoor cutaway's height and
+radius, and a see-through checkbox. They are saved CVars (`arpgCameraYaw` 45, `arpgCameraPitch` 55,
+`arpgCameraDistance` 28, `arpgCutHeight` 2.8, `arpgCutRadius` 30, `arpgSeeThrough` 1) that the view
+reads every frame (`ARPG_KNOBS` in `player/arpg.rs`), so a slider acts at once. The env variables
+`WOW_ARPG_YAW`, `WOW_ARPG_PITCH`, `WOW_ARPG_DIST`, `WOW_ARPG_CUT`, `WOW_ARPG_CUT_RADIUS` and
+`WOW_ARPG_XRAY` still work: each seeds its setting for that session only, and then the slider's
+moves aren't saved. `WOW_ARPG_MAGNET` (3) stays env-only.
 
 Server (`src/game/Arpg/`, plus hooks in `Player`, `Unit`, `Spell`, `SpellEffects`,
 `UnitAuraProcHandler`, `Opcodes`, `World`): `CMSG_ARPG_ACTION` = 0x33C, protocol version 2.

@@ -95,6 +95,10 @@ const fn deviates(
 }
 
 /// A row the reference has no counterpart for.
+/// Why the ARPG fork's rows leave the reference: it has no fixed top-down view to tune.
+const ARPG_WHY: &str = "benilla's own (ARPG fork) — 1.12 has no fixed top-down view, cutaway or \
+     see-through to tune";
+
 const fn ours(name: &'static str, default: &'static str, why: &'static str) -> Registered {
     Registered {
         name,
@@ -716,6 +720,15 @@ pub(crate) const REGISTERED: &[Registered] = &[
         "benilla's own — 1.12 has no player-side perf log; its nearest thing is the \
          Ctrl+R framerate label, a number with no file behind it",
     ),
+    // Fork-only, not 1.12.1: the ARPG view's tunables (`crate::player::ARPG_KNOBS`), read every
+    // frame while `WOW_ARPG` is on and moved by the options window's ARPG page, which the ARPG HUD
+    // addon adds. Each `WOW_ARPG_*` variable seeds its row for the session.
+    ours("arpgCameraYaw", "45", ARPG_WHY),
+    ours("arpgCameraPitch", "55", ARPG_WHY),
+    ours("arpgCameraDistance", "28", ARPG_WHY),
+    ours("arpgCutHeight", "2.8", ARPG_WHY),
+    ours("arpgCutRadius", "30", ARPG_WHY),
+    ours("arpgSeeThrough", "1", ARPG_WHY),
     // `lastCharacterIndex` (`0x402d93`, "0" `0x82e570`, category 4, handle `[0x882674]`), help
     // "Last character selected": a 0-based row (the selection cell `[0x83856c]` under `"%d"`), so
     // "0" is the first character. It mirrors [`crate::char_select::Roster::pending_index`].

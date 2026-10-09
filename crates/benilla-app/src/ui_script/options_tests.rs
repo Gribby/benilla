@@ -4477,3 +4477,50 @@ fn the_guild_line_greys_with_player_names_and_the_follow_speed_with_the_style() 
     assert!(speed_thumb(&mut s));
     assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
 }
+
+/// Fork-only: the ARPG HUD addon adds an "ARPG View" page whose sliders write their settings at
+/// once, read back on a refresh, and reset to the table's defaults.
+#[test]
+fn the_arpg_page_writes_its_settings_live() {
+    benilla_formats::wow_data_or_skip!();
+    let s = harness();
+    s.register_cvars(crate::cvars::registered_pairs());
+    s.run(include_str!("../player/arpg_hud.lua")).unwrap();
+    s.run("ShowUIPanel(BenillaOptionsFrame)").unwrap();
+    s.run("BenillaOptionsFrameCategoryListRowArpg:Click()")
+        .unwrap();
+    assert!(s.frame_visible("BenillaOptionsFrameContainerBodyArpg"));
+    let base = "BenillaOptionsFrameContainerBodyArpg";
+    assert_eq!(
+        s.eval::<f64>(&format!(
+            "return {base}RowCutHeightControlSlider:GetValue()"
+        ))
+        .unwrap(),
+        2.8_f32 as f64
+    );
+    s.run(&format!("{base}RowCutHeightControlSlider:SetValue(4.2)"))
+        .unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgCutHeight\")")
+            .unwrap(),
+        "4.2"
+    );
+    assert_eq!(
+        s.eval::<String>(&format!("return {base}RowCutHeightControlValue:GetText()"))
+            .unwrap(),
+        "4.2 yd"
+    );
+    s.run(&format!("{base}RowSeeThroughCheck:Click()")).unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgSeeThrough\")")
+            .unwrap(),
+        "0"
+    );
+    s.run("BenillaOptionsPage_Defaults(\"Arpg\")").unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgCutHeight\")")
+            .unwrap(),
+        "2.8"
+    );
+    assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
+}

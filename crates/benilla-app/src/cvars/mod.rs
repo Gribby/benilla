@@ -594,6 +594,16 @@ fn session_values(world: &World) -> Vec<(&'static str, Option<String>)> {
         let v = world.get_resource::<crate::world_backdrop::RenderScale>();
         out.push(("renderScale", v.map(|r| r.0.to_string())));
     }
+    // Fork-only: a `WOW_ARPG_*` variable pins its view setting for the session, unsaved.
+    for knob in crate::player::ARPG_KNOBS {
+        if let Some(v) = std::env::var(knob.env)
+            .ok()
+            .map(|v| v.trim().to_string())
+            .filter(|v| v.parse::<f32>().is_ok_and(f32::is_finite))
+        {
+            out.push((knob.cvar, Some(v)));
+        }
+    }
     // `$WOW_HOST` is the session's realmlist, which a test run must never write into the file.
     if set("WOW_HOST") {
         let v = world.get_resource::<crate::realmlist::Realmlist>();
