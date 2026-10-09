@@ -1,6 +1,6 @@
 # ARPG character design: skills, passives, attributes and items
 
-Design, not built. This replaces the first skill tree (`ARPG-SKILL-TREES.md`, a vanilla talent
+Design, not built; Jeff's decisions are recorded where they apply. This replaces the first skill tree (`ARPG-SKILL-TREES.md`, a vanilla talent
 grid with ARPG nodes mixed in), after Jeff's review of it in game: it didn't look or play like an
 ARPG tree. This doc rethinks how the character systems fit together, then plans the paladin in
 full.
@@ -41,9 +41,11 @@ building blocks here.
 flowchart LR
   subgraph Character
     L[Level] -->|1 point per level| W[Passive web]
-    XP[XP while slotted] -->|skill level 1-20| ST[Skill trees x5]
+    L -->|2 skill points per level| ST[Skill trees x5]
   end
   I[Items] -->|+skill levels| ST
+  D[Boss and champion drops] -->|Codex pages: capstones| ST
+  D -->|runes: one socket per tree| ST
   I -->|attributes| A[Attributes]
   I -->|tag affixes| T((Tags))
   I -->|uniques: transform a skill| S[Skills]
@@ -111,18 +113,34 @@ replaces a vanilla effect. The rates are a starting point, to tune in play.
 
 ### Specialisation
 
-- **Five specialisation slots.** Any class spell can be specialised. A specialised skill gets
-  a skill level and its own tree. Everything else stays castable as vanilla made it.
-- **Skill level 1 to 20, earned by playing.** A specialised skill gains skill XP from the XP you
-  earn while it's slotted. A level 20 character's first five skills arrive at about level 20
-  each, if they were slotted all the way.
-- **One point per skill level** goes into that skill's tree, so a skill tree holds 20 points by
-  default. Items with "+N to <skill>" add levels past 20, up to 25: more points, and those
-  points are only spendable in that skill.
-- **Respec is free:** points within a skill's tree move freely. Unslotting a skill keeps its
-  level, so you can swap a skill in for a dungeon and back.
-- **Learning ranks:** skills learn their vanilla ranks automatically at the vanilla level, so
-  there's no trainer run. The skill tree is where the depth goes.
+Jeff's calls: slots unlock by level and show on the bar; points come from character levels;
+drops gate the biggest upgrades; and spells have no ranks.
+
+- **Five slots, unlocked by level:** the first at level 1, then 10, 20, 30 and 40. Vanilla hands
+  out spells slowly, so this follows its pace, and each new slot is a levelling milestone.
+- **The bar is the build:** a specialised skill sits on the ARPG bar (left-click, right-click,
+  keys 1 to 4), so what's on the bar is what the character is. Buffs, Blessings and utility spells
+  stay castable from the spellbook, without a tree.
+- **Skill points: two per level from level 2 to 51,** 100 in all, which fills five trees of 20 by
+  level 51. Levels past 51 still give passive web points. Points go into whichever specialised
+  skill you like, so a character can rush one skill early.
+- **Items raise a skill past 20:** "+2 to Judgement" raises that skill's cap to 22 and gives the 2
+  points, spendable only in Judgement.
+- **Respec is free:** points move freely within and between trees, and unslotting a skill refunds
+  its points.
+- **Drops gate the biggest upgrades:** capstones need a Codex page, and each tree has a rune
+  socket. See "Drops that unlock skills" below.
+
+### Support and defence skills feed the attacks
+
+Nothing forces a defensive or support pick, but every defence and support tree has a branch that
+makes the attack skills hit harder, so five attack skills is the weaker build. Paladin examples:
+
+- **Auras:** Sanctity Aura gives +10% Holy damage; Wide Aura spreads it to the whole pack you're
+  fighting.
+- **Divine:** when Divine Shield ends, your next three Judgements are critical strikes.
+- **Hammer of Justice:** stunned enemies take +15% damage from you (Sentence Passed).
+- **Seals:** they are the swing's damage. A Strike build without Seals is half a build.
 
 ### What a skill tree looks like
 
@@ -134,7 +152,71 @@ branches and one or two capstones at the ends. The branches compete for the same
 | Modifier | Small circle | Numbers: more damage, less cost, bigger radius, longer stun | `SpellModifier` (cmangos spell mods by the skill's family mask) |
 | Transformer | Diamond | Changes how the skill works: chains, splits, becomes a projectile, changes damage type | The uniques kit, plus per-skill hooks |
 | Synergy | Hexagon | Interacts with another skill or a tag: "Judgement on an enemy in your Consecration..." | Small per-node hooks |
-| Capstone | Large star | A big rule change at the end of a branch; usually exclusive with the other capstone | A hook per capstone |
+| Capstone | Large star | A big rule change at the end of a branch; needs its Codex page to learn | A hook per capstone |
+| Rune socket | Ring | Holds one rune: a portable mechanic for any skill whose tags fit | The uniques kit |
+
+## Drops that unlock skills
+
+Points from levels keep progress steady, so a build never waits on luck for its basics. Drops
+gate two things on top: the capstones, and a rune socket per skill.
+
+### Codex pages: the capstones
+
+- **Every capstone is sealed until you read its Codex page,** a book that drops from one named boss
+  whose theme fits it (Whirling Strikes from Herod, Walking Consecration from High Inquisitor
+  Whitemane). Read once and it's yours for that character; then you still spend points on it.
+- **Each page has a home boss and a fallback.** The home boss drops it often enough that a few
+  runs find it. Champion packs (from the mob packs step) drop **Codex fragments**, and five
+  fragments make any page for a skill you have specialised. Bad luck is never a wall, only a
+  slower road.
+- **Why capstones:** they're the build-defining part, so finding one is an event ("I finally got
+  Blessed Hammer"), and every dungeon has something a build wants from it. Leaving the rest of the
+  tree open means a character is never weak for lack of a drop.
+
+### Runes: a socket in every skill tree
+
+- **Each skill tree has one rune socket,** opening once 10 points are in that skill.
+- **Runes drop as loot** (blue and better, from bosses and champion packs) and add one portable
+  mechanic to the socketed skill, if the skill carries the rune's tag. Socketing is free and
+  reversible, so a new rune is an experiment, not a commitment.
+- **Runes reuse the uniques kit,** so they're cheap to build and they make every skill a
+  candidate for chaining, splitting or echoing, while uniques stay the strongest version of each.
+  The same kit on the same skill from a rune, a unique and a tree node doesn't stack: the strongest
+  applies.
+
+| Rune | Fits | Effect |
+|---|---|---|
+| Chains | Spell, single target | The skill chains to 1 more enemy at 50% |
+| Splitting | Projectile | +2 projectiles at 40% |
+| Echoes | Spell | Every 4th cast repeats at 50% |
+| Expanse | Area | +30% area |
+| Lingering | Ground, Duration | +50% duration |
+| Fury | Melee | Also strikes every enemy in front of you at 30% |
+| Haste | Any | −25% cooldown, −15% damage |
+| Leech | Any damage | 3% of the damage dealt heals you |
+| Command | Control | The control effect spreads to 1 enemy nearby |
+| Sanctity | Holy | +15% damage, and the skill counts as Area for Area bonuses |
+
+### Levels past 20
+
+"+N to <skill>" item affixes are the only route past 20, so the third source of skill power is
+plain gear. Tomes (a third drop type) aren't needed.
+
+## Spells without ranks
+
+- **A skill is one spell with no "Rank N".** The spellbook shows one Judgement; trainers no
+  longer teach spells. A class's skills unlock at the level vanilla first gives them (Consecration
+  at 6 for the ARPG paladin), for free.
+- **Base power follows your level smoothly.** The server takes vanilla's rank data for your level
+  and blends between the two ranks either side of it, so damage and mana cost climb a little every
+  level instead of jumping at rank 2, 3, 4.
+- **On top of the base:** gear (spell power and attack power, through vanilla's coefficients),
+  attributes (their ARPG effects), tags (passive and item bonuses), and the skill's own tree.
+- **Downranking goes away** (a cheaper low rank for mana). Mana pacing moves into the trees and
+  the web instead: Mana Strike on Seals, Righteous Mind on Judgement, Spirit, Illumination.
+- **How it's built:** first, at each level-up the server teaches the vanilla rank for that level
+  and removes the lower one, and the client hides "Rank N". The smooth blend between ranks comes
+  second, as a damage and cost multiplier.
 
 ## The passive web
 
@@ -205,9 +287,10 @@ hit any creature type** for ARPG players (their undead-and-demon limit is a raid
 | Holy Wrath | Spell, Holy, Area | Holy Wrath | Nova |
 | Divine | Holy, Movement | Divine Shield, Blessing of Protection | Survival |
 
-Pick five. Each tree below has 20 points to spend by default (25 with items). Points cost one per
-rank. **[A]** marks a node built from the uniques kit, **[M]** a spell modifier, and **[H]** a new
-hook.
+Pick five. Each tree below has 20 points to spend by default (more with items). Points cost one
+per rank. **[A]** marks a node built from the uniques kit, **[M]** a spell modifier, and **[H]** a
+new hook. Every capstone needs its Codex page (table after the trees), and every tree has a rune
+socket at 10 points.
 
 #### Strike: the held swing
 
@@ -308,6 +391,26 @@ hook.
 | Holy Wrath | Radius, Stun, Cooldown | Holy Wrath fires on its own whenever you're surrounded |
 | Divine | Shield (Divine Shield lets you attack, at half damage), Blessing (BoP on yourself grants speed) | Lay on Hands also nukes everything around you |
 
+#### Paladin Codex pages
+
+| Capstone | Skill | Home boss |
+|---|---|---|
+| Crusader's Pace | Strike | Mr. Smite, Deadmines |
+| Whirling Strikes | Strike | Herod, Scarlet Monastery |
+| Shockwave | Strike | Ironaya, Uldaman |
+| Twin Seals | Seals | Arcanist Doan, Scarlet Monastery |
+| Light of the Crusader | Seals | High Inquisitor Fairbanks, Scarlet Monastery |
+| Final Verdict | Judgement | Scarlet Commander Mograine, Scarlet Monastery |
+| Sentence | Judgement | Emperor Dagran Thaurissan, Blackrock Depths |
+| Walking Consecration | Consecration | High Inquisitor Whitemane, Scarlet Monastery |
+| Sacred Seal | Consecration | Balnazzar, Stratholme |
+| Blessed Hammer | Hammer of Justice | Baron Rivendare, Stratholme |
+| Sentence Passed | Hammer of Justice | Overlord Wyrmthalak, Lower Blackrock Spire |
+| Dual Aura | Auras | Golemagg, Molten Core |
+
+Scarlet Monastery holds five of them on purpose: it's the paladin's dungeon, and the levels
+where it's run (30 to 45) are when builds take shape.
+
 ### The paladin passive web
 
 Three regions around a start node, about 90 nodes. Small nodes are listed by their cluster; each
@@ -392,7 +495,10 @@ for capstones and hooks:
 - **Tables in code**, as the uniques and the current tree are: tags per spell, the web (nodes,
   their position and links), each skill tree, each affix family.
 - **Saved:** `character_arpg_tree` grows a column for which tree a node belongs to (the web, or a
-  skill); `character_arpg_skill` holds each skill's slot, level and XP.
+  skill); `character_arpg_skill` holds each skill's slot and socketed rune; `character_arpg_codex`
+  the pages read.
+- **New items:** Codex pages, fragments and runes are new `item_template` rows, shipped as a fork
+  SQL file that the server update script applies.
 
 ### Client
 
@@ -408,15 +514,14 @@ for capstones and hooks:
 1. **Tags, attributes and the web.** Tag bonuses, the five attributes' ARPG effects, the paladin
    web with its small nodes, notables and keystones, and the canvas window. This replaces the
    current tree.
-2. **Skill specialisation.** Slots, skill XP and levels, and the paladin's five most-wanted skill
-   trees (Strike, Seals, Judgement, Consecration, Hammer of Justice).
-3. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
-4. **Other classes**, one at a time, starting with whichever Jeff plays next.
+2. **Skill specialisation and spells without ranks.** Slots by level, the skill point pool, rank
+   handling, and the paladin's five most-wanted skill trees (Strike, Seals, Judgement,
+   Consecration, Hammer of Justice).
+3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
+4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
+5. **Other classes**, one at a time, starting with whichever Jeff plays next.
 
 ## Open questions for Jeff
 
-- **Five specialisation slots,** or fewer (Last Epoch uses five, Diablo IV's bar has six)?
-- **Skill XP:** level skills by playing (the Last Epoch feel), or a point per character level to
-  spread across skill trees (simpler, no grind)?
-- **Automatic spell ranks,** with no trainer runs?
-- **The attribute rates and caps** above: a fair first pass?
+- **The attribute rates and caps** in "Attributes": a fair first pass?
+- **Codex page homes:** the bosses above are chosen for theme. Swap any that feel wrong.
