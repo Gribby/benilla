@@ -68,6 +68,11 @@ gaps: drops vanish with the corpse (no persistent ground items); no item models 
 shields could lie as their real M2s, everything else a sack).
 
 Next:
+- Camera (banked by Jeff, after gameplay): the height cut fails in multi-storey instances
+  (Naxxramas, Blackrock Spire). Plan: cut by room, hiding whole WMO groups above the player's
+  room (`wmo_portal::PlayerWmoRoom` already tracks it); fade anything left on the camera→player
+  sightline as the outdoor dither does; keep the height cut as the fallback for open caves
+  (Molten Core). Floors more than `FLOOR_RISE` over the plane are already cut.
 - Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
 - Phase 3: more and denser mobs (server spawn scaling), mob packs, dodge/evade movement skill,
