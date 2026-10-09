@@ -1037,6 +1037,7 @@ fn writer_loop(
                         level,
                     } => w.arpg_dev_loot(quality, count, level),
                     ClientCommand::ArpgTreeSpend { node } => w.arpg_tree_spend(node),
+                    ClientCommand::ArpgTreeRefund { node } => w.arpg_tree_refund(node),
                     ClientCommand::ArpgTreeRespec => w.arpg_tree_respec(),
                     ClientCommand::ArpgTreeQuery => w.arpg_tree_query(),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {

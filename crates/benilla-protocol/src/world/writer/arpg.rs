@@ -33,6 +33,7 @@ const KIND_DEV_LOOT: u8 = 7;
 const KIND_TREE_SPEND: u8 = 8;
 const KIND_TREE_RESPEC: u8 = 9;
 const KIND_TREE_QUERY: u8 = 10;
+const KIND_TREE_REFUND: u8 = 11;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -117,20 +118,32 @@ pub fn arpg_dev_loot_body(quality: u8, count: u8, level: u8) -> Vec<u8> {
     vec![KIND_DEV_LOOT, quality, count, level]
 }
 
-/// The tree spend body: a point into `node`.
+/// The web take body: a point into `node`.
 pub fn arpg_tree_spend_body(node: u16) -> Vec<u8> {
     let mut body = vec![KIND_TREE_SPEND];
     body.extend_from_slice(&node.to_le_bytes());
     body
 }
 
+/// The web give-back body: `node`'s point back.
+pub fn arpg_tree_refund_body(node: u16) -> Vec<u8> {
+    let mut body = vec![KIND_TREE_REFUND];
+    body.extend_from_slice(&node.to_le_bytes());
+    body
+}
+
 impl WorldWriter {
-    /// Spend a point in an ARPG skill tree node.
+    /// Take a node of the ARPG passive web.
     pub fn arpg_tree_spend(&mut self, node: u16) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_tree_spend_body(node))
     }
 
-    /// Refund the ARPG skill tree.
+    /// Give a node of the ARPG passive web back.
+    pub fn arpg_tree_refund(&mut self, node: u16) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_tree_refund_body(node))
+    }
+
+    /// Give the whole ARPG passive web back.
     pub fn arpg_tree_respec(&mut self) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &[KIND_TREE_RESPEC])
     }
@@ -211,6 +224,7 @@ mod tests {
     #[test]
     fn the_tree_spend_body_is_kind_and_node() {
         assert_eq!(arpg_tree_spend_body(0x0102), vec![8, 0x02, 0x01]);
+        assert_eq!(arpg_tree_refund_body(0x0102), vec![11, 0x02, 0x01]);
     }
 
     #[test]

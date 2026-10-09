@@ -64,7 +64,7 @@ pub use action_bar::{
 };
 pub use addons::{hidden_from_reply, SecureAddon, STANDARD_MODULUS_CRC, STOCK_SECURE_ADDONS};
 pub use area_trigger::area_trigger;
-pub use arpg::{ArpgLootItem, ArpgTree, ArpgTreeNode};
+pub use arpg::{ArpgLootItem, ArpgTree, ArpgTreeNode, ArpgTreeRegion};
 pub use attack::{attack_swing, AttackSwingError, AttackerState};
 pub use auction::{
     auction_action, auction_duration, auction_error, auction_filter, auction_hello,

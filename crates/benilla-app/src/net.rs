@@ -1004,13 +1004,17 @@ pub(crate) enum ClientCommand {
         count: u8,
         level: u8,
     },
-    /// Fork-only: spend a point in ARPG skill tree node `node`.
+    /// Fork-only: take node `node` of the ARPG passive web.
     ArpgTreeSpend {
         node: u16,
     },
-    /// Fork-only: refund the ARPG skill tree.
+    /// Fork-only: give node `node` of the ARPG passive web back.
+    ArpgTreeRefund {
+        node: u16,
+    },
+    /// Fork-only: give the whole ARPG passive web back.
     ArpgTreeRespec,
-    /// Fork-only: ask for the ARPG skill tree.
+    /// Fork-only: ask for the ARPG passive web.
     ArpgTreeQuery,
     /// `CMSG_CAST_SPELL` with `TARGET_FLAG_DEST_LOCATION`; `dest` in WoW coordinates.
     CastSpellAtDest {

@@ -41,77 +41,100 @@ pub fn read_arpg_item_mechanics(r: &mut impl io::Read) -> io::Result<Vec<(u32, S
     Ok(rows)
 }
 
-/// The player's ARPG skill tree (cmangos `Arpg/ArpgTree.h`), sent after the hello and every spend
-/// or respec.
+/// The player's ARPG passive web (cmangos `Arpg/ArpgTree.h`), sent after the hello and every
+/// take, give-back or respec.
 pub const SMSG_ARPG_TREE: u16 = 0x033F;
 
-/// One node of the skill tree, as the server lays it out.
+/// One node of the passive web, where the server lays it out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArpgTreeNode {
     pub id: u16,
-    pub branch: u8,
-    /// 1 to 3, 4 the branch's keystone.
-    pub tier: u8,
-    /// 0 to 2.
-    pub column: u8,
-    /// 0 passive, 1 skill, 2 modifier, 3 keystone.
+    /// 0 the start, 1 small, 2 notable, 3 keystone.
     pub kind: u8,
-    pub max_rank: u8,
-    pub rank: u8,
-    /// The spell whose icon the node shows.
+    /// Index into [`ArpgTree::regions`].
+    pub region: u8,
+    /// Web units from the start, y down.
+    pub x: i16,
+    pub y: i16,
+    pub taken: bool,
+    /// The spell whose icon the node shows; 0 for none.
     pub icon_spell: u32,
     pub name: String,
     pub text: String,
 }
 
-/// The whole tree: points, branch names and nodes.
+/// A region of the web: its name and where its label sits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArpgTreeRegion {
+    pub name: String,
+    pub x: i16,
+    pub y: i16,
+}
+
+/// The whole web: points, regions, nodes and the links between them.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ArpgTree {
     pub points_total: u16,
     pub points_spent: u16,
-    pub branches: Vec<String>,
+    pub regions: Vec<ArpgTreeRegion>,
     pub nodes: Vec<ArpgTreeNode>,
+    /// Node id pairs.
+    pub links: Vec<(u16, u16)>,
 }
 
-/// `SMSG_ARPG_TREE`: `u8` version (1), `u16` points total, `u16` points spent, `u8` branch count
-/// and a C string each, `u8` node count, then per node `u16` id, `u8` branch, tier, column, kind,
-/// max rank and rank, `u32` icon spell, and C strings name and text.
+fn read_i16_le(r: &mut impl io::Read) -> io::Result<i16> {
+    read_u16_le(r).map(|v| v as i16)
+}
+
+/// `SMSG_ARPG_TREE`: `u8` version (2), `u16` points total, `u16` points spent; `u8` region count,
+/// per region a C string name and `i16` x, y; `u16` node count, per node `u16` id, `u8` kind and
+/// region, `i16` x, y, `u8` taken, `u32` icon spell, C strings name and text; `u16` link count,
+/// per link two `u16` node ids.
 pub fn read_arpg_tree(r: &mut impl io::Read) -> io::Result<ArpgTree> {
     let version = read_u8(r)?;
-    if version != 1 {
+    if version != 2 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("ARPG tree version {version}, this client reads 1"),
+            format!("ARPG tree version {version}, this client reads 2"),
         ));
     }
     let points_total = read_u16_le(r)?;
     let points_spent = read_u16_le(r)?;
-    let nb = read_u8(r)?;
-    let mut branches = Vec::with_capacity(capacity_hint(nb, 16));
-    for _ in 0..nb {
-        branches.push(read_cstring(r)?);
+    let nr = read_u8(r)?;
+    let mut regions = Vec::with_capacity(capacity_hint(nr, 16));
+    for _ in 0..nr {
+        regions.push(ArpgTreeRegion {
+            name: read_cstring(r)?,
+            x: read_i16_le(r)?,
+            y: read_i16_le(r)?,
+        });
     }
-    let nn = read_u8(r)?;
-    let mut nodes = Vec::with_capacity(capacity_hint(nn, 255));
+    let nn = read_u16_le(r)?;
+    let mut nodes = Vec::with_capacity(capacity_hint(nn, 512));
     for _ in 0..nn {
         nodes.push(ArpgTreeNode {
             id: read_u16_le(r)?,
-            branch: read_u8(r)?,
-            tier: read_u8(r)?,
-            column: read_u8(r)?,
             kind: read_u8(r)?,
-            max_rank: read_u8(r)?,
-            rank: read_u8(r)?,
+            region: read_u8(r)?,
+            x: read_i16_le(r)?,
+            y: read_i16_le(r)?,
+            taken: read_u8(r)? != 0,
             icon_spell: read_u32_le(r)?,
             name: read_cstring(r)?,
             text: read_cstring(r)?,
         });
     }
+    let nl = read_u16_le(r)?;
+    let mut links = Vec::with_capacity(capacity_hint(nl, 1024));
+    for _ in 0..nl {
+        links.push((read_u16_le(r)?, read_u16_le(r)?));
+    }
     Ok(ArpgTree {
         points_total,
         points_spent,
-        branches,
+        regions,
         nodes,
+        links,
     })
 }
 
@@ -138,36 +161,59 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_tree_reads_its_points_branches_and_nodes() {
-        let mut body = vec![1];
+    fn a_web_reads_its_points_regions_nodes_and_links() {
+        let mut body = vec![2];
         body.extend_from_slice(&59u16.to_le_bytes());
         body.extend_from_slice(&3u16.to_le_bytes());
         body.push(1);
         body.extend_from_slice(b"Crusader\0");
+        body.extend_from_slice(&(-554i16).to_le_bytes());
+        body.extend_from_slice(&(-320i16).to_le_bytes());
+        body.extend_from_slice(&2u16.to_le_bytes());
+        body.extend_from_slice(&1u16.to_le_bytes());
+        body.extend_from_slice(&[0, 3]);
+        body.extend_from_slice(&0i16.to_le_bytes());
+        body.extend_from_slice(&0i16.to_le_bytes());
         body.push(1);
-        body.extend_from_slice(&5u16.to_le_bytes());
-        body.extend_from_slice(&[0, 2, 1, 2, 2, 1]);
-        body.extend_from_slice(&20271u32.to_le_bytes());
-        body.extend_from_slice(b"Chain of Judgement\0Judgement chains.\0");
+        body.extend_from_slice(&0u32.to_le_bytes());
+        body.extend_from_slice(b"Paladin\0Start.\0");
+        body.extend_from_slice(&2u16.to_le_bytes());
+        body.extend_from_slice(&[1, 0]);
+        body.extend_from_slice(&(-69i16).to_le_bytes());
+        body.extend_from_slice(&(-40i16).to_le_bytes());
+        body.push(0);
+        body.extend_from_slice(&20111u32.to_le_bytes());
+        body.extend_from_slice(b"Crusader\0+2 to all attributes\0");
+        body.extend_from_slice(&1u16.to_le_bytes());
+        body.extend_from_slice(&1u16.to_le_bytes());
+        body.extend_from_slice(&2u16.to_le_bytes());
         let tree = read_arpg_tree(&mut body.as_slice()).unwrap();
         assert_eq!((tree.points_total, tree.points_spent), (59, 3));
-        assert_eq!(tree.branches, vec!["Crusader".to_string()]);
         assert_eq!(
-            tree.nodes[0],
+            tree.regions,
+            vec![ArpgTreeRegion {
+                name: "Crusader".into(),
+                x: -554,
+                y: -320
+            }]
+        );
+        assert_eq!(
+            tree.nodes[1],
             ArpgTreeNode {
-                id: 5,
-                branch: 0,
-                tier: 2,
-                column: 1,
-                kind: 2,
-                max_rank: 2,
-                rank: 1,
-                icon_spell: 20271,
-                name: "Chain of Judgement".into(),
-                text: "Judgement chains.".into(),
+                id: 2,
+                kind: 1,
+                region: 0,
+                x: -69,
+                y: -40,
+                taken: false,
+                icon_spell: 20111,
+                name: "Crusader".into(),
+                text: "+2 to all attributes".into(),
             }
         );
-        assert!(read_arpg_tree(&mut [2u8].as_slice()).is_err());
+        assert!(tree.nodes[0].taken);
+        assert_eq!(tree.links, vec![(1, 2)]);
+        assert!(read_arpg_tree(&mut [1u8].as_slice()).is_err());
     }
 
     #[test]

@@ -303,177 +303,375 @@ end
 
 addArpgOptionsPage()
 
--- ── The ARPG skill tree window ──
--- The server owns the tree (Arpg/ArpgTree.h): the client hands each layout it sends to
+-- ── The ARPG passive web window ──
+-- The server owns the web (Arpg/ArpgTree.h): the client hands each layout it sends to
 -- ArpgTree_Update. The talent key and the talent micro button open this window in place of the
--- talent frame; a click spends a point, Respec refunds them all (free, out of combat). Requests go
--- back through the session-only setting arpgTreeAction, as a number.
+-- talent frame. Drag to pan, the wheel zooms; a click takes a node that joins the web, a right
+-- click gives one back, Respec gives everything back (free, out of combat). Requests go back
+-- through the session-only setting arpgTreeAction, as a number.
 
-local TREE_GATES = { 0, 5, 10, 20 }
-local TREE_KINDS = {
-    [0] = { "Passive", 0.55, 0.62, 0.75 },
-    [1] = { "Skill", 1.0, 0.82, 0.0 },
-    [2] = { "Modifier", 0.902, 0.8, 0.502 },
-    [3] = { "Keystone", 1.0, 0.5, 0.0 },
+local WEB_REGION_RGB = {
+    [0] = { 0.86, 0.36, 0.30 },  -- Crusader
+    [1] = { 0.98, 0.84, 0.45 },  -- Lightbringer
+    [2] = { 0.42, 0.62, 0.95 },  -- Templar
+    [3] = { 0.80, 0.74, 0.60 },  -- the start and the bridges
 }
-local TREE_NODE, TREE_COL, TREE_ROW = 40, 64, 84
+local WEB_KIND_NAME = { [0] = "Start", [1] = "Small", [2] = "Notable", [3] = "Keystone" }
+local WEB_SIZE = { [0] = 40, [1] = 20, [2] = 38, [3] = 50 }
+local WEB_LINE_TEX = "Interface\\TaxiFrame\\UI-Taxi-Line"
+local WEB_DOT_TEX = "Interface\\TaxiFrame\\UI-Taxi-Icon-White"
+local WEB_LINE_FACTOR = 32 / 30
 local treeData, treeFrame, treeNonce = nil, nil, 0
+local webById, webNext = {}, {}
+-- The web spans about 1100 units each way, centred a little below the start.
+local webView = { x = 0, y = 90, zoom = nil }
 
--- kind 1 spend, 2 respec, 3 query: kind * 100000 + node * 100 + a nonce under 100.
+-- kind 1 take, 2 respec, 3 query, 4 give back: kind * 100000 + node * 100 + a nonce under 100.
 local function treeAsk(kind, node)
     treeNonce = treeNonce + 1
     if treeNonce >= 100 then treeNonce = 1 end
     SetCVar("arpgTreeAction", tostring(kind * 100000 + (node or 0) * 100 + treeNonce))
 end
 
-local function treeSpentIn(branch)
-    local spent = 0
-    for _, n in ipairs(treeData.nodes) do
-        if n.branch == branch then spent = spent + n.rank end
-    end
-    return spent
+local function webTaken(id)
+    local n = webById[id]
+    return n and n.taken == 1
 end
 
--- Why a point cannot go into `n` now, or nil when it can.
-local function treeBlocked(n)
-    if n.rank >= n.max then return "Fully learned" end
-    if treeData.spent >= treeData.total then return "No points left" end
-    local gate = TREE_GATES[n.tier] or 0
-    if treeSpentIn(n.branch) < gate then
-        return "Requires " .. gate .. " points in " .. (treeData.branches[n.branch + 1] or "this branch")
+-- Whether `n` joins a taken node.
+local function webJoined(n)
+    for _, m in ipairs(webNext[n.id] or {}) do
+        if webTaken(m) then return true end
     end
+    return false
+end
+
+-- Why `n` cannot be taken now, or nil when it can.
+local function webBlocked(n)
+    if n.taken == 1 then return "Taken" end
+    if not webJoined(n) then return "Not joined to your web yet" end
+    if treeData.spent >= treeData.total then return "No points left" end
     return nil
 end
 
-local function treeShowTip(button)
+-- A texture drawn as a line from (sx, sy) to (ex, ey), canvas BOTTOMLEFT coordinates, `w` wide:
+-- the taxi map's route line, its texture rotated by texture coordinates.
+local function webLine(T, C, sx, sy, ex, ey, w)
+    local dx, dy = ex - sx, ey - sy
+    local cx, cy = (sx + ex) / 2, (sy + ey) / 2
+    if dx < 0 then dx, dy = -dx, -dy end
+    local l = math.sqrt(dx * dx + dy * dy)
+    T:ClearAllPoints()
+    if l == 0 then
+        T:SetTexCoord(0, 0, 0, 0, 0, 0, 0, 0)
+        T:SetPoint("BOTTOMLEFT", C, "BOTTOMLEFT", cx, cy)
+        T:SetPoint("TOPRIGHT", C, "BOTTOMLEFT", cx, cy)
+        return
+    end
+    local s, c = -dy / l, dx / l
+    local sc = s * c
+    local Bwid, Bhgt, BLx, BLy, TLx, TLy, TRx, TRy, BRx, BRy
+    if dy >= 0 then
+        Bwid = ((l * c) - (w * s)) * WEB_LINE_FACTOR / 2
+        Bhgt = ((w * c) - (l * s)) * WEB_LINE_FACTOR / 2
+        BLx, BLy, BRy = (w / l) * sc, s * s, (l / w) * sc
+        BRx, TLx, TLy, TRx = 1 - BLy, BLy, 1 - BRy, 1 - BLx
+        TRy = BRx
+    else
+        Bwid = ((l * c) + (w * s)) * WEB_LINE_FACTOR / 2
+        Bhgt = ((w * c) + (l * s)) * WEB_LINE_FACTOR / 2
+        BLx, BLy, BRx = s * s, -(l / w) * sc, 1 + (w / l) * sc
+        BRy, TLx, TLy, TRy = BLx, 1 - BRx, 1 - BLx, 1 - BLy
+        TRx = TLy
+    end
+    T:SetTexCoord(TLx, TLy, BLx, BLy, TRx, TRy, BRx, BRy)
+    T:SetPoint("BOTTOMLEFT", C, "BOTTOMLEFT", cx - Bwid, cy - Bhgt)
+    T:SetPoint("TOPRIGHT", C, "BOTTOMLEFT", cx + Bwid, cy + Bhgt)
+end
+
+local function webShowTip(button)
     local n = button.node
     if not n then return end
-    local kind = TREE_KINDS[n.kind] or TREE_KINDS[0]
+    local rgb = WEB_REGION_RGB[n.region] or WEB_REGION_RGB[3]
     GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-    GameTooltip:SetText(n.name, 1, 1, 1)
-    GameTooltip:AddLine(kind[1] .. "   Rank " .. n.rank .. "/" .. n.max, kind[2], kind[3], kind[4])
+    GameTooltip:SetText(n.name, rgb[1], rgb[2], rgb[3])
+    GameTooltip:AddLine(WEB_KIND_NAME[n.kind] or "", 0.6, 0.6, 0.6)
     GameTooltip:AddLine(n.text, 1, 0.82, 0, 1)
-    local blocked = treeBlocked(n)
-    if blocked then
-        GameTooltip:AddLine(blocked, 1, 0.13, 0.13)
-    else
-        GameTooltip:AddLine("Click to learn", 0, 1, 0)
+    if n.kind ~= 0 then
+        local blocked = webBlocked(n)
+        if n.taken == 1 then
+            GameTooltip:AddLine("Right-click to give it back", 0.5, 0.8, 1)
+        elseif blocked then
+            GameTooltip:AddLine(blocked, 1, 0.13, 0.13)
+        else
+            GameTooltip:AddLine("Click to take", 0, 1, 0)
+        end
     end
     GameTooltip:Show()
 end
 
-local function treeMakeButton(parent, name)
-    local b = CreateFrame("Button", name, parent)
-    b:SetWidth(TREE_NODE)
-    b:SetHeight(TREE_NODE)
+local function webMakeButton(parent, id)
+    local b = CreateFrame("Button", "ArpgWebNode" .. id, parent)
     b.border = b:CreateTexture(nil, "BACKGROUND")
-    b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -3, 3)
-    b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 3, -3)
     b.icon = b:CreateTexture(nil, "ARTWORK")
     b.icon:SetAllPoints(b)
-    b.rank = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    b.rank:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", 2, -2)
-    b:SetScript("OnEnter", function() treeShowTip(this) end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b.glow = b:CreateTexture(nil, "OVERLAY")
+    b.glow:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
+    b.glow:SetBlendMode("ADD")
+    b.glow:SetAllPoints(b)
+    b.glow:Hide()
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnEnter", function() this.glow:Show(); webShowTip(this) end)
+    b:SetScript("OnLeave", function() this.glow:Hide(); GameTooltip:Hide() end)
     b:SetScript("OnClick", function()
-        if this.node and not treeBlocked(this.node) then
-            treeAsk(1, this.node.id)
+        local n = this.node
+        if not n or n.kind == 0 then return end
+        if arg1 == "RightButton" then
+            if n.taken == 1 then treeAsk(4, n.id) end
+        elseif not webBlocked(n) then
+            treeAsk(1, n.id)
         end
     end)
     return b
 end
 
+-- Where web point (wx, wy) sits on the canvas, from its TOPLEFT, y down.
+local function webToCanvas(wx, wy)
+    local f = treeFrame
+    return f.canvasW / 2 + (wx - webView.x) * webView.zoom, f.canvasH / 2 + (wy - webView.y) * webView.zoom
+end
+
+-- Lay every node, line and label out at the current pan and zoom.
+local function webLayout()
+    local f = treeFrame
+    if not f or not treeData then return end
+    local canvas, z = f.canvas, webView.zoom
+    for _, n in ipairs(treeData.nodes) do
+        local b = f.buttons[n.id]
+        if b then
+            local px, py = webToCanvas(n.x, n.y)
+            local size = math.max(8, (WEB_SIZE[n.kind] or 16) * math.max(0.6, z * 1.6))
+            b:SetWidth(size)
+            b:SetHeight(size)
+            b:ClearAllPoints()
+            b:SetPoint("CENTER", canvas, "TOPLEFT", px, -py)
+            local pad = n.kind == 1 and 0 or math.max(2, size * 0.08)
+            b.border:ClearAllPoints()
+            b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -pad, pad)
+            b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", pad, -pad)
+        end
+    end
+    local w = math.max(3, 9 * z)
+    for i, link in ipairs(treeData.links) do
+        local T = f.lines[i]
+        local a, b = webById[link[1]], webById[link[2]]
+        if T and a and b then
+            local ax, ay = webToCanvas(a.x, a.y)
+            local bx, by = webToCanvas(b.x, b.y)
+            webLine(T, canvas, ax, f.canvasH - ay, bx, f.canvasH - by, w)
+        end
+    end
+    for i, region in ipairs(treeData.regions) do
+        local label = f.labels[i]
+        if label then
+            local px, py = webToCanvas(region.x, region.y)
+            label:ClearAllPoints()
+            label:SetPoint("CENTER", canvas, "TOPLEFT", px, -py)
+        end
+    end
+end
+
+-- Colour every node and line for what is taken and what can be.
+local function webPaint()
+    local f = treeFrame
+    for _, n in ipairs(treeData.nodes) do
+        local b = f.buttons[n.id]
+        local rgb = WEB_REGION_RGB[n.region] or WEB_REGION_RGB[3]
+        local taken = n.taken == 1
+        local open = not taken and not webBlocked(n)
+        if n.kind == 1 then
+            b.icon:SetTexture(WEB_DOT_TEX)
+            b.border:SetTexture(0, 0, 0, 0)
+            if taken then
+                b.icon:SetVertexColor(rgb[1], rgb[2], rgb[3])
+            elseif open then
+                b.icon:SetVertexColor(0.85, 0.85, 0.85)
+            else
+                b.icon:SetVertexColor(0.32, 0.32, 0.34)
+            end
+        else
+            b.icon:SetTexture(n.icon ~= "" and n.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
+            b.icon:SetDesaturated(not (taken or open) and 1 or nil)
+            if taken then
+                b.icon:SetVertexColor(1, 1, 1)
+                b.border:SetTexture(rgb[1], rgb[2], rgb[3], 1)
+            elseif open then
+                b.icon:SetVertexColor(0.9, 0.9, 0.9)
+                b.border:SetTexture(0.75, 0.75, 0.75, 0.9)
+            else
+                b.icon:SetVertexColor(0.55, 0.55, 0.55)
+                b.border:SetTexture(0.18, 0.18, 0.2, 0.95)
+            end
+            if n.kind == 3 and taken then
+                b.border:SetTexture(1, 0.5, 0, 1)
+            end
+        end
+        b.node = n
+        b:Show()
+    end
+    for i, link in ipairs(treeData.links) do
+        local T = f.lines[i]
+        local a, b = webTaken(link[1]), webTaken(link[2])
+        if a and b then
+            T:SetVertexColor(1, 0.8, 0.3, 1)
+        elseif a or b then
+            T:SetVertexColor(0.6, 0.6, 0.62, 0.9)
+        else
+            T:SetVertexColor(0.28, 0.28, 0.32, 0.8)
+        end
+    end
+    for i, region in ipairs(treeData.regions) do
+        local label = f.labels[i]
+        local rgb = WEB_REGION_RGB[i - 1] or WEB_REGION_RGB[3]
+        label:SetText(region.name)
+        label:SetTextColor(rgb[1], rgb[2], rgb[3], 0.9)
+    end
+    f.points:SetText("Points: " .. (treeData.total - treeData.spent) .. " of " .. treeData.total .. " left")
+end
+
+-- Zoom by `factor` about canvas point (cx, cy), from its TOPLEFT, y down.
+local function webZoom(factor, cx, cy)
+    local f = treeFrame
+    local old = webView.zoom
+    local new = math.max(0.25, math.min(1.6, old * factor))
+    -- The web point under (cx, cy) stays under it.
+    local wx = webView.x + (cx - f.canvasW / 2) / old
+    local wy = webView.y + (cy - f.canvasH / 2) / old
+    webView.zoom = new
+    webView.x = wx - (cx - f.canvasW / 2) / new
+    webView.y = wy - (cy - f.canvasH / 2) / new
+    webLayout()
+end
+
+-- The cursor on the canvas, from its TOPLEFT, y down.
+local function webCursor()
+    local f = treeFrame
+    local x, y = GetCursorPosition()
+    local scale = f.canvas:GetEffectiveScale()
+    return x / scale - f.view:GetLeft(), f.view:GetTop() - y / scale
+end
+
 local function treeBuild()
     if treeFrame then return treeFrame end
     local f = CreateFrame("Frame", "ArpgTreeFrame", UIParent)
-    f:SetWidth(3 * 230 + 40)
-    f:SetHeight(4 * TREE_ROW + 110)
-    f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
+    local width = math.min(980, UIParent:GetWidth() - 60)
+    local height = math.min(700, UIParent:GetHeight() - 120)
+    f:SetWidth(width)
+    f:SetHeight(height)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
     f:Hide()
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints(f)
-    bg:SetTexture(0.04, 0.035, 0.05, 0.94)
+    bg:SetTexture(0.03, 0.028, 0.04, 0.96)
+    local edge = f:CreateTexture(nil, "BORDER")
+    edge:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -36)
+    edge:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -36)
+    edge:SetHeight(1)
+    edge:SetTexture(0.9, 0.8, 0.5, 0.35)
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", f, "TOP", 0, -12)
-    title:SetText("Skill Tree")
+    title:SetPoint("TOP", f, "TOP", 0, -10)
+    title:SetText("Passive Web")
     f.points = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.points:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -16)
+    f.points:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -13)
+    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 14)
+    hint:SetText("Drag to move, mouse wheel to zoom. Click a node joined to your web to take it; right-click to give one back.")
     local close = CreateFrame("Button", "ArpgTreeFrameClose", f, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
     local respec = CreateFrame("Button", "ArpgTreeFrameRespec", f, "UIPanelButtonTemplate")
     respec:SetWidth(90)
     respec:SetHeight(22)
-    respec:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 12)
+    respec:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 9)
     respec:SetText("Respec")
     respec:SetScript("OnClick", function() treeAsk(2) end)
-    f.columns, f.buttons = {}, {}
-    for b = 1, 3 do
-        local col = CreateFrame("Frame", nil, f)
-        col:SetWidth(220)
-        col:SetHeight(4 * TREE_ROW + 30)
-        col:SetPoint("TOPLEFT", f, "TOPLEFT", 20 + (b - 1) * 230, -44)
-        local shade = col:CreateTexture(nil, "BACKGROUND")
-        shade:SetAllPoints(col)
-        shade:SetTexture(1, 1, 1, 0.04)
-        col.label = col:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        col.label:SetPoint("TOP", col, "TOP", 0, -6)
-        f.columns[b] = col
-    end
+
+    -- The viewport clips the canvas, which holds the lines, labels and node buttons.
+    local view = CreateFrame("ScrollFrame", "ArpgTreeView", f)
+    view:SetPoint("TOPLEFT", f, "TOPLEFT", 4, -38)
+    view:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -4, 38)
+    f.canvasW, f.canvasH = width - 8, height - 76
+    local canvas = CreateFrame("Frame", "ArpgTreeCanvas", view)
+    canvas:SetWidth(f.canvasW)
+    canvas:SetHeight(f.canvasH)
+    view:SetScrollChild(canvas)
+    view:EnableMouse(true)
+    view:EnableMouseWheel(true)
+    view:SetScript("OnMouseWheel", function()
+        local cx, cy = webCursor()
+        webZoom(arg1 > 0 and 1.15 or 1 / 1.15, cx, cy)
+    end)
+    view:SetScript("OnMouseDown", function()
+        local cx, cy = webCursor()
+        f.drag = { cx = cx, cy = cy, x = webView.x, y = webView.y }
+    end)
+    view:SetScript("OnMouseUp", function() f.drag = nil end)
+    view:SetScript("OnUpdate", function()
+        local d = f.drag
+        if not d then return end
+        local cx, cy = webCursor()
+        webView.x = d.x - (cx - d.cx) / webView.zoom
+        webView.y = d.y - (cy - d.cy) / webView.zoom
+        webLayout()
+    end)
+    f.view, f.canvas = view, canvas
+    f.buttons, f.lines, f.labels = {}, {}, {}
+    f:SetScript("OnHide", function() f.drag = nil end)
     if UISpecialFrames then tinsert(UISpecialFrames, "ArpgTreeFrame") end
     treeFrame = f
     return f
 end
 
+-- Take a new layout: index it, make what it needs, then paint and lay it out.
 local function treeRedraw()
     if not treeData then return end
     local f = treeBuild()
-    f.points:SetText("Points: " .. (treeData.total - treeData.spent) .. " of " .. treeData.total .. " left")
-    for b = 1, 3 do
-        local col = f.columns[b]
-        local name = treeData.branches[b]
-        if name then
-            col.label:SetText(name .. "  (" .. treeSpentIn(b - 1) .. ")")
-            col:Show()
-        else
-            col:Hide()
-        end
-    end
-    for _, button in pairs(f.buttons) do button:Hide() end
+    webById, webNext = {}, {}
     for _, n in ipairs(treeData.nodes) do
-        local col = f.columns[n.branch + 1]
-        if col then
-            local button = f.buttons[n.id]
-            if not button then
-                button = treeMakeButton(col, "ArpgTreeNode" .. n.id)
-                f.buttons[n.id] = button
-            end
-            button.node = n
-            button:ClearAllPoints()
-            button:SetPoint("TOPLEFT", col, "TOPLEFT", 22 + n.column * TREE_COL, -30 - (n.tier - 1) * TREE_ROW)
-            button.icon:SetTexture(n.icon ~= "" and n.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-            local kind = TREE_KINDS[n.kind] or TREE_KINDS[0]
-            local blocked = treeBlocked(n)
-            local open = n.rank > 0 or not blocked or blocked == "Fully learned"
-            if open then
-                button.icon:SetVertexColor(1, 1, 1)
-                button.border:SetTexture(kind[2], kind[3], kind[4], 0.9)
-            else
-                button.icon:SetVertexColor(0.35, 0.35, 0.35)
-                button.border:SetTexture(0.25, 0.25, 0.25, 0.9)
-            end
-            button.rank:SetText(n.rank .. "/" .. n.max)
-            if n.rank >= n.max then
-                button.rank:SetTextColor(1, 0.82, 0)
-            elseif n.rank > 0 then
-                button.rank:SetTextColor(0, 1, 0)
-            else
-                button.rank:SetTextColor(0.8, 0.8, 0.8)
-            end
-            button:Show()
+        webById[n.id] = n
+        webNext[n.id] = {}
+        if not f.buttons[n.id] then
+            f.buttons[n.id] = webMakeButton(f.canvas, n.id)
         end
     end
+    for i, link in ipairs(treeData.links) do
+        if webNext[link[1]] and webNext[link[2]] then
+            tinsert(webNext[link[1]], link[2])
+            tinsert(webNext[link[2]], link[1])
+        end
+        if not f.lines[i] then
+            local T = f.canvas:CreateTexture(nil, "BACKGROUND")
+            T:SetTexture(WEB_LINE_TEX)
+            f.lines[i] = T
+        end
+        f.lines[i]:Show()
+    end
+    for i = table.getn(treeData.links) + 1, table.getn(f.lines) do f.lines[i]:Hide() end
+    for i, _ in ipairs(treeData.regions) do
+        if not f.labels[i] then
+            f.labels[i] = f.canvas:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+        end
+    end
+    for id, b in pairs(f.buttons) do
+        if not webById[id] then b:Hide() end
+    end
+    if not webView.zoom then
+        -- First open: the whole web in view.
+        webView.zoom = math.min(f.canvasW, f.canvasH) / 1200
+    end
+    webPaint()
+    webLayout()
 end
 
 function ArpgTree_Update(tree)
@@ -484,7 +682,7 @@ end
 function ArpgTree_Toggle()
     if not treeData then
         treeAsk(3)
-        DEFAULT_CHAT_FRAME:AddMessage("The skill tree has not arrived from the server yet.")
+        DEFAULT_CHAT_FRAME:AddMessage("The passive web has not arrived from the server yet.")
         return
     end
     local f = treeBuild()

@@ -4478,6 +4478,42 @@ fn the_guild_line_greys_with_player_names_and_the_follow_speed_with_the_style() 
     assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
 }
 
+/// Fork-only: the ARPG HUD addon's passive web window lays out what the server sends, opens on
+/// the talent key's toggle, and takes a node joined to the web through `arpgTreeAction`.
+#[test]
+fn the_arpg_web_window_takes_a_joined_node() {
+    benilla_formats::wow_data_or_skip!();
+    let s = harness();
+    s.register_cvars(crate::cvars::registered_pairs());
+    s.run(include_str!("../player/arpg_hud.lua")).unwrap();
+    s.run(
+        "ArpgTree_Update({total=5,spent=0,\
+           regions={{name=\"Crusader\",x=-554,y=-320}},\
+           nodes={{id=1,kind=0,region=3,x=0,y=0,taken=1,icon=\"\",name=\"Paladin\",text=\"Start.\"},\
+                  {id=2,kind=1,region=0,x=-69,y=-40,taken=0,icon=\"\",name=\"Crusader\",text=\"+2 to all attributes\"},\
+                  {id=3,kind=3,region=0,x=-200,y=-120,taken=0,icon=\"\",name=\"Zealot\",text=\"Haste.\"}},\
+           links={{1,2},{2,3}}})",
+    )
+    .unwrap();
+    s.run("ArpgTree_Toggle()").unwrap();
+    assert!(s.frame_visible("ArpgTreeFrame"));
+    assert!(s.frame_visible("ArpgWebNode2"));
+    // Node 3 joins nothing taken: a click asks for nothing.
+    s.run("ArpgWebNode3:Click()").unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgTreeAction\")")
+            .unwrap(),
+        "0"
+    );
+    s.run("ArpgWebNode2:Click()").unwrap();
+    assert_eq!(
+        s.eval::<String>("return GetCVar(\"arpgTreeAction\")")
+            .unwrap(),
+        "100201"
+    );
+    assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
+}
+
 /// Fork-only: the ARPG HUD addon adds an "ARPG View" page whose sliders write their settings at
 /// once, read back on a refresh, and reset to the table's defaults.
 #[test]

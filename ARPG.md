@@ -30,7 +30,7 @@ Client (`crates/`):
 | Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
 | Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |
-| Skill tree window (talent key), fed by `SMSG_ARPG_TREE` 0x33F, spend/respec through `arpgTreeAction` | `benilla-app/src/player/arpg/tree.rs`, `arpg_hud.lua` |
+| Passive web window (talent key), fed by `SMSG_ARPG_TREE` 0x33F (version 2), take/give back/respec through `arpgTreeAction` | `benilla-app/src/player/arpg/tree.rs`, `arpg_hud.lua` |
 | Uniques: the server's item lines (`SMSG_ARPG_ITEM_MECHANICS` 0x33E), the pale gold tooltip line, the gold label border and beam core | `benilla-app/src/player/arpg/uniques.rs`, `ui_items/feed.rs`, `benilla-ui/src/script/tooltip_item/render.rs`, `loot.rs` |
 
 Floating damage numbers are stock benilla (`combat_text`).
@@ -94,7 +94,7 @@ Next:
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
 - Phase 3: more and denser mobs (server spawn scaling), mob packs, dodge/evade movement skill,
   potions on hotkeys, real item models on the ground.
-- Itemisation: see `docs/ARPG-ITEMISATION.md`; the named-item uniques: `docs/ARPG-UNIQUES.md`; skill trees: `docs/ARPG-SKILL-TREES.md` (paladin first).
+- Itemisation: see `docs/ARPG-ITEMISATION.md`; the named-item uniques: `docs/ARPG-UNIQUES.md`; skills, the passive web and attributes: `docs/ARPG-CHARACTER.md` (paladin first).
 - Phase 4: vanilla raids as weekly-lockout solo ARPG dungeons (scaled bosses, trash density,
   pacing like vanilla's raid week).
 

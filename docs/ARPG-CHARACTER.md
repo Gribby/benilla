@@ -205,8 +205,8 @@ plain gear. Tomes (a third drop type) aren't needed.
 ## Spells without ranks
 
 - **A skill is one spell with no "Rank N".** The spellbook shows one Judgement; trainers no
-  longer teach spells. A class's skills unlock at the level vanilla first gives them (Consecration
-  at 6 for the ARPG paladin), for free.
+  longer teach spells. A class's skills unlock at the level vanilla first gives them, for
+  free; a talent-granted spell at its talent row's level (Consecration at 20; built in phase 1).
 - **Base power follows your level smoothly.** The server takes vanilla's rank data for your level
   and blends between the two ranks either side of it, so damage and mana cost climb a little every
   level instead of jumping at rank 2, 3, 4.
@@ -277,7 +277,7 @@ hit any creature type** for ARPG players (their undead-and-demon limit is a raid
 | Strike | Melee, Physical | The held swing | The left-click |
 | Seals | Seal, Holy, Melee | All Seals, as one skill | Swing empowerment |
 | Judgement | Spell, Holy | Judgement | Burst, chaining |
-| Consecration | Spell, Holy, Area, Ground | Consecration (baseline at 6) | Ground control |
+| Consecration | Spell, Holy, Area, Ground | Consecration (free at 20, its talent row) | Ground control |
 | Hammer of Justice | Spell, Control | Hammer of Justice | Stun, or a thrown hammer |
 | Exorcism | Spell, Holy | Exorcism | Single-target nuke |
 | Holy Shock | Spell, Holy, Heal | Holy Shock (baseline at 40) | Damage-or-heal |
@@ -413,51 +413,73 @@ where it's run (30 to 45) are when builds take shape.
 
 ### The paladin passive web
 
-Three regions around a start node, about 90 nodes. Small nodes are listed by their cluster; each
-cluster is 3 to 5 small nodes on the path to a notable.
+**Built (phase 1).** 88 nodes in three regions around a start node. Each region has two entry
+nodes, three arms of five small nodes leading to a notable and then a keystone or a second
+notable, two side nodes between its arms, and cross-links. Three small "Swiftness" nodes join the
+regions near the start, and three bridges join them farther out.
 
-**Crusader region (north-west):** Strength, physical damage, Seals, Strike.
-
-| Kind | Name | Effect |
-|---|---|---|
-| Cluster | Might | +5 Strength each (×4) |
-| Cluster | Edge | +3% Melee damage each (×4) |
-| Notable | Two-Handed Mastery | +12% damage with two-handers |
-| Notable | Conviction | +4% melee crit |
-| Notable | Vengeance | After a crit, +10% physical and Holy damage for 8 sec |
-| Notable | Righteous Fervour | +15% Seal damage, Seals cost 30% less |
-| **Keystone** | **Zealot** | +25% attack speed; Seals drain 1% mana per second |
-| **Keystone** | **Crusade** | Each kill in the last 5 sec gives +4% damage (max 10 stacks); out of combat you're 20% slower |
-
-**Templar region (south):** Stamina, armour, auras, blocking, control.
+**Crusader region (north-west):** Strength, Melee damage, Seals.
 
 | Kind | Name | Effect |
 |---|---|---|
-| Cluster | Fortitude | +6 Stamina each (×4) |
-| Cluster | Plate | +4% armour each (×4) |
-| Notable | Shield Wall | +10% block, blocks heal 1% health |
-| Notable | Redoubt | Being crit gives +30% block for 10 sec |
-| Notable | Reckoning | Being crit has a 20% chance to grant an extra swing |
-| Notable | Righteous Fury | +20% Holy damage while three or more enemies are near |
-| **Keystone** | **Martyr** | Damage you take is shared with every enemy within 10 yd (25% of it, as Holy); your healing taken is halved |
-| **Keystone** | **Unyielding** | You can't be stunned or slowed; −20% movement speed |
+| Entry (×2) | Crusader | +2 to all attributes |
+| Arm (×5) | Might | +5 Strength |
+| Arm (×5) | Edge | +3% Melee damage |
+| Arm (×5) | Fervour | +4% Seal damage |
+| Side | Reach | +5% melee area |
+| Side | Bloodthirst | +5 life on kill |
+| Notable | Two-Handed Mastery | +12% Melee damage with a two-handed weapon |
+| Notable | Conviction | Vanilla's Conviction at rank 5: +5% melee crit |
+| Notable | Vengeance | Vanilla's Vengeance at rank 5: +15% Physical and Holy damage for 8 sec after a crit |
+| Notable | Righteous Fervour | +15% Seal damage, and vanilla's Benediction at rank 5 (Seals and Judgement cost 15% less) |
+| **Keystone** | **Zealot** | +25% attack speed; while a Seal is on you, it drains 1% of your mana a second |
+| **Keystone** | **Crusade** | Each kill in the last 5 sec gives +4% damage (10 kills at most); out of combat you're 20% slower |
 
-**Lightbringer region (north-east):** Intellect, Spirit, Holy spells, healing.
+**Lightbringer region (north-east):** Intellect, Spirit, Holy, healing.
 
 | Kind | Name | Effect |
 |---|---|---|
-| Cluster | Wisdom | +5 Intellect each (×4) |
-| Cluster | Devotion | +5 Spirit each (×3) |
-| Cluster | Radiant | +4% Holy damage each (×4) |
-| Notable | Illumination | Holy crits refund 50% of their mana cost |
-| Notable | Holy Power | +5% Holy crit |
-| Notable | Healing Light | +15% healing, and heals on yourself +15% more |
-| Notable | Divine Favour | Every 20 sec, your next Holy spell crits |
-| **Keystone** | **Lightforged** | Your healing is converted into Holy damage to the nearest enemy, and your heals no longer heal you; +30% Holy damage |
+| Entry (×2) | Lightbringer | +2 to all attributes |
+| Arm (×5) | Wisdom | +5 Intellect |
+| Arm (×5) | Radiant | +4% Holy damage |
+| Arm (×5) | Devotion | +5 Spirit |
+| Side | Expanse | +5% spell area |
+| Side | Tempo | +4% cooldown recovery |
+| Notable | Illumination | Vanilla's Illumination at rank 5: healing crits refund their mana |
+| Notable | Holy Power | Vanilla's Holy Power at rank 5: +5% Holy crit |
+| Notable | Divine Favour | Every 20 sec, your next Holy spell is a critical strike |
+| Notable | Healing Light | Vanilla's Healing Light at rank 3 (+12% Holy Light and Flash of Light), and +10% all healing |
+| Notable | Blessed Recovery | Healing yourself gives +10% cooldown recovery for 4 sec |
+| **Keystone** | **Lightforged** | Your heals also fly as a Holy bolt at the nearest enemy for their full amount, and no longer heal you; +30% Holy damage |
 
-**Bridges:** a few nodes link regions, so hybrids pay a toll: Crusader–Lightbringer ("Holy
-Weapons": +3% Holy damage per 10 Strength), Templar–Crusader ("Shield and Hammer": one-handers
-+10% damage with a shield), Lightbringer–Templar ("Aegis": +5 Stamina, +3 Spirit).
+**Templar region (south):** Stamina, armour, blocking, area.
+
+| Kind | Name | Effect |
+|---|---|---|
+| Entry (×2) | Templar | +2 to all attributes |
+| Arm (×5) | Fortitude | +6 Stamina |
+| Arm (×5) | Plate | +4% armour |
+| Arm (×5) | Zeal | +4% Area damage |
+| Side | Endurance | +8 life on kill |
+| Side | Stride | +3% movement speed |
+| Notable | Shield Wall | +10% block chance; blocks heal you for 1% of your health |
+| Notable | Redoubt | Vanilla's Redoubt at rank 5 |
+| Notable | Reckoning | Vanilla's Reckoning at rank 2: a 20% chance after being hit of an extra swing |
+| Notable | Righteous Fury | +20% Holy damage while three or more enemies are within 8 yd |
+| **Keystone** | **Martyr** | 25% of the damage you take strikes every enemy within 10 yd as Holy damage; healing you take is halved |
+| **Keystone** | **Unyielding** | You can't be stunned or slowed; you move 20% slower |
+
+**Between the regions:** "Swiftness" (+3% movement speed) near the start; bridges of two
+"+3 to all attributes" nodes round a notable: Holy Weapons (Crusader–Lightbringer, +3% Holy
+damage per 10 Strength), Aegis (Lightbringer–Templar, +8 Stamina, Intellect and Spirit), Shield
+and Hammer (Templar–Crusader, +10% Melee damage with a one-hander and a shield).
+
+**What's not in the web:** the first tree's skill modifiers (Sweeping Seal, Chain of Judgement…)
+and its capstones (Avenger, Martyr's Ward, Dawnbringer, Purifying Light) move to the skill trees
+in phase 2. Their server hooks stay. The talent-granted spells (Consecration, Seal of Command,
+Blessing of Kings at 20; Blessing of Sanctuary, Divine Favor, Sanctity Aura at 30; Holy Shock,
+Holy Shield, Repentance at 40) come free at the level their talent row needs, as "Spells without
+ranks" plans.
 
 ### Example builds at 60
 
@@ -502,18 +524,21 @@ for capstones and hooks:
 
 ### Client
 
-- **The tree is drawn by the client in Rust, not in Lua:** a pan-and-zoom canvas with nodes as
-  circles, diamonds and stars, and paths as lines between them, glowing where allocated. The
-  1.12 Lua UI can't draw lines; the client's own overlay can.
-- **One window, tabs:** the passive web, then a tab per specialised skill.
-- **The server sends positions and links** with the tree, so the layout is server data and a
+- **The web window is the ARPG HUD addon's** (`arpg_hud.lua`), drawn with the 1.12 UI's own
+  tools: the paths are the taxi map's route lines (a line texture turned by
+  `SetTexCoord`'s eight-number form, as `DrawRouteLine` does), in a scroll frame that clips them.
+  Drag pans, the wheel zooms about the cursor, nodes glow in their region's colour when taken. This
+  replaces the plan for a Rust canvas: the stock UI could draw it after all, and its tooltips and
+  buttons come free.
+- **One window, tabs** (phase 2): the passive web, then a tab per specialised skill.
+- **The server sends positions and links** with the web, so the layout is server data and a
   new node needs no client release.
 
 ### Phases
 
-1. **Tags, attributes and the web.** Tag bonuses, the five attributes' ARPG effects, the paladin
-   web with its small nodes, notables and keystones, and the canvas window. This replaces the
-   current tree.
+1. **Tags, attributes and the web.** Built: tag bonuses, the five attributes' ARPG effects, the
+   paladin web with its small nodes, notables and keystones, boss-kill points, and the web
+   window. It replaced the first tree.
 2. **Skill specialisation and spells without ranks.** Slots by level, the skill point pool, rank
    handling, and the paladin's five most-wanted skill trees (Strike, Seals, Judgement,
    Consecration, Hammer of Justice).
