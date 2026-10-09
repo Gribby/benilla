@@ -13,7 +13,6 @@
 use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 
 use benilla_protocol::messages::ArpgLootItem;
