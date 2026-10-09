@@ -10,8 +10,8 @@
 //! The window answers through one session-only setting, `arpgTreeAction`: a number, `kind *
 //! 100000 + node * 100 + nonce` with the nonce under 100 so a repeat still moves it (kind 1 take,
 //! 2 respec, 3 query, 4 give back; 5 slot, its node `slot * 100 + skill`; 6 take a skill rank,
-//! 7 give one back, 8 respec a skill, its node the skill), which [`on_tree_action`] turns into a
-//! `ClientCommand`.
+//! 7 give one back, 8 respec a skill, its node the skill; 9 the dev tools' test pack, its node the
+//! size), which [`on_tree_action`] turns into a `ClientCommand`.
 
 use benilla_protocol::messages::{ArpgSkills, ArpgTree};
 use benilla_protocol::{SessionEvent, SessionEventKind};
@@ -255,6 +255,7 @@ enum TreeAction {
     Slot { slot: u8, skill: u8 },
     SkillNode { node: u16, refund: bool },
     SkillRespec(u8),
+    DevPack(u8),
 }
 
 fn parse_action(value: &str) -> Option<TreeAction> {
@@ -284,6 +285,9 @@ fn parse_action(value: &str) -> Option<TreeAction> {
         8 => u8::try_from(code % 100_000 / 100)
             .ok()
             .map(TreeAction::SkillRespec),
+        9 => u8::try_from(code % 100_000 / 100)
+            .ok()
+            .map(TreeAction::DevPack),
         _ => None,
     }
 }
@@ -303,6 +307,7 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
             ClientCommand::ArpgSkillNode { node, refund }
         }
         Some(TreeAction::SkillRespec(skill)) => ClientCommand::ArpgSkillRespec { skill },
+        Some(TreeAction::DevPack(size)) => ClientCommand::ArpgDevPack { size },
         None => return,
     };
     let _ = net.0.send(command);
@@ -341,6 +346,7 @@ mod tests {
             })
         );
         assert_eq!(parse_action("800403"), Some(TreeAction::SkillRespec(4)));
+        assert_eq!(parse_action("900507"), Some(TreeAction::DevPack(5)));
         assert_eq!(parse_action("0"), None);
         assert_eq!(parse_action("spend"), None);
     }

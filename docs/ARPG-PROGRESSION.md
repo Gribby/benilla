@@ -14,6 +14,8 @@ built for.
 - Raids need progression: Molten Core needs items from endgame dungeons.
 - Bosses must be soloable: no one-shots from auto attacks, so damage scales somehow.
 - No quest glows, markers or any other hand-holding.
+- The damage caps below are the first pass; raid keys are permanent attunements; each dungeon's
+  Warden is drafted as it's built, for Jeff to veto.
 
 ## Packs
 
@@ -51,8 +53,18 @@ Enchanted (fire on hit, a burst on death), Cold Enchanted (slows; a nova at low 
 Thorns, Teleporter, Healer (heals its pack), Molten (a burning trail). The client gets each
 champion's tier, name and affixes and shows them on the hover bar, with a ring under its feet.
 
-**Tuning:** a dev tool spawns a pack at the cursor, and the server logs each pack fight's time to
-kill and damage taken, so the numbers can be set from play.
+**Tuning:** a dev tool forms a pack round the nearest mob, and the server logs each pack fight's
+time to kill and damage taken, so the numbers can be set from play.
+
+**Built (step 1):** `Arpg/ArpgPacks.{h,cpp}` on the server. Packs form a second or so after a
+leader is added to its map (a grid loading, a respawn); followers are temporary summons of the
+leader's entry, placed behind it, following a patrolling leader or wandering near a wandering
+one. Settings: `Arpg.Packs` (on), `Arpg.Packs.FollowerPower` (0.55), `Arpg.Packs.FollowerXp`
+(0.3), `Arpg.Packs.FollowerLoot` (0.5). The ARPG View page's **Form Test Pack** button (with
+`Arpg.DevTools = 1`) makes the nearest mob lead a pack of five; the server log reads
+"ARPG packs: a pack of 5 Kobold Vermin (level 3) fell in 14.2 s; it dealt 312 damage".
+Known gaps: a follower that evades walks back to where it appeared rather than to its leader,
+and champions and rares come in step 2.
 
 ## Scaling for one to five players
 
@@ -169,7 +181,4 @@ the whole way.
 
 ## Open questions for Jeff
 
-- **The damage caps:** a fair first pass? They're the main dial for how hard everything feels.
-- **The keys:** permanent attunement (as above), or used up per run on higher raid tiers, as
-  Diablo's keys are?
-- **Wardens' names and themes:** written per dungeon as they're built, for you to veto.
+None open: see "Jeff's calls so far".

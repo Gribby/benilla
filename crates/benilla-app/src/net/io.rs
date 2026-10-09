@@ -1041,6 +1041,7 @@ fn writer_loop(
                     ClientCommand::ArpgSkillSlot { slot, skill } => w.arpg_skill_slot(slot, skill),
                     ClientCommand::ArpgSkillNode { node, refund } => w.arpg_skill_node(node, refund),
                     ClientCommand::ArpgSkillRespec { skill } => w.arpg_skill_respec(skill),
+                    ClientCommand::ArpgDevPack { size } => w.arpg_dev_pack(size),
                     ClientCommand::ArpgTreeRespec => w.arpg_tree_respec(),
                     ClientCommand::ArpgTreeQuery => w.arpg_tree_query(),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {

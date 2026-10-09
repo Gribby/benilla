@@ -192,8 +192,8 @@ ARPG_TOOLTIP_CUT_RADIUS = "Indoors and in caves, how far from your character the
 ARPG_TOOLTIP_LOOT_FILTER = "Which items on the ground get a name label. Hidden ones still "
     .. "glow and can be picked up, and holding Alt shows every label. Gold always shows."
 ARPG_TOOLTIP_DEV_LOOT = "For testing: Drop Test Loot asks the server for a corpse at your feet "
-    .. "holding this many items of this quality around this item level. Needs Arpg.DevTools = 1 "
-    .. "in the server's mangosd.conf."
+    .. "holding this many items of this quality around this item level. Form Test Pack makes the "
+    .. "nearest mob lead a pack of five. Both need Arpg.DevTools = 1 in the server's mangosd.conf."
 ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
     .. "camera turn see-through."
 
@@ -284,6 +284,18 @@ local function addArpgOptionsPage()
         PlaySound("igMainMenuOptionCheckBoxOn")
         SetCVar("arpgDevLootDrop", tostring((tonumber(GetCVar("arpgDevLootDrop")) or 0) + 1))
     end)
+    -- Form Test Pack: the nearest mob forms a full pack (Arpg.DevTools), through the web window's
+    -- action setting (kind 9, the size in the node field).
+    local pack = CreateFrame("Button", body:GetName() .. "DevPack", prev, "BenillaOptionsRedButtonTemplate")
+    pack:SetWidth(140)
+    pack:SetPoint("LEFT", drop, "RIGHT", 10, 0)
+    pack:SetText("Form Test Pack")
+    pack:SetScript("OnClick", function()
+        PlaySound("igMainMenuOptionCheckBoxOn")
+        local n = (tonumber(GetCVar("arpgTreeAction")) or 0) + 1
+        local nonce = n - math.floor(n / 100) * 100
+        SetCVar("arpgTreeAction", tostring(900000 + 5 * 100 + nonce))
+    end)
 
     BENILLA_OPTIONS_PAGE_ROWS.Arpg = keys
     table.insert(BENILLA_OPTIONS_CATEGORY_KEYS, "Arpg")
@@ -318,9 +330,10 @@ local WEB_REGION_RGB = {
 }
 local WEB_KIND_NAME = { [0] = "Start", [1] = "Small", [2] = "Notable", [3] = "Keystone" }
 local WEB_SIZE = { [0] = 40, [1] = 20, [2] = 38, [3] = 50 }
-local WEB_LINE_TEX = "Interface\\TaxiFrame\\UI-Taxi-Line"
-local WEB_DOT_TEX = "Interface\\TaxiFrame\\UI-Taxi-Icon-White"
-local WEB_LINE_FACTOR = 32 / 30
+local WEB_SOLID_TEX = "Interface\\Buttons\\WHITE8X8"
+-- Paths are rows of small squares this far apart, in web units: solid at any zoom, and no
+-- texture-coordinate tricks (a rotated route-line texture tiles outside its square).
+local WEB_DOT_STEP = 8
 local treeData, treeFrame, treeNonce = nil, nil, 0
 local webById, webNext = {}, {}
 -- The web spans about 1100 units each way, centred a little below the start.
@@ -354,39 +367,33 @@ local function webBlocked(n)
     return nil
 end
 
--- A texture drawn as a line from (sx, sy) to (ex, ey), canvas BOTTOMLEFT coordinates, `w` wide:
--- the taxi map's route line, its texture rotated by texture coordinates.
-local function webLine(T, C, sx, sy, ex, ey, w)
-    local dx, dy = ex - sx, ey - sy
-    local cx, cy = (sx + ex) / 2, (sy + ey) / 2
-    if dx < 0 then dx, dy = -dx, -dy end
-    local l = math.sqrt(dx * dx + dy * dy)
-    T:ClearAllPoints()
-    if l == 0 then
-        T:SetTexCoord(0, 0, 0, 0, 0, 0, 0, 0)
-        T:SetPoint("BOTTOMLEFT", C, "BOTTOMLEFT", cx, cy)
-        T:SetPoint("TOPRIGHT", C, "BOTTOMLEFT", cx, cy)
-        return
+-- A path is `n` squares in `line` (a table of textures, grown as needed), on `parent`.
+local function lineDots(line, parent, layer, n)
+    for k = 1, n do
+        if not line[k] then
+            local T = parent:CreateTexture(nil, layer)
+            T:SetTexture(WEB_SOLID_TEX)
+            line[k] = T
+        end
     end
-    local s, c = -dy / l, dx / l
-    local sc = s * c
-    local Bwid, Bhgt, BLx, BLy, TLx, TLy, TRx, TRy, BRx, BRy
-    if dy >= 0 then
-        Bwid = ((l * c) - (w * s)) * WEB_LINE_FACTOR / 2
-        Bhgt = ((w * c) - (l * s)) * WEB_LINE_FACTOR / 2
-        BLx, BLy, BRy = (w / l) * sc, s * s, (l / w) * sc
-        BRx, TLx, TLy, TRx = 1 - BLy, BLy, 1 - BRy, 1 - BLx
-        TRy = BRx
-    else
-        Bwid = ((l * c) + (w * s)) * WEB_LINE_FACTOR / 2
-        Bhgt = ((w * c) + (l * s)) * WEB_LINE_FACTOR / 2
-        BLx, BLy, BRx = s * s, -(l / w) * sc, 1 + (w / l) * sc
-        BRy, TLx, TLy, TRy = BLx, 1 - BRx, 1 - BLx, 1 - BLy
-        TRx = TLy
+    for k = n + 1, table.getn(line) do line[k]:Hide() end
+end
+
+-- Lay `line`'s first `n` squares evenly from (ax, ay) to (bx, by), from `parent`'s TOPLEFT, y down.
+local function placeDots(line, parent, n, ax, ay, bx, by, size)
+    for k = 1, n do
+        local t = (k - 0.5) / n
+        local T = line[k]
+        T:ClearAllPoints()
+        T:SetWidth(size)
+        T:SetHeight(size)
+        T:SetPoint("CENTER", parent, "TOPLEFT", ax + (bx - ax) * t, -(ay + (by - ay) * t))
+        T:Show()
     end
-    T:SetTexCoord(TLx, TLy, BLx, BLy, TRx, TRy, BRx, BRy)
-    T:SetPoint("BOTTOMLEFT", C, "BOTTOMLEFT", cx - Bwid, cy - Bhgt)
-    T:SetPoint("TOPRIGHT", C, "BOTTOMLEFT", cx + Bwid, cy + Bhgt)
+end
+
+local function colorDots(line, n, r, g, b, a)
+    for k = 1, n do line[k]:SetVertexColor(r, g, b, a) end
 end
 
 local function webShowTip(button)
@@ -455,20 +462,20 @@ local function webLayout()
             b:SetHeight(size)
             b:ClearAllPoints()
             b:SetPoint("CENTER", canvas, "TOPLEFT", px, -py)
-            local pad = n.kind == 1 and 0 or math.max(2, size * 0.08)
+            local pad = n.kind == 1 and 1 or math.max(2, size * 0.08)
             b.border:ClearAllPoints()
             b.border:SetPoint("TOPLEFT", b, "TOPLEFT", -pad, pad)
             b.border:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", pad, -pad)
         end
     end
-    local w = math.max(3, 9 * z)
+    local size = math.max(2, WEB_DOT_STEP * z * 1.05)
     for i, link in ipairs(treeData.links) do
-        local T = f.lines[i]
+        local line = f.lines[i]
         local a, b = webById[link[1]], webById[link[2]]
-        if T and a and b then
+        if line and a and b then
             local ax, ay = webToCanvas(a.x, a.y)
             local bx, by = webToCanvas(b.x, b.y)
-            webLine(T, canvas, ax, f.canvasH - ay, bx, f.canvasH - by, w)
+            placeDots(line, canvas, f.lineN[i], ax, ay, bx, by, size)
         end
     end
     for i, region in ipairs(treeData.regions) do
@@ -490,8 +497,9 @@ local function webPaint()
         local taken = n.taken == 1
         local open = not taken and not webBlocked(n)
         if n.kind == 1 then
-            b.icon:SetTexture(WEB_DOT_TEX)
-            b.border:SetTexture(0, 0, 0, 0)
+            b.icon:SetTexture(WEB_SOLID_TEX)
+            b.icon:SetDesaturated(nil)
+            b.border:SetTexture(0, 0, 0, 0.9)
             if taken then
                 b.icon:SetVertexColor(rgb[1], rgb[2], rgb[3])
             elseif open then
@@ -520,14 +528,14 @@ local function webPaint()
         b:Show()
     end
     for i, link in ipairs(treeData.links) do
-        local T = f.lines[i]
+        local line, n = f.lines[i], f.lineN[i]
         local a, b = webTaken(link[1]), webTaken(link[2])
         if a and b then
-            T:SetVertexColor(1, 0.8, 0.3, 1)
+            colorDots(line, n, 1, 0.8, 0.3, 1)
         elseif a or b then
-            T:SetVertexColor(0.6, 0.6, 0.62, 0.9)
+            colorDots(line, n, 0.6, 0.6, 0.62, 0.9)
         else
-            T:SetVertexColor(0.28, 0.28, 0.32, 0.8)
+            colorDots(line, n, 0.28, 0.28, 0.32, 0.8)
         end
     end
     for i, region in ipairs(treeData.regions) do
@@ -642,7 +650,7 @@ local function treeBuild()
         webLayout()
     end)
     f.view, f.canvas = view, canvas
-    f.buttons, f.lines, f.labels = {}, {}, {}
+    f.buttons, f.lines, f.lineN, f.labels = {}, {}, {}, {}
     f:SetScript("OnHide", function() f.drag = nil end)
     if UISpecialFrames then tinsert(UISpecialFrames, "ArpgTreeFrame") end
     treeFrame = f
@@ -666,14 +674,16 @@ local function treeRedraw()
             tinsert(webNext[link[1]], link[2])
             tinsert(webNext[link[2]], link[1])
         end
-        if not f.lines[i] then
-            local T = f.canvas:CreateTexture(nil, "BACKGROUND")
-            T:SetTexture(WEB_LINE_TEX)
-            f.lines[i] = T
-        end
-        f.lines[i]:Show()
+        local a, b = webById[link[1]], webById[link[2]]
+        local length = (a and b) and math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y)) or 0
+        f.lineN[i] = math.max(1, math.ceil(length / WEB_DOT_STEP))
+        f.lines[i] = f.lines[i] or {}
+        lineDots(f.lines[i], f.canvas, "BACKGROUND", f.lineN[i])
     end
-    for i = table.getn(treeData.links) + 1, table.getn(f.lines) do f.lines[i]:Hide() end
+    for i = table.getn(treeData.links) + 1, table.getn(f.lines) do
+        lineDots(f.lines[i], f.canvas, "BACKGROUND", 0)
+        f.lineN[i] = 0
+    end
     for i, _ in ipairs(treeData.regions) do
         if not f.labels[i] then
             f.labels[i] = f.canvas:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
@@ -938,7 +948,7 @@ local function skillsPaint()
     -- The shown skill's tree: the root on top, a column per branch, a row per depth.
     local k = skillById(skillSel)
     for _, b in pairs(p.nodes) do b:Hide() end
-    for _, T in pairs(p.lines) do T:Hide() end
+    for _, line in pairs(p.lines) do lineDots(line, p.tree, "BORDER", 0) end
     for _, l in pairs(p.branches) do l:Hide() end
     if not k then return end
     p.treeTitle:SetText(k.name .. "   " .. k.spent .. "/" .. k.cap)
@@ -993,19 +1003,17 @@ local function skillsPaint()
         local from, to = pos[n.parent], pos[n.id]
         if from and to then
             li = li + 1
-            local T = p.lines[li]
-            if not T then
-                T = p.tree:CreateTexture(nil, "BORDER")
-                T:SetTexture(WEB_LINE_TEX)
-                p.lines[li] = T
-            end
+            p.lines[li] = p.lines[li] or {}
+            local line = p.lines[li]
+            local dx, dy = to[1] - from[1], to[2] - from[2]
+            local count = math.max(1, math.ceil(math.sqrt(dx * dx + dy * dy) / 4))
+            lineDots(line, p.tree, "BORDER", count)
+            placeDots(line, p.tree, count, from[1], from[2], to[1], to[2], 4)
             if n.rank > 0 then
-                T:SetVertexColor(1, 0.8, 0.3, 1)
+                colorDots(line, count, 1, 0.8, 0.3, 1)
             else
-                T:SetVertexColor(0.35, 0.35, 0.4, 0.9)
+                colorDots(line, count, 0.35, 0.35, 0.4, 0.9)
             end
-            webLine(T, p.tree, from[1], height - from[2], to[1], height - to[2], 8)
-            T:Show()
         end
     end
     for i, name in ipairs(k.branches) do

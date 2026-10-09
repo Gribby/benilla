@@ -38,6 +38,7 @@ const KIND_SKILL_SLOT: u8 = 12;
 const KIND_SKILL_SPEND: u8 = 13;
 const KIND_SKILL_REFUND: u8 = 14;
 const KIND_SKILL_RESPEC: u8 = 15;
+const KIND_DEV_PACK: u8 = 16;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -166,6 +167,11 @@ impl WorldWriter {
     /// Take a rank of an ARPG skill tree node, or give one back.
     pub fn arpg_skill_node(&mut self, node: u16, refund: bool) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_skill_node_body(node, refund))
+    }
+
+    /// Dev tools: the nearest mob forms a pack of `size` (0: by level).
+    pub fn arpg_dev_pack(&mut self, size: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_DEV_PACK, size])
     }
 
     /// Give back every point in an ARPG skill.

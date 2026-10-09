@@ -95,8 +95,23 @@ pub(super) fn route_swing_impacts(
     mut out: MessageWriter<SwingImpact>,
     mut defenses: MessageWriter<DefenseAnim>,
     mut slows: MessageWriter<SwingSlowdown>,
+    arpg: Option<Res<crate::player::ArpgMode>>,
 ) {
     for s in swings.read() {
+        // Fork-only, not 1.12.1: an ARPG server resolves the swing at its impact, after the
+        // animation it started with an emote, and marks the hit `HitInfo & 0x10000` (no
+        // animation); with no clip to carry it, its feedback lands now.
+        if arpg.is_some() && s.hit_info & 0x10000 != 0 {
+            if !lootable_victim(&stores, s.victim) {
+                out.write(SwingImpact {
+                    swing: *s,
+                    text_only: false,
+                    natural: None,
+                    pos: None,
+                });
+            }
+            continue;
+        }
         // One slot per attacker: a superseded record flushes as text only (`0x6243e0` alone).
         if let Some(old) = pending.0.insert(
             s.attacker,

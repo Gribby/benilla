@@ -1024,6 +1024,10 @@ pub(crate) enum ClientCommand {
         node: u16,
         refund: bool,
     },
+    /// Fork-only: with the server's dev tools, the nearest mob forms a pack of `size` (0: by level).
+    ArpgDevPack {
+        size: u8,
+    },
     /// Fork-only: give back every point in ARPG skill `skill`.
     ArpgSkillRespec {
         skill: u8,
