@@ -1,4 +1,5 @@
 # ARPG skill trees: a new tree per class
+\n> Superseded by `ARPG-CHARACTER.md` (Jeff's review: the first tree read as a talent grid). The built paladin tree below stays until the new system replaces it.
 
 The paladin tree is built (see "How it's built"). Jeff's call (`ARPG-ITEMISATION.md`, "Decisions so far"): ARPG players get a new
 tree per class in place of vanilla's talents. This doc sets the framework every class shares, then
