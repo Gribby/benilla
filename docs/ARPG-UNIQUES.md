@@ -190,7 +190,7 @@ Built:
   Judgement splash).
 - Kit G on **Night Reaver** (1318, Heroic Strike) and **Felstriker** (12590, Eviscerate).
 
-15 of the 27. Test with `.additem <id>` on a GM account, or farm them.
+13 of the 27. Test with `.additem <id>` on a GM account, or farm them.
 
 Next:
 1. Kit F (spread: Venomstrike, Living Root, Hypnotic Blade, Lok'amir) and kit B (pierce: Witching
