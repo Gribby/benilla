@@ -1,0 +1,175 @@
+# ARPG progression: packs, dungeons, raids and quests
+
+How a character goes from level 1 to Naxxramas on this server, alone or in a small group of ARPG
+players. Read `ARPG-CHARACTER.md` first: this doc sets the fights that the character's power is
+built for.
+
+## Jeff's calls so far
+
+- Only ARPG players play here, alone or in small groups: no stock-client or bot balance to keep.
+- Packs of 3 to 5, sized to what the paladin can kill at each level.
+- Pack followers are smaller, easier mobs and give less XP.
+- Dungeons are special: a challenge with a reward.
+- Levelling at about 1.3 to 1.5 times vanilla's pace.
+- Raids need progression: Molten Core needs items from endgame dungeons.
+- Bosses must be soloable: no one-shots from auto attacks, so damage scales somehow.
+- No quest glows, markers or any other hand-holding.
+
+## Packs
+
+**Size grows with the character**, because the paladin's area damage does:
+
+| Level | Pack size | The paladin by then |
+|---|---|---|
+| 1–5 | 1–2 | The swing and Seal of Righteousness |
+| 6–11 | 2–3 | Consecration (level 6), one skill slot |
+| 12–19 | 3–4 | First tree nodes (Wide Swing, Sweeping Seal), a second slot |
+| 20+ | 3–5 | Area damage, life on kill, Hallowed Ground |
+
+**Followers** are the leader's own kind, one or two levels lower, drawn a little smaller, with
+about 55% of its health and damage: a pack of five fights like about three ordinary mobs. Each
+gives about 30% of the XP, so a pack of four is worth about two kills, and area damage kills it
+far faster: about 1.3 to 1.5 times vanilla's pace. Quest items drop from followers as usual; their
+gold and gear chances are reduced.
+
+**How they spawn:** at runtime, not in the database. When an eligible creature spawns, it may
+lead a pack: its followers are temporary summons that follow its path, share its aggro, despawn
+with its corpse and come back when it respawns. Eligible: hostile, normal rank, no NPC flags, not
+a pet, summon, rare or boss. Settings: `Arpg.Packs.Enable`, sizes, champion and rare chances.
+
+**Champions and rares:**
+
+| Tier | What | How often | Reward |
+|---|---|---|---|
+| Pack | Leader and followers | Most spawns | Normal |
+| Champion pack | 2–3 champions sharing one or two affixes, and followers | About 1 in 8 | Bonus loot, later Codex fragments and runes |
+| Rare | One named leader with 2–3 affixes, and followers | About 1 in 40 | Blue or better, later fragments and a rune chance |
+
+Champions have about three times the health and a larger model; their names show blue, rares'
+yellow. Affixes, each from stats, auras or a small hook: Extra Strong, Extra Fast, Stone Skin, Fire
+Enchanted (fire on hit, a burst on death), Cold Enchanted (slows; a nova at low health), Vampiric,
+Thorns, Teleporter, Healer (heals its pack), Molten (a burning trail). The client gets each
+champion's tier, name and affixes and shows them on the hover bar, with a ring under its feet.
+
+**Tuning:** a dev tool spawns a pack at the cursor, and the server logs each pack fight's time to
+kill and damage taken, so the numbers can be set from play.
+
+## Scaling for one to five players
+
+WoW's encounters assume a tank, a healer and three damage dealers; here a fight has one to five
+players, each of them all three at once. Three rules make that work in dungeons and raids alike.
+
+**1. Health scales with the players inside.** A creature's health is set when the first player
+engages it, by the number of players in the instance: solo about 35% of vanilla's in a dungeon,
+then about +16% per player. Raids scale from a solo baseline the same way (see below).
+
+**2. Damage is measured against the player, not in flat numbers.** In vanilla a boss swing is
+sized for a tank in raid gear: Ragnaros's melee would one-shot a solo paladin whatever the
+multiplier. So a hostile creature's hit in a dungeon or raid is capped at a share of the
+victim's maximum health:
+
+| Source | Cap per hit |
+|---|---|
+| Trash and followers | 6% |
+| Champions and rares | 9% |
+| Dungeon bosses | 12% |
+| Raid bosses, melee | 15% |
+| Avoidable boss abilities (fire on the ground, a telegraphed blast) | 35–50% |
+
+Auto attacks wear you down, and life on kill, leech, blocks and heals hold them off; what kills
+you is standing in what you should have dodged. The caps follow the player's gear on their own,
+so they never need retuning per level. Difficulty tiers raise them.
+
+**3. Mechanics that need a raid get a small-group form.** Each boss whose fight needs several
+players gets a few lines of change, kept small so the fight stays recognisable. Molten Core as the
+model:
+
+| Boss | Vanilla needs | Small-group form |
+|---|---|---|
+| Lucifron | Decursers, adds tanked | Curses fade in Consecration or after 10 sec; one guard per player |
+| Magmadar | Fear ward, a tank | The fear is shorter; Lava Bombs are the avoidable damage |
+| Gehennas | Decursers | As Lucifron |
+| Garr | Banishers for eight adds | One add per player, which explode on death (dodge them) |
+| Baron Geddon | Living Bomb spread out | The bomb shows a ring for 4 sec: get away from the pack |
+| Shazzrah | Ranged spread, decursing | Blinks to you; Arcane Explosion is the avoidable damage |
+| Sulfuron Harbinger | Four priests interrupted | Two priests, plus one per extra player; any stun interrupts |
+| Golemagg | Two dog tanks | The dogs share his damage cap; stand out of Earthquake |
+| Majordomo | Crowd control for eight adds | Four adds plus one per extra player, killed in any order |
+| Ragnaros | Tank swaps, sons phase | Wrath of Ragnaros knocks back (avoidable); sons scale with players |
+
+Dungeon bosses mostly need only rules 1 and 2. Some get a line or two where a mechanic assumes
+five players.
+
+**Enrage timers keep a damage check:** about 4 minutes solo for a dungeon boss, about 6 for a raid
+boss, so the character's damage has to keep up with the dungeon tier.
+
+## Dungeons
+
+1. **Group scaling** (above).
+2. **Every pack is a real pack:** vanilla's trash groups stay as they are, with champion and rare
+   rolls at three times the open world's rate. Followers don't add to them.
+3. **A Warden in every dungeon:** a fixed, named rare with themed affixes ("Gorehowl the
+   Fleshrender", Vampiric and Extra Strong, in the Deadmines) and its own drops: the dungeon's
+   Codex page chance and a themed unique.
+4. **A Cache at the final boss:** loot for the character's level and the tier. The first kill
+   also gives a passive point (built).
+5. **Difficulty tiers:** Normal, Hard, Brutal, then Torment I, II and III. Each raises health,
+   the damage caps and champions' affix count, for better loot quality, more drops and higher rune
+   and Codex chances. A clear unlocks the next tier for that dungeon. The tier is chosen at the
+   entrance by whoever enters first.
+
+## Raids: progression gated by dungeons
+
+Each raid has an attunement: a key made from pieces that endgame dungeons drop at a set tier.
+It's per character and permanent, as vanilla's attunements are.
+
+| Raid | Key | Pieces |
+|---|---|---|
+| Molten Core | Core Sigil | Ember of Thaurissan (Blackrock Depths, Emperor, Brutal), Spire Brand (Lower Blackrock Spire, Wyrmthalak, Brutal), Drakkisath's Seal (Upper Blackrock Spire, Brutal) |
+| Onyxia's Lair | Drakefire Amulet (vanilla's chain) | Its quest line, with General Drakkisath on Brutal |
+| Blackwing Lair | Blackhand's Command (vanilla) | Molten Core cleared, and Upper Blackrock Spire on Torment I |
+| Zul'Gurub | Hakkari Totem | Zul'Farrak and Sunken Temple Wardens on Brutal |
+| Ruins and Temple of Ahn'Qiraj | Scarab Sigil | Blackwing Lair cleared, and Dire Maul's three Wardens on Torment I |
+| Naxxramas | Argent Writ | Ahn'Qiraj cleared, and Stratholme and Scholomance on Torment III |
+
+The pieces are new items, shipped as a fork SQL file the server update applies. An attunement
+quest, given by the vanilla quest givers where they exist (Lothos Riftwaker for Molten Core),
+turns the pieces into the key. The raid's entrance checks for the key (the area trigger's
+required item, or a check in the instance entry for ARPG players).
+
+**Raid sizes:** health is set for one player (about 8% of vanilla's 40-player value for Molten
+Core), then rises per extra player. Loot comes as one drop per player, and the boss's Cache scales
+with the group.
+
+**Why this order works:** levelling gets a character to Brutal Blackrock dungeons; Brutal gear and
+uniques make Molten Core possible; Molten Core's gear makes Torment I possible, which opens
+Blackwing Lair. Every raid needs the dungeons one step below it, so dungeons stay worth running
+the whole way.
+
+## Quests
+
+- **Vanilla's quests as they are**, stories and all. Packs make "kill 10" quests quicker.
+- **No hand-holding:** no glows, markers or objective arrows; the quest text and the map are the
+  guide, as in vanilla.
+- **Open-world elite quests** scale with the group, as dungeons do.
+- **Attunement quests** for the raids (above).
+- **Bounties (later):** a board in each capital with a few zone tasks ("kill the rare in Felwood",
+  "clear Scholomance on Hard"), each paying a Cache, so level 60 zones stay worth visiting.
+
+## Build order
+
+1. Packs: level-scaled sizes, lesser followers, shared aggro, the dev spawn tool, the fight log.
+2. Champions and rares: affixes, the client's names and rings.
+3. Group scaling and damage caps, in dungeons first.
+4. Dungeon Wardens and Caches.
+5. Codex pages and runes, dropping from champions, Wardens and Caches.
+6. Difficulty tiers.
+7. Raid attunements and Molten Core's small-group forms; the other raids one at a time.
+8. Bounties, and a paragon track past 60 (`ARPG-CHARACTER.md`'s open question).
+
+## Open questions for Jeff
+
+- **The damage caps:** a fair first pass? They're the main dial for how hard everything feels.
+- **The keys:** permanent attunement (as above), or used up per run on higher raid tiers, as
+  Diablo's keys are?
+- **Wardens' names and themes:** written per dungeon as they're built, for you to veto.
