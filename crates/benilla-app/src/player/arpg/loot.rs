@@ -188,6 +188,10 @@ fn on_arpg_loot(In(ev): In<SessionEvent>, mut out: MessageWriter<ArpgLootList>) 
         items,
     } = ev
     {
+        info!(
+            "arpg: ground loot for {corpse:#x}: {} item(s), {gold} copper",
+            items.len()
+        );
         out.write(ArpgLootList {
             corpse,
             gold,
