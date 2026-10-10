@@ -74,8 +74,7 @@ Strong, Extra Fast, Stone Skin, Fire Enchanted, Cold Enchanted, Vampiric, Thorns
 Healer; Molten waits for a ground visual. The server sends `SMSG_ARPG_CHAMPIONS` (0x341) for the
 champions within 100 yards; the client (`player/arpg/champions.rs`) colours the hover bar's name
 blue or yellow, lists the affixes under it, and lays a ring of that colour under each one. The
-ARPG View page gains **Champion Pack** and **Rare Pack** dev buttons. Champions in dungeons come
-with step 3.
+ARPG View page gains **Champion Pack** and **Rare Pack** dev buttons.
 
 ## Scaling for one to five players
 
@@ -123,6 +122,20 @@ model:
 Dungeon bosses mostly need only rules 1 and 2. Some get a line or two where a mechanic assumes
 five players.
 
+**Built (rules 1 and 2):** `Arpg/ArpgDungeons.{h,cpp}` on the server (`Arpg.Dungeons`, on).
+Health: dungeons `Arpg.Dungeons.SoloHealth` (0.35) plus `Arpg.Dungeons.PlayerHealth` (0.16) per
+extra player; raids 0.35 × 9 / the raid's size solo (about 8% for Molten Core), each extra player
+adding three quarters of that; open-world elites `Arpg.Dungeons.EliteSoloHealth` (0.5) plus 0.16
+per group member within 100 yards; world bosses as a 40-player raid. A creature is scaled a moment
+after it spawns and again when a fight starts with a different player count or tier, keeping its
+share of health. Caps, melee / spell (DoT ticks as melee): trash 6% / 12%, champions, rares and
+open-world elites 9% / 15%, dungeon bosses 12% / 30%, raid and world bosses 15% / 35%; ordinary
+open-world mobs are uncapped. A boss is rank 3, a ScriptDev `boss_` script, or in a dungeon a
+health multiplier of 5 or more (6 from level 40): checked against the database, vanilla trash
+peaks at 3 in low dungeons and 6 in Stratholme and Blackrock Spire, while bosses run 5 to 25.
+Dungeon trash rolls champions (6%) and rares (1.5%) per mob from level 8. Enrage timers and the
+small-group boss forms are not built yet.
+
 **Enrage timers keep a damage check:** about 4 minutes solo for a dungeon boss, about 6 for a raid
 boss, so the character's damage has to keep up with the dungeon tier.
 
@@ -140,6 +153,46 @@ boss, so the character's damage has to keep up with the dungeon tier.
    the damage caps and champions' affix count, for better loot quality, more drops and higher rune
    and Codex chances. A clear unlocks the next tier for that dungeon. The tier is chosen at the
    entrance by whoever enters first.
+
+**Built (Wardens, Caches, tiers):** in `Arpg/ArpgDungeons.cpp`.
+- *Wardens:* each vanilla dungeon has a themed one (Gorehowl the Fleshrender, Vampiric and Extra
+  Strong, in the Deadmines; Forgemaster Ironmaw, Fire Enchanted and Stone Skin, in Blackrock
+  Depths; nineteen in all). One trash spawn per instance, picked at random from the database's
+  spawns for that map, is crowned a named rare; a chat line announces it and its fall. It drops
+  two blues and a 30% chance at a purple. Its own unique and the Codex page come with step 5.
+- *Caches:* each final boss (`Arpg::Bosses`) drops gold, and per player there a blue, a green and
+  a 25% chance at a purple, announced in chat.
+- *Tiers:* the ARPG View page's **Dungeon Tier** slider (`arpgDungeonTier`, sent at each world
+  entry and on a change, `CMSG_ARPG_ACTION` kind 19). An instance takes its first ARPG player's
+  tier, as far as that player has it open there, and says so in chat; a final boss's kill opens
+  the next tier for everyone in at the kill (`character_arpg_tier`, which the server creates).
+
+  | | Normal | Hard | Brutal | Torment I | Torment II | Torment III |
+  |---|---|---|---|---|---|---|
+  | Health | ×1 | ×1.4 | ×1.9 | ×2.6 | ×3.4 | ×4.4 |
+  | Damage | ×1 | ×1.15 | ×1.3 | ×1.5 | ×1.7 | ×2 |
+  | Caps | ×1 | ×1.2 | ×1.4 | ×1.65 | ×1.9 | ×2.2 |
+  | XP | ×1 | ×1.15 | ×1.3 | ×1.5 | ×1.7 | ×2 |
+  | Champion and rare chance | ×1 | ×1.25 | ×1.5 | ×1.75 | ×2 | ×2.5 |
+  | Extra affixes | 0 | 0 | 1 | 1 | 2 | 2 |
+  | Warden and Cache drops | | +2 item levels, +8% purple per tier; an extra blue per two tiers | | | | |
+
+## Survival: the roll and the flask
+
+Built (`Arpg/ArpgActions.{h,cpp}` on the server, `player/arpg/actions.rs` on the client).
+
+- **Roll (Space, the Jump binding):** a leap of about seven yards toward the movement keys' walk,
+  or the cursor with none held, every 2.5 seconds. The server sends it as a knockback, which the
+  client flies and the anticheat expects; while airborne (0.45 s) every blow and hostile spell at
+  the player is dodged. Not while rooted, stunned, feared, mounted, swimming or falling. A bar
+  beside the power orb shows the cooldown.
+- **Flask (Q, the Strafe Left binding; A still walks left):** three charges, starting full. A
+  charge heals 15% of maximum health at once and 25% more over three seconds. Kills refill it
+  (a follower 1 point, a mob 2, an elite 4, a champion 5, a rare 10, a boss 20; ten points a
+  charge), and out of combat a charge returns every 12 seconds. Vials beside the health orb show
+  the charges and the next one filling.
+- The server sends `SMSG_ARPG_STATUS` (0x342) on a change: the charges, the next charge's
+  progress and the roll's cooldown.
 
 ## Raids: progression gated by dungeons
 
@@ -182,11 +235,12 @@ the whole way.
 ## Build order
 
 1. Packs: level-scaled sizes, lesser followers, shared aggro, the dev spawn tool, the fight log.
-2. Champions and rares: affixes, the client's names and rings.
-3. Group scaling and damage caps, in dungeons first.
-4. Dungeon Wardens and Caches.
+   (Built.)
+2. Champions and rares: affixes, the client's names and rings. (Built.)
+3. Group scaling and damage caps, in dungeons first. (Built, but not the enrage timers.)
+4. Dungeon Wardens and Caches. (Built, but not the Warden's own unique.)
 5. Codex pages and runes, dropping from champions, Wardens and Caches.
-6. Difficulty tiers.
+6. Difficulty tiers. (Built.)
 7. Raid attunements and Molten Core's small-group forms; the other raids one at a time.
 8. Bounties, and a paragon track past 60 (`ARPG-CHARACTER.md`'s open question).
 

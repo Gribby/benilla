@@ -39,6 +39,9 @@ const KIND_SKILL_SPEND: u8 = 13;
 const KIND_SKILL_REFUND: u8 = 14;
 const KIND_SKILL_RESPEC: u8 = 15;
 const KIND_DEV_PACK: u8 = 16;
+const KIND_DODGE: u8 = 17;
+const KIND_FLASK: u8 = 18;
+const KIND_TIER: u8 = 19;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -97,6 +100,15 @@ pub fn arpg_aim_body(at: [f32; 3], intended: u64) -> Vec<u8> {
         body.extend_from_slice(&c.to_le_bytes());
     }
     body.extend_from_slice(&intended.to_le_bytes());
+    body
+}
+
+/// A dodge body: roll toward the WoW-space point `(x, y)`.
+pub fn arpg_dodge_body(x: f32, y: f32) -> Vec<u8> {
+    let mut body = Vec::with_capacity(9);
+    body.push(KIND_DODGE);
+    body.extend_from_slice(&x.to_le_bytes());
+    body.extend_from_slice(&y.to_le_bytes());
     body
 }
 
@@ -243,11 +255,35 @@ impl WorldWriter {
     pub fn arpg_aim(&mut self, at: [f32; 3], intended: u64) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &arpg_aim_body(at, intended))
     }
+
+    /// Roll toward the WoW-space point `(x, y)`; the server answers with a knockback.
+    pub fn arpg_dodge(&mut self, x: f32, y: f32) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_dodge_body(x, y))
+    }
+
+    /// Drink a charge of the flask.
+    pub fn arpg_flask(&mut self) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_FLASK])
+    }
+
+    /// Ask for dungeon difficulty `tier` (0 Normal to 5 Torment III).
+    pub fn arpg_tier(&mut self, tier: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_TIER, tier])
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_dodge_body_is_kind_then_the_point() {
+        let body = arpg_dodge_body(1.5, -2.0);
+        assert_eq!(body.len(), 9);
+        assert_eq!(body[0], KIND_DODGE);
+        assert_eq!(f32::from_le_bytes(body[1..5].try_into().unwrap()), 1.5);
+        assert_eq!(f32::from_le_bytes(body[5..9].try_into().unwrap()), -2.0);
+    }
 
     #[test]
     fn the_cast_body_is_kind_spell_aim_the_point_and_the_intended_unit() {

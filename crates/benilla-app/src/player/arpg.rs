@@ -32,6 +32,7 @@
 //! The character always faces the cursor: standing, it turns to the aim; walking, it faces within
 //! 22.5° of the aim and walks with the stock forward, backpedal and strafe moves ([`steer`]).
 
+mod actions;
 mod champions;
 mod fx;
 mod loot;
@@ -250,6 +251,7 @@ pub(super) fn plugin(app: &mut App) {
     uniques::register_net(app);
     tree::register_net(app);
     champions::register_net(app);
+    actions::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -265,6 +267,8 @@ pub(super) fn plugin(app: &mut App) {
     tree::plugin(app);
     // The champions' hover line and rings.
     champions::plugin(app);
+    // Space rolls, Q drinks the flask.
+    actions::plugin(app);
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);
@@ -911,10 +915,8 @@ pub(super) fn steer(
 ) -> MoveAxes {
     let key = |input: Input| i32::from(binds.pressed(input));
     let up = key(Input::MoveForward) - key(Input::MoveBackward);
-    let right = (key(Input::StrafeRight) + key(Input::TurnRight)
-        - key(Input::StrafeLeft)
-        - key(Input::TurnLeft))
-    .signum();
+    // Strafe Left (Q) is the flask's key in the view ([`actions`]); A still walks left.
+    let right = (key(Input::StrafeRight) + key(Input::TurnRight) - key(Input::TurnLeft)).signum();
     let key_facing = screen_facing(cam_yaw, up, right);
     if key_facing.is_some() {
         mouse.goal = None;

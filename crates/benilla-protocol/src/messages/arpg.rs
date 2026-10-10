@@ -269,6 +269,33 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
 /// The champions and rares near the player (cmangos `Arpg/ArpgPacks.h`), each sent once.
 pub const SMSG_ARPG_CHAMPIONS: u16 = 0x0341;
 
+/// The flask's charges and the dodge's cooldown (cmangos `Arpg/ArpgActions.h`), on a change.
+pub const SMSG_ARPG_STATUS: u16 = 0x0342;
+
+/// The player's flask and dodge roll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ArpgStatus {
+    pub flask_charges: u8,
+    pub flask_max: u8,
+    /// The next charge's progress, 0 to 100.
+    pub flask_progress: u8,
+    /// Milliseconds until the dodge is ready, 0 when it is.
+    pub dodge_ready_ms: u32,
+    pub dodge_cooldown_ms: u32,
+}
+
+/// `SMSG_ARPG_STATUS`: `u8` charges, `u8` max, `u8` progress, `u32` ms until the dodge is ready,
+/// `u32` the dodge's cooldown.
+pub fn read_arpg_status(r: &mut impl io::Read) -> io::Result<ArpgStatus> {
+    Ok(ArpgStatus {
+        flask_charges: read_u8(r)?,
+        flask_max: read_u8(r)?,
+        flask_progress: read_u8(r)?,
+        dodge_ready_ms: read_u32_le(r)?,
+        dodge_cooldown_ms: read_u32_le(r)?,
+    })
+}
+
 /// A champion or rare: its tier (1 champion, 2 rare), its own name (empty: the creature's), and
 /// its affixes' names.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -436,6 +463,23 @@ mod tests {
             }
         );
         assert!(read_arpg_skills(&mut [2u8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn the_status_reads_the_flask_then_the_dodge() {
+        let mut body = vec![2, 3, 40];
+        body.extend_from_slice(&1200u32.to_le_bytes());
+        body.extend_from_slice(&2500u32.to_le_bytes());
+        assert_eq!(
+            read_arpg_status(&mut body.as_slice()).unwrap(),
+            ArpgStatus {
+                flask_charges: 2,
+                flask_max: 3,
+                flask_progress: 40,
+                dodge_ready_ms: 1200,
+                dodge_cooldown_ms: 2500,
+            }
+        );
     }
 
     #[test]

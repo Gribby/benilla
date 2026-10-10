@@ -93,8 +93,9 @@ Next:
   (Molten Core). Floors more than `FLOOR_RISE` over the plane are already cut.
 - Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
-- Phase 3: more and denser mobs (server spawn scaling), mob packs, dodge/evade movement skill,
-  potions on hotkeys, real item models on the ground.
+- Phase 3: real item models on the ground. Built since: mob packs, champions and rares,
+  dungeon scaling and caps, Wardens, Caches, difficulty tiers, the roll (Space) and the flask (Q):
+  `docs/ARPG-PROGRESSION.md`.
 - Itemisation: see `docs/ARPG-ITEMISATION.md`; the named-item uniques: `docs/ARPG-UNIQUES.md`; skills, the passive web and attributes: `docs/ARPG-CHARACTER.md` (paladin first); packs, dungeons, raids and quests: `docs/ARPG-PROGRESSION.md`.
 - Phase 4: vanilla raids as weekly-lockout solo ARPG dungeons (scaled bosses, trash density,
   pacing like vanilla's raid week).

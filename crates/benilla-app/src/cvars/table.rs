@@ -732,6 +732,9 @@ pub(crate) const REGISTERED: &[Registered] = &[
     // The ground loot's label filter (`player::arpg::loot`): 0 all, 1 no greys, 2 no greys or
     // whites, 3 blue and better.
     ours("arpgLootFilter", "0", ARPG_WHY),
+    // The dungeon difficulty tier asked of the server (`player::arpg::actions`): 0 Normal, 1 Hard,
+    // 2 Brutal, 3 to 5 Torment I to III.
+    ours("arpgDungeonTier", "0", ARPG_WHY),
     // The options page's test loot (`player::arpg::drop_dev_loot`, a server with `Arpg.DevTools`):
     // quality (0 a mix, else quality + 1), count, item level (0 the player's), and the button's
     // counter, which the session owns so it is never saved.

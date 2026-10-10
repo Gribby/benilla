@@ -1029,6 +1029,17 @@ pub(crate) enum ClientCommand {
         size: u8,
         tier: u8,
     },
+    /// Fork-only: roll toward the WoW-space point `(x, y)`.
+    ArpgDodge {
+        x: f32,
+        y: f32,
+    },
+    /// Fork-only: drink a charge of the ARPG flask.
+    ArpgFlask,
+    /// Fork-only: ask for ARPG dungeon difficulty `tier`.
+    ArpgTier {
+        tier: u8,
+    },
     /// Fork-only: give back every point in ARPG skill `skill`.
     ArpgSkillRespec {
         skill: u8,

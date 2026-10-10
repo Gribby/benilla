@@ -513,7 +513,9 @@ pub(super) fn control(
         // `Jump` (`0x513bd0`) inlines `0x5144e0` and `0x514560`, which is `may_translate` term for
         // term: health, root and stand state 7. Hover's refusal is the movement handler's
         // (`0x7c623a`), which keeps the mounted flourish reachable while hovering.
-        let mut want_jump = binds.fired(crate::bindings::Input::Jump) && may_translate;
+        // Fork-only, not 1.12.1: in the ARPG view Space is the dodge roll (`arpg::actions`).
+        let mut want_jump =
+            binds.fired(crate::bindings::Input::Jump) && may_translate && arpg_pin.is_none();
 
         // Swim or walk, latched with hysteresis at the `0x6030c0` boundary against flicker.
         let surface_y = swim::surface_over_feet(world, player.pos);

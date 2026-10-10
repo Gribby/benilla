@@ -200,6 +200,94 @@ local function refreshOrbs()
     paintOrb(powerOrb, top > 0 and power / top or 0, color, power)
 end
 
+-- The flask (Q) and the dodge roll (Space): the server's charges and cooldown, which the client
+-- passes on through ArpgHud_Status. The flask's charges stand as vials beside the health orb, the
+-- next one filling as kills come in; the roll's bar beside the power orb fills back up after a
+-- roll.
+local VIAL_W, VIAL_H, VIAL_GAP = 12, 34, 5
+local vials = {}
+local function makeVial(i)
+    local v = CreateFrame("Frame", nil, UIParent)
+    v:SetWidth(VIAL_W)
+    v:SetHeight(VIAL_H)
+    v:SetPoint("BOTTOMLEFT", healthOrb, "BOTTOMRIGHT", 6 + (i - 1) * (VIAL_W + VIAL_GAP), 4)
+    v:SetFrameStrata("MEDIUM")
+    local back = v:CreateTexture(nil, "BACKGROUND")
+    back:SetAllPoints(v)
+    back:SetTexture(0.05, 0.04, 0.03, 0.85)
+    v.fill = v:CreateTexture(nil, "ARTWORK")
+    v.fill:SetPoint("BOTTOMLEFT", v, "BOTTOMLEFT", 2, 2)
+    v.fill:SetWidth(VIAL_W - 4)
+    v.fill:SetHeight(1)
+    v:Hide()
+    return v
+end
+
+local flaskLabel = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+flaskLabel:SetPoint("BOTTOMLEFT", healthOrb, "BOTTOMRIGHT", 6, VIAL_H + 8)
+flaskLabel:SetText("Q")
+flaskLabel:Hide()
+
+local dodgeBar = CreateFrame("StatusBar", nil, UIParent)
+dodgeBar:SetWidth(70)
+dodgeBar:SetHeight(8)
+dodgeBar:SetPoint("BOTTOMRIGHT", powerOrb, "BOTTOMLEFT", -8, 8)
+dodgeBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+dodgeBar:SetStatusBarColor(0.85, 0.8, 0.55)
+dodgeBar:SetMinMaxValues(0, 1)
+dodgeBar:SetValue(1)
+dodgeBar:SetFrameStrata("MEDIUM")
+local dodgeBack = dodgeBar:CreateTexture(nil, "BACKGROUND")
+dodgeBack:SetAllPoints(dodgeBar)
+dodgeBack:SetTexture(0, 0, 0, 0.7)
+local dodgeLabel = dodgeBar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+dodgeLabel:SetPoint("BOTTOM", dodgeBar, "TOP", 0, 2)
+dodgeLabel:SetText("Space: Roll")
+dodgeBar:Hide()
+
+local flask = { charges = 0, max = 0, progress = 0 }
+local dodgeReadyAt, dodgeCooldown = 0, 2.5
+
+function ArpgHud_Status(charges, max, progress, dodgeMs, cooldownMs)
+    flask.charges, flask.max, flask.progress = charges or 0, max or 0, progress or 0
+    dodgeReadyAt = GetTime() + (dodgeMs or 0) / 1000
+    if cooldownMs and cooldownMs > 0 then
+        dodgeCooldown = cooldownMs / 1000
+    end
+    for i = 1, flask.max do
+        local v = vials[i] or makeVial(i)
+        vials[i] = v
+        local h = VIAL_H - 4
+        if i <= flask.charges then
+            v.fill:SetHeight(h)
+            v.fill:SetTexture(0.85, 0.12, 0.12, 0.95)
+        elseif i == flask.charges + 1 and flask.progress > 0 then
+            v.fill:SetHeight(math.max(1, h * flask.progress / 100))
+            v.fill:SetTexture(0.45, 0.10, 0.10, 0.9)
+        else
+            v.fill:SetHeight(1)
+            v.fill:SetTexture(0, 0, 0, 0)
+        end
+        v:Show()
+    end
+    flaskLabel:Show()
+    dodgeBar:Show()
+end
+
+local function refreshDodge()
+    if not dodgeBar:IsShown() then
+        return
+    end
+    local left = dodgeReadyAt - GetTime()
+    if left <= 0 then
+        dodgeBar:SetValue(1)
+        dodgeBar:SetStatusBarColor(0.85, 0.8, 0.55)
+    else
+        dodgeBar:SetValue(1 - left / dodgeCooldown)
+        dodgeBar:SetStatusBarColor(0.45, 0.42, 0.3)
+    end
+end
+
 local orbDriver = CreateFrame("Frame")
 local orbSince = 0
 orbDriver:SetScript("OnUpdate", function()
@@ -207,6 +295,7 @@ orbDriver:SetScript("OnUpdate", function()
     if orbSince >= 0.05 then
         orbSince = 0
         refreshOrbs()
+        refreshDodge()
     end
 end)
 
@@ -229,6 +318,9 @@ ARPG_TOOLTIP_DEV_LOOT = "For testing: Drop Test Loot asks the server for a corps
     .. "holding this many items of this quality around this item level. Form Test Pack makes the "
     .. "nearest mob lead a pack of five; Champion Pack and Rare Pack bring champions or a rare. "
     .. "All need Arpg.DevTools = 1 in the server's mangosd.conf."
+ARPG_TOOLTIP_DUNGEON_TIER = "The difficulty of the next dungeon you enter first: tougher, harder-"
+    .. "hitting monsters with more affixes, for more XP and better loot. Clearing a dungeon's final "
+    .. "boss opens its next tier. Q drinks your flask; Space rolls."
 ARPG_TOOLTIP_SEE_THROUGH = "Outdoors, roofs, awnings and trees between your character and the "
     .. "camera turn see-through."
 
@@ -248,6 +340,8 @@ local ARPG_OPTION_ROWS = {
         5, 120, 1, "%d yd" },
     { "RowLootFilter", "arpgLootFilter", "Loot Labels", "ARPG_TOOLTIP_LOOT_FILTER",
         0, 3, 1, nil, { "All", "No Grey", "Green and Better", "Blue and Better" } },
+    { "RowDungeonTier", "arpgDungeonTier", "Dungeon Tier", "ARPG_TOOLTIP_DUNGEON_TIER",
+        0, 5, 1, nil, { "Normal", "Hard", "Brutal", "Torment I", "Torment II", "Torment III" } },
     -- Developer: test loot, which a server with Arpg.DevTools = 1 drops at your feet.
     { "RowDevLootQuality", "arpgDevLootQuality", "Test Loot Quality", "ARPG_TOOLTIP_DEV_LOOT",
         0, 6, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Orange" } },
