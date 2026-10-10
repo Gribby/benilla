@@ -394,6 +394,8 @@ pub enum ServerPacket {
     ArpgChampions(Vec<crate::messages::ArpgChampion>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_STATUS`, the flask's charges and the dodge's cooldown.
     ArpgStatus(crate::messages::ArpgStatus),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_ITEM_AFFIXES`, the rolled affixes of the player's items.
+    ArpgItemAffixes(Vec<(u64, String)>),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1370,6 +1372,7 @@ impl ServerPacket {
             ServerPacket::ArpgSkills(_) => "SMSG_ARPG_SKILLS".into(),
             ServerPacket::ArpgChampions(_) => "SMSG_ARPG_CHAMPIONS".into(),
             ServerPacket::ArpgStatus(_) => "SMSG_ARPG_STATUS".into(),
+            ServerPacket::ArpgItemAffixes(_) => "SMSG_ARPG_ITEM_AFFIXES".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

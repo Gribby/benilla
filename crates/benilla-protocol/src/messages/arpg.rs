@@ -331,6 +331,20 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
 /// The champions and rares near the player (cmangos `Arpg/ArpgPacks.h`), each sent once.
 pub const SMSG_ARPG_CHAMPIONS: u16 = 0x0341;
 
+/// The rolled affixes of the player's items (cmangos `Arpg/ArpgAffixes.h`): after the hello, and
+/// when an affixed item is stored.
+pub const SMSG_ARPG_ITEM_AFFIXES: u16 = 0x0343;
+
+/// `SMSG_ARPG_ITEM_AFFIXES`: `u16` count, per item `u64` guid and a C string of lines, `\n` between.
+pub fn read_arpg_item_affixes(r: &mut impl io::Read) -> io::Result<Vec<(u64, String)>> {
+    let n = read_u16_le(r)?;
+    let mut out = Vec::with_capacity(usize::from(n).min(256));
+    for _ in 0..n {
+        out.push((read_u64_le(r)?, read_cstring(r)?));
+    }
+    Ok(out)
+}
+
 /// The flask's charges and the dodge's cooldown (cmangos `Arpg/ArpgActions.h`), on a change.
 pub const SMSG_ARPG_STATUS: u16 = 0x0342;
 
@@ -578,6 +592,20 @@ mod tests {
                 held: 2,
                 fits: 0b0010_1000,
             }]
+        );
+    }
+
+    #[test]
+    fn item_affixes_read_as_guid_and_lines_pairs() {
+        let mut body = 1u16.to_le_bytes().to_vec();
+        body.extend_from_slice(&0x4000_0000_0000_0123u64.to_le_bytes());
+        body.extend_from_slice(b"+8 Strength\n+5% Holy damage\0");
+        assert_eq!(
+            read_arpg_item_affixes(&mut body.as_slice()).unwrap(),
+            vec![(
+                0x4000_0000_0000_0123,
+                "+8 Strength\n+5% Holy damage".to_string()
+            )]
         );
     }
 

@@ -437,6 +437,9 @@ pub enum SessionEvent {
     },
     /// Fork-only, not 1.12.1: the flask's charges and the dodge's cooldown (`SMSG_ARPG_STATUS`).
     ArpgStatus { status: crate::messages::ArpgStatus },
+    /// Fork-only, not 1.12.1: the rolled affixes of the player's items (`SMSG_ARPG_ITEM_AFFIXES`):
+    /// item guid and its lines.
+    ArpgItemAffixes { items: Vec<(u64, String)> },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

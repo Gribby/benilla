@@ -33,6 +33,8 @@ pub(crate) struct FeedMemory {
     names_generation: gate::Watch,
     petition_records: gate::Watch,
     enchant_deadlines: gate::Watch,
+    /// Fork-only: [`crate::items::arpg_affixes::generation`].
+    arpg_affixes: gate::Watch,
     /// The last [`SlotGuids::bags`], diffed for `BAG_CLOSED`.
     bag_guids: [u64; 10],
     /// The last [`SlotGuids::vault`], diffed for `PLAYERBANKSLOTS_CHANGED`.
@@ -654,48 +656,59 @@ fn resolve_slot(
     let enchant_ms: [Option<u64>; crate::items::ENCHANT_SLOTS] =
         std::array::from_fn(|s| countdowns.and_then(|c| c.enchant_remaining_display_ms(s as u32)));
     let duration_ms = countdowns.and_then(|c| c.lifetime_remaining_display_ms());
-    let (entry, count, durability, readable, creator, flags, already_bound, roll, enchant_lines) =
-        match objects.object(guid) {
-            Some(fields) => (
-                fields.object_entry().unwrap_or(0),
-                fields.item_stack_count().unwrap_or(1),
-                // Max 0 is indestructible: no line.
-                fields
-                    .item_durability()
-                    .zip(fields.item_max_durability())
-                    .filter(|&(_, max)| max > 0),
-                // Letter text on the instance, which the hover magnifier keys off; a template
-                // `PageText` book does not set it.
-                fields.item_text_id().is_some_and(|id| id != 0),
-                // The creator's name for "<Made by %s>" and "Written by %s", `None` until the
-                // name query answers.
-                fields
-                    .item_creator()
-                    .filter(|&g| g != 0)
-                    .and_then(|g| names.resolve(g, commands).map(str::to_string)),
-                // The tooltip's unlocked (0x4) and wrapped (0x8) bits.
-                fields.item_flags().unwrap_or(0),
-                // `0x5da2c0`: soulbound, or carrying a binding enchant, off the raw descriptor.
-                crate::items::already_bound(fields, rolls.enchants),
-                // The roll behind the name's suffix; its enchants are already in slots 2..6.
-                fields.item_random_properties_id(),
-                // All seven enchant slots with charges and countdowns: our own items stream whole,
-                // where others' carry two slots.
-                crate::items::enchant_lines(
-                    (0..7).map(|s| {
-                        (
-                            s,
-                            fields.item_enchant(s).unwrap_or(0),
-                            fields.item_enchant_charges(s),
-                            enchant_ms[usize::from(s)],
-                        )
-                    }),
-                    rolls.enchants,
-                ),
+    let (
+        entry,
+        count,
+        durability,
+        readable,
+        creator,
+        flags,
+        already_bound,
+        roll,
+        mut enchant_lines,
+    ) = match objects.object(guid) {
+        Some(fields) => (
+            fields.object_entry().unwrap_or(0),
+            fields.item_stack_count().unwrap_or(1),
+            // Max 0 is indestructible: no line.
+            fields
+                .item_durability()
+                .zip(fields.item_max_durability())
+                .filter(|&(_, max)| max > 0),
+            // Letter text on the instance, which the hover magnifier keys off; a template
+            // `PageText` book does not set it.
+            fields.item_text_id().is_some_and(|id| id != 0),
+            // The creator's name for "<Made by %s>" and "Written by %s", `None` until the
+            // name query answers.
+            fields
+                .item_creator()
+                .filter(|&g| g != 0)
+                .and_then(|g| names.resolve(g, commands).map(str::to_string)),
+            // The tooltip's unlocked (0x4) and wrapped (0x8) bits.
+            fields.item_flags().unwrap_or(0),
+            // `0x5da2c0`: soulbound, or carrying a binding enchant, off the raw descriptor.
+            crate::items::already_bound(fields, rolls.enchants),
+            // The roll behind the name's suffix; its enchants are already in slots 2..6.
+            fields.item_random_properties_id(),
+            // All seven enchant slots with charges and countdowns: our own items stream whole,
+            // where others' carry two slots.
+            crate::items::enchant_lines(
+                (0..7).map(|s| {
+                    (
+                        s,
+                        fields.item_enchant(s).unwrap_or(0),
+                        fields.item_enchant_charges(s),
+                        enchant_ms[usize::from(s)],
+                    )
+                }),
+                rolls.enchants,
             ),
-            // A guid whose create has not landed: occupied, unresolved.
-            None => return Some(ContainerSlot::default()),
-        };
+        ),
+        // A guid whose create has not landed: occupied, unresolved.
+        None => return Some(ContainerSlot::default()),
+    };
+    // Fork-only, not 1.12.1: the ARPG server's rolled affixes, after the item's own enchants.
+    enchant_lines.extend(crate::items::arpg_affixes::views(guid));
     if entry == 0 {
         return Some(ContainerSlot::default());
     }
@@ -862,6 +875,9 @@ pub(crate) fn feed_containers(
         .enchant_deadlines
         .moved(inv.changes.countdown_steps());
     let sweep = cooldowns.sweep_pending(clock.anchor);
+    let affixes_moved = memory
+        .arpg_affixes
+        .moved(crate::items::arpg_affixes::generation());
     let self_changed = !inv.self_changed.is_empty();
     // `is_added`, not `is_changed`: only the load-once icon catalog is read here, and the
     // resource's model cache changes every frame.
@@ -884,6 +900,7 @@ pub(crate) fn feed_containers(
             ("names", names_moved),
             ("petition-records", petitions_moved),
             ("deadlines", deadlines_moved),
+            ("affixes", affixes_moved),
             ("self", self_changed),
             ("icons", icons_changed),
             ("enchants", enchants_changed),
@@ -903,6 +920,7 @@ pub(crate) fn feed_containers(
             || names_moved
             || petitions_moved
             || deadlines_moved
+            || affixes_moved
             || self_changed
             || icons_changed
             || enchants_changed

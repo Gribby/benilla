@@ -272,6 +272,15 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   - **ARPG stat:** +6% movement speed, +8% cooldown recovery, +12 life on kill, +3 mana on hit.
   - **Skill:** +1 to Judgement, +1 to all Holy skills. These are rare and valuable, and they go
     in the item's fourth enchantment slot.
+- **Built (affixes):** `Arpg/ArpgAffixes.{h,cpp}` on the server. Every green, blue and purple
+  weapon or armour piece dropped for an ARPG player (not a named unique) rolls 1, 2 or 3 affixes
+  from: +Strength, Agility, Stamina, Intellect, Spirit (4-20), +% Holy, Physical, Melee, Spell
+  damage (2-12 or 2-10), +% Area damage (3-15), +% healing (3-12), +% armour (3-15), +% block
+  chance (shields, 1-5), +% movement speed (boots, 2-8), +% cooldown recovery (2-10), +life on
+  kill (3-30), each at level 60 values scaled by item level. The roll is one seed per item, kept
+  in `character_arpg_item`; worn affixes add into the same totals as the web. The tooltip shows
+  them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`, 0x343). The
+  "+N to a skill" affixes are not built yet.
 - **Counts by quality:** green 1 affix, blue 2, purple 3. Named dungeon and raid items keep their
   authored stats and get their unique mechanic instead (`ARPG-UNIQUES.md`).
 - **Uniques get one more hook:** "+2 to Judgement's Chain node", raising one node past its cap.

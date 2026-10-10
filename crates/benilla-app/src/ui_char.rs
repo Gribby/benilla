@@ -58,6 +58,8 @@ struct CharFeedMemo {
     names_generation: gate::Watch,
     /// `ItemChanges::countdown_steps`: one step per displayed-second change, the final elapse too.
     enchant_deadlines: gate::Watch,
+    /// Fork-only: [`crate::items::arpg_affixes::generation`].
+    arpg_affixes: gate::Watch,
     /// `PendingItemOps::epoch`, beside `!is_empty()`: that holds the gate open while an op is in
     /// flight, this catches the frame a lock clears with no object moving
     /// (`SMSG_INVENTORY_CHANGE_FAILURE`).
@@ -523,7 +525,7 @@ fn slot_view(
         .and_then(|g| names.resolve(g, commands).map(str::to_string));
     // All seven enchant slots: our own gear streams as item objects, where an inspected player's
     // descriptor carries only two.
-    let enchants = crate::items::enchant_lines(
+    let mut enchants = crate::items::enchant_lines(
         (0..7).map(|s| {
             (
                 s,
@@ -534,6 +536,8 @@ fn slot_view(
         }),
         rolls.enchants,
     );
+    // Fork-only, not 1.12.1: the ARPG server's rolled affixes, after the item's own enchants.
+    enchants.extend(crate::items::arpg_affixes::views(guid));
     // `ITEM_FIELD_RANDOM_PROPERTIES_ID`, the roll behind an "of the Bear" name; its enchants are
     // already in the slots above.
     let roll = obj.item_random_properties_id();
@@ -891,6 +895,9 @@ pub(crate) fn feed_char(
     // The display epoch, not a per-frame hold-open: the views read whole-second countdowns, so
     // they can change only when it steps.
     let deadlines_moved = memo.enchant_deadlines.moved(inv.changes.countdown_steps());
+    let affixes_moved = memo
+        .arpg_affixes
+        .moved(crate::items::arpg_affixes::generation());
     let self_changed = !inv.self_changed.is_empty();
     // `is_added`, not `is_changed`: only the load-once icon column is read, and the model-cache
     // half churns every frame.
@@ -908,6 +915,7 @@ pub(crate) fn feed_char(
             ("templates", templates_moved),
             ("names", names_moved),
             ("deadlines", deadlines_moved),
+            ("affixes", affixes_moved),
             ("self", self_changed),
             ("icons", icons_added),
             ("enchants", enchants_changed),
@@ -921,6 +929,7 @@ pub(crate) fn feed_char(
             || templates_moved
             || names_moved
             || deadlines_moved
+            || affixes_moved
             || self_changed
             || icons_added
             || enchants_changed

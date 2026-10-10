@@ -1049,3 +1049,65 @@ mod tests {
         );
     }
 }
+
+/// Fork-only, not 1.12.1: the ARPG server's rolled affixes per item instance (cmangos
+/// `Arpg/ArpgAffixes.h`), shown as extra enchant lines in the item's tooltip. Kept in one store
+/// the bag and character feeds read by guid, and gate on through [`arpg_affixes::generation`].
+pub(crate) mod arpg_affixes {
+    use std::collections::HashMap;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{LazyLock, RwLock};
+
+    static LINES: LazyLock<RwLock<HashMap<u64, String>>> = LazyLock::new(Default::default);
+    static GENERATION: AtomicU64 = AtomicU64::new(0);
+
+    /// Take the server's lines, item by item.
+    pub(crate) fn set(items: impl IntoIterator<Item = (u64, String)>) {
+        if let Ok(mut lines) = LINES.write() {
+            lines.extend(items);
+        }
+        GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Bumped by every [`set`], for the feeds' gates.
+    pub(crate) fn generation() -> u64 {
+        GENERATION.load(Ordering::Relaxed)
+    }
+
+    /// The item's affixes as enchant lines: slot 0, so they paint green as an enchant does.
+    pub(crate) fn views(guid: u64) -> Vec<benilla_ui::script::EnchantView> {
+        let Ok(lines) = LINES.read() else {
+            return Vec::new();
+        };
+        lines.get(&guid).map_or_else(Vec::new, |text| {
+            text.lines()
+                .filter(|l| !l.is_empty())
+                .map(|l| benilla_ui::script::EnchantView {
+                    slot: 0,
+                    name: l.to_string(),
+                    ..Default::default()
+                })
+                .collect()
+        })
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn an_items_lines_come_back_as_green_enchant_lines() {
+            let before = generation();
+            set([(
+                0x4000_0000_0000_0042,
+                "+8 Strength\n+5% Holy damage".to_string(),
+            )]);
+            assert!(generation() > before);
+            let lines = views(0x4000_0000_0000_0042);
+            assert_eq!(lines.len(), 2);
+            assert_eq!(lines[1].name, "+5% Holy damage");
+            assert_eq!(lines[0].slot, 0);
+            assert!(views(7).is_empty());
+        }
+    }
+}

@@ -32,7 +32,15 @@ pub(crate) struct ArpgActionState {
 /// Registered whatever the view, so every session event kind has its owner.
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgActionState>()
-        .net_handler(SessionEventKind::ArpgStatus, on_status);
+        .net_handler(SessionEventKind::ArpgStatus, on_status)
+        .net_handler(SessionEventKind::ArpgItemAffixes, on_affixes);
+}
+
+/// The server's rolled item affixes (cmangos `Arpg/ArpgAffixes.h`), for the tooltips.
+fn on_affixes(In(ev): In<SessionEvent>) {
+    if let SessionEvent::ArpgItemAffixes { items } = ev {
+        crate::items::arpg_affixes::set(items);
+    }
 }
 
 fn on_status(In(ev): In<SessionEvent>, mut state: ResMut<ArpgActionState>, time: Res<Time>) {
