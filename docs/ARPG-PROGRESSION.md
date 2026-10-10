@@ -133,7 +133,9 @@ open-world elites 9% / 15%, dungeon bosses 12% / 30%, raid and world bosses 15% 
 open-world mobs are uncapped. A boss is rank 3, a ScriptDev `boss_` script, or in a dungeon a
 health multiplier of 5 or more (6 from level 40): checked against the database, vanilla trash
 peaks at 3 in low dungeons and 6 in Stratholme and Blackrock Spire, while bosses run 5 to 25.
-Dungeon trash rolls champions (6%) and rares (1.5%) per mob from level 8. Enrage timers and the
+Dungeon trash rolls champions (6%) and rares (1.5%) per mob from level 8. Enrage timers (built):
+a dungeon boss still fighting after 4 minutes, a raid or world boss after 6, enrages (+50%
+damage and cap, a stack more every 30 seconds, up to ten), and the players there are told. The
 small-group boss forms are not built yet.
 
 **Enrage timers keep a damage check:** about 4 minutes solo for a dungeon boss, about 6 for a raid
@@ -209,7 +211,13 @@ It's per character and permanent, as vanilla's attunements are.
 | Ruins and Temple of Ahn'Qiraj | Scarab Sigil | Blackwing Lair cleared, and Dire Maul's three Wardens on Torment I |
 | Naxxramas | Argent Writ | Ahn'Qiraj cleared, and Stratholme and Scholomance on Torment III |
 
-The pieces are new items, shipped as a fork SQL file the server update applies. An attunement
+**Built (Molten Core):** the Core Sigil's three pieces drop on Brutal or harder, one per ARPG
+player at the kill, and go into the character's Codex (no bag space); the third fuses them, and
+the Sigil is permanent. Below Brutal the boss's kill says what it would have dropped. An ARPG player
+without the Sigil can't enter Molten Core, and ARPG players need no raid group for any raid
+(`Player::GetAreaTriggerLockStatus`). The other raids keep their vanilla requirements for now.
+
+The pieces are new items, which the server writes into `item_template` itself (`Arpg/ArpgCodex.h`). An attunement
 quest, given by the vanilla quest givers where they exist (Lothos Riftwaker for Molten Core),
 turns the pieces into the key. The raid's entrance checks for the key (the area trigger's
 required item, or a check in the instance entry for ARPG players).
@@ -243,7 +251,8 @@ the whole way.
 5. Codex pages and runes, dropping from champions, Wardens and Caches. (Built:
    `ARPG-CHARACTER.md`, "Drops that unlock skills".)
 6. Difficulty tiers. (Built.)
-7. Raid attunements and Molten Core's small-group forms; the other raids one at a time.
+7. Raid attunements and Molten Core's small-group forms; the other raids one at a time. (Molten
+   Core's attunement built.)
 8. Bounties, and a paragon track past 60 (`ARPG-CHARACTER.md`'s open question).
 
 ## Open questions for Jeff

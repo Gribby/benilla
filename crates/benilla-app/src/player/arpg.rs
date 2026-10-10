@@ -75,6 +75,12 @@ fn arpg_env_on() -> bool {
     std::env::var("WOW_ARPG").is_ok_and(|v| !matches!(v.trim(), "" | "0" | "off"))
 }
 
+/// Fork-only, not 1.12.1: whether this session plays the ARPG view (`WOW_ARPG`), read once.
+pub(crate) fn arpg_session() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(arpg_env_on)
+}
+
 /// Fork-only, not 1.12.1: one of the view's tunables, a saved setting (a CVar) that the in-game
 /// options' ARPG page moves and the view reads every frame, so a slider acts at once. Its
 /// environment variable, when set, seeds the setting for the session instead

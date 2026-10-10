@@ -404,7 +404,28 @@ socket at 10 points.
 | All | Wide Aura **[M]** | 3 | +10 yd aura range per rank. |
 | All | Dual Aura **[H]** | 1 | Two auras at once. *(capstone)* |
 
-#### The other six, in brief
+#### Exorcism, Holy Wrath and Hammer of Wrath (built)
+
+Specialising Exorcism or Holy Wrath lifts their undead-and-demon limit for that spell, as the
+web's Purifying Light does. Hammer of Wrath is usable at any health on this server (it never
+checked the target's health; the client keeps its button lit in the ARPG view).
+
+| Skill | Branch | Nodes | Capstone (Codex page home) |
+|---|---|---|---|
+| Exorcism | Burning | Holy Fire **[A]** (burst 4/6/8 yd, 35%), Searing Word **[M]** (+10%/rank) | Purging Light **[A]**: every enemy within 10 yd behind the target takes the full hit (Ras Frostwhisper, Scholomance) |
+| Exorcism | Chain | Chain Exorcism **[A]** (1/2/3 jumps, 60%), Swift Exorcism **[M]** (−2 s), Echoing Word **[A]** (every 4th/3rd repeats at 50%) | |
+| Exorcism | Purge | Exorcist **[M]** (+5% crit), Zealous Word **[M]** (−15% cost) | Twin Exorcism **[A]**: a second bolt at 70% (Magistrate Barthilas, Stratholme) |
+| Holy Wrath | Radius | Wide Wrath **[M]** (+12% radius), Searing Wrath **[M]** (+10%) | Wrathful **[H]**: fires on its own with 4+ enemies within 10 yd, every 12 s (Archivist Galford, Stratholme) |
+| Holy Wrath | Fury | Swift Wrath **[M]** (−8 s), Quick Wrath **[M]** (−0.4 s cast), Shattering Wrath **[A]** (each struck enemy bursts, 20/30%) | |
+| Holy Wrath | Zeal | Zealous Wrath **[M]** (−15% cost), Righteous Wrath **[M]** (+5% crit), Radiant Wrath **[M]** (+10%) | |
+| Hammer of Wrath | Volley | Hammer Volley **[A]** (1/2 more hammers, 60%), Weighted Hammer **[M]** (+8%) | Storm of Hammers **[A]**: every 2nd throw repeats at 60% (Warchief Rend Blackhand, Upper Blackrock Spire) |
+| Hammer of Wrath | Pierce | Piercing Hammer **[A]** (through 1/2/all, 60%), Long Throw **[M]** (+5 yd), Swift Hammer **[M]** (−1 s) | |
+| Hammer of Wrath | Execute | Righteous Hammer **[M]** (+5% crit), Zealous Hammer **[M]** (−15% cost) | Executioner **[H]**: double damage below 20% health (Pyroguard Emberseer, Upper Blackrock Spire) |
+
+Runes: Chains, Shattering and Leech also fit Exorcism; Expanse fits Holy Wrath; Haste and Sanctity
+fit both. Hammer of Wrath takes no rune yet (a rune's skill mask is a byte, skills 1 to 7).
+
+#### The others, in brief
 
 | Skill | Branch ideas | Capstone |
 |---|---|---|
@@ -430,6 +451,11 @@ socket at 10 points.
 | Sacred Seal | Consecration | Balnazzar, Stratholme |
 | Blessed Hammer | Hammer of Justice | Baron Rivendare, Stratholme |
 | Sentence Passed | Hammer of Justice | Overlord Wyrmthalak, Lower Blackrock Spire |
+| Purging Light | Exorcism | Ras Frostwhisper, Scholomance |
+| Twin Exorcism | Exorcism | Magistrate Barthilas, Stratholme |
+| Wrathful | Holy Wrath | Archivist Galford, Stratholme |
+| Storm of Hammers | Hammer of Wrath | Warchief Rend Blackhand, Upper Blackrock Spire |
+| Executioner | Hammer of Wrath | Pyroguard Emberseer, Upper Blackrock Spire |
 | Dual Aura | Auras | Golemagg, Molten Core |
 
 Scarlet Monastery holds five of them on purpose: it's the paladin's dungeon, and the levels

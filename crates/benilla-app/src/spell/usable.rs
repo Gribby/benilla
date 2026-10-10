@@ -408,8 +408,9 @@ pub(crate) fn spell_usable(
         return (false, false);
     }
     // Legs 10/10b (`0x6e3f58`): no current target is unusable; then the aura-state bit; then the
-    // relation fork.
-    if d.target_aura_state != 0 {
+    // relation fork. Fork-only, not 1.12.1: the ARPG view has no target, and its server picks the
+    // unit at the cursor, so the leg passes there (Hammer of Wrath stays lit).
+    if d.target_aura_state != 0 && !crate::player::arpg_session() {
         let Some(target) = ctx.target_store else {
             return (false, false);
         };
