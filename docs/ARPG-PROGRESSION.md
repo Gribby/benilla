@@ -157,8 +157,9 @@ boss, so the character's damage has to keep up with the dungeon tier.
 **Built (Wardens, Caches, tiers):** in `Arpg/ArpgDungeons.cpp`.
 - *Wardens:* each vanilla dungeon has a themed one (Gorehowl the Fleshrender, Vampiric and Extra
   Strong, in the Deadmines; Forgemaster Ironmaw, Fire Enchanted and Stone Skin, in Blackrock
-  Depths; nineteen in all). One trash spawn per instance, picked at random from the database's
-  spawns for that map, is crowned a named rare; a chat line announces it and its fall. It drops
+  Depths; nineteen in all). One trash spawn per instance, among those that load (each eligible
+  one at 1 in 12 as it settles, the 25th surely, so it stands in the wing the group is in), is
+  crowned a named rare; a chat line announces it and its fall. It drops
   two blues and a 30% chance at a purple. Its own unique and the Codex page come with step 5.
 - *Caches:* each final boss (`Arpg::Bosses`) drops gold, and per player there a blue, a green and
   a 25% chance at a purple, announced in chat.
