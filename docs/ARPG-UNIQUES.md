@@ -74,7 +74,7 @@ item becomes a data row.
 | Meteor Shard | 6220 | Archmage Arugal, Shadowfang Keep | H | Sinister Strike sends a burning shard 12 yd along your aim for 50%. | Rogue |
 | Venomstrike | 6469 | Lord Serpentis, Wailing Caverns | F | Serpent Sting spreads to 2 enemies within 8 yd when it lands. | Hunter |
 | Living Root | 6631 | Verdan the Everliving, Wailing Caverns | F | Entangling Roots also roots 2 more enemies within 6 yd of the target. | Druid |
-| Rod of the Sleepwalker | 1155 | Twilight Lord Kelris, Blackfathom Deeps | D | Wrath bursts into 3 motes on hit, each dealing 30% to the enemies behind. | Druid |
+| Rod of the Sleepwalker | 1155 | Twilight Lord Kelris, Blackfathom Deeps | D | Wrath bursts into 3 motes on hit that strike the nearest enemies within 8 yards for 30% each. | Druid |
 
 ### Levels 30–50
 
@@ -87,7 +87,7 @@ item becomes a data row.
 | Ravager | 7717 | Herod, Scarlet Monastery | K* | Whirlwind first pulls every enemy within 10 yd in toward you. | Warrior |
 | Whitemane's Chapeau | 7720 | High Inquisitor Whitemane, Scarlet Monastery | C | Smite chains to 2 more enemies within 10 yd for 60%. | Priest |
 | Mograine's Might | 7723 | Scarlet Commander Mograine, Scarlet Monastery | E | Judgement also strikes every enemy within 8 yd of the target for 50%. | Paladin |
-| Staff of Jordan | 873 | World drop (levels 35–45) | D | Frostbolt shatters on hit into 4 ice shards. Each deals 30% and slows. | Mage |
+| Staff of Jordan | 873 | World drop (levels 35–45) | D | Frostbolt shatters on hit into 4 ice shards that strike the nearest enemies within 10 yards for 35% each; spare shards scatter on the ground. | Mage |
 | Bow of Searing Arrows | 2825 | World drop (levels 37–47) | B | Your Auto Shot arrows pierce every enemy in their path at 60%. | Hunter |
 
 \* Ravager's pull is a small extra: a knock-in rather than one of the kit pieces. Build it after
@@ -125,7 +125,7 @@ the first ARPG player says hello and logs a wrong item or spell id as an error.
 
 | Item | Id | Drops from | Kit | Mechanic (tooltip line) | For |
 |---|---|---|---|---|---|
-| Staff of Dominance | 18842 | Golemagg, Molten Core | D | Fireball bursts into 5 fragments on hit, each dealing 25% to the enemies behind. | Mage |
+| Staff of Dominance | 18842 | Golemagg, Molten Core | D | Fireball bursts into 5 fragments on hit that strike the nearest enemies within 10 yards for 25% each. | Mage |
 | Azuresong Mageblade | 17103 | Golemagg, Molten Core | I | Every 3rd Frostbolt is echoed for free at 60%. | Mage |
 | Striker's Mark | 17069 | Magmadar, Molten Core | A | Multi-Shot fires 5 arrows in a 45° fan rather than picking 3 targets. | Hunter |
 | Bonereaver's Edge | 17076 | Ragnaros, Molten Core | H | A swing that hits 3 or more enemies sends a shockwave 15 yd ahead for 50%. | Warrior |

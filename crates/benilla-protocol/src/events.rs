@@ -445,6 +445,8 @@ pub enum SessionEvent {
     ArpgTelegraph {
         telegraph: crate::messages::ArpgTelegraph,
     },
+    /// Fork-only, not 1.12.1: a health globe dropped or taken (`SMSG_ARPG_GLOBE`).
+    ArpgGlobe { globe: crate::messages::ArpgGlobe },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

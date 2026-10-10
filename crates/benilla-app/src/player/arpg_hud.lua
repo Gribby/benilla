@@ -1014,6 +1014,13 @@ local function treeRedraw()
     for id, b in pairs(f.buttons) do
         if not webById[id] then b:Hide() end
     end
+    -- A class with no web yet says so, rather than an empty canvas.
+    if not f.emptyNote then
+        f.emptyNote = f.webPane:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        f.emptyNote:SetPoint("CENTER", f.webPane, "CENTER", 0, 0)
+        f.emptyNote:SetText("Your class has no passive web yet.")
+    end
+    if table.getn(treeData.nodes) == 0 then f.emptyNote:Show() else f.emptyNote:Hide() end
     if not webView.zoom then
         -- First open: the whole web in view.
         webView.zoom = math.min(f.canvasW, f.canvasH) / 1200
@@ -1342,6 +1349,12 @@ local function skillsPaint()
     if f.tab == "skills" then
         f.points:SetText("Skill points: " .. (skillsData.total - skillsData.spent) .. " of " .. skillsData.total .. " left")
     end
+    if not p.emptyNote then
+        p.emptyNote = p:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        p.emptyNote:SetPoint("CENTER", p, "CENTER", 0, 0)
+        p.emptyNote:SetText("Your class has no skill trees yet.")
+    end
+    if table.getn(skillsData.skills) == 0 then p.emptyNote:Show() else p.emptyNote:Hide() end
     if not skillSel or not skillById(skillSel) then
         local first = skillsData.skills[1]
         skillSel = first and first.id

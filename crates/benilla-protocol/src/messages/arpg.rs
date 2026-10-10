@@ -384,6 +384,35 @@ pub const TELEGRAPH_BROKEN: u8 = 2;
 pub const TELEGRAPH_RING: u8 = 1;
 pub const TELEGRAPH_CONE: u8 = 2;
 pub const TELEGRAPH_BLAST: u8 = 3;
+/// A line from the caster along its facing: a lunge or a charge. Its radius is its length and
+/// its half angle field its half width, in yards.
+pub const TELEGRAPH_LINE: u8 = 4;
+/// The grade of an ordinary creature's move, below an elite's.
+pub const TELEGRAPH_GRADE_MINOR: u8 = 5;
+
+/// A health globe dropped or taken (cmangos `Arpg/ArpgActions.h`).
+pub const SMSG_ARPG_GLOBE: u16 = 0x0345;
+pub const GLOBE_DROPPED: u8 = 1;
+pub const GLOBE_GONE: u8 = 2;
+
+/// A health globe on the ground.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ArpgGlobe {
+    /// [`GLOBE_DROPPED`] or [`GLOBE_GONE`].
+    pub kind: u8,
+    pub id: u32,
+    /// Where it lies, in WoW coordinates.
+    pub pos: [f32; 3],
+}
+
+/// `SMSG_ARPG_GLOBE`: `u8` kind, `u32` globe, `f32` x y z.
+pub fn read_arpg_globe(r: &mut impl io::Read) -> io::Result<ArpgGlobe> {
+    Ok(ArpgGlobe {
+        kind: read_u8(r)?,
+        id: read_u32_le(r)?,
+        pos: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+    })
+}
 
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -656,6 +685,23 @@ mod tests {
                 0x4000_0000_0000_0123,
                 "+8 Strength\n+5% Holy damage".to_string()
             )]
+        );
+    }
+
+    #[test]
+    fn a_globe_reads_its_kind_id_and_place() {
+        let mut body = vec![GLOBE_DROPPED];
+        body.extend_from_slice(&9u32.to_le_bytes());
+        for f in [1.0f32, 2.0, 3.0] {
+            body.extend_from_slice(&f.to_le_bytes());
+        }
+        assert_eq!(
+            read_arpg_globe(&mut body.as_slice()).unwrap(),
+            ArpgGlobe {
+                kind: GLOBE_DROPPED,
+                id: 9,
+                pos: [1.0, 2.0, 3.0],
+            }
         );
     }
 

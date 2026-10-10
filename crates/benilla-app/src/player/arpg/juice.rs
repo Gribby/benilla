@@ -53,7 +53,8 @@ const SHAKE_SPEED: f32 = 47.0;
 /// numbers can land on a corpse, none of which may burst it again.
 #[derive(Resource, Default)]
 struct StruckUnits {
-    live: Vec<(Entity, f64)>,
+    /// The unit, the last hit's time, its damage and whether it was a crit.
+    live: Vec<(Entity, f64, u32, bool)>,
     burst: std::collections::HashSet<Entity>,
 }
 
@@ -82,8 +83,28 @@ struct Burst {
     rgb: [f32; 3],
 }
 
+/// A unit the player struck died: where, and whether the blow that did it was heavy (a crit, or
+/// a quarter of its health at once), which flings the corpse (`super::impact`).
+#[derive(Message, Clone, Copy, Debug)]
+pub(crate) struct ArpgKill {
+    pub(crate) unit: Entity,
+    pub(crate) at: Vec3,
+    pub(crate) overkill: bool,
+}
+
+/// The damage a combat text names: its leading number.
+pub(super) fn text_damage(text: &str) -> u32 {
+    let digits: String = text
+        .trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse().unwrap_or(0)
+}
+
 pub(super) fn plugin(app: &mut App) {
-    app.init_resource::<StruckUnits>()
+    app.add_message::<ArpgKill>()
+        .init_resource::<StruckUnits>()
         .init_resource::<CameraShake>()
         .add_systems(Update, (note_hits, spot_kills, grow_bursts).chain())
         .add_systems(
@@ -116,10 +137,17 @@ fn note_hits(
         if spawn.category == CATEGORY_CRIT {
             shake.kick(SHAKE_CRIT);
         }
-        struck.live.retain(|(unit, _)| *unit != spawn.anchor);
-        struck.live.push((spawn.anchor, now));
+        struck.live.retain(|(unit, ..)| *unit != spawn.anchor);
+        struck.live.push((
+            spawn.anchor,
+            now,
+            text_damage(&spawn.text),
+            spawn.category == CATEGORY_CRIT,
+        ));
     }
-    struck.live.retain(|(_, at)| now - at < KILL_WINDOW_SECS);
+    struck
+        .live
+        .retain(|(_, at, ..)| now - at < KILL_WINDOW_SECS);
 }
 
 /// The burst's colour and size for a kill of a unit of champion tier `tier` (0 for none).
@@ -143,18 +171,28 @@ fn spot_kills(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut mesh: Local<Option<Handle<Mesh>>>,
+    mut kills: MessageWriter<ArpgKill>,
 ) {
     let now = time.elapsed_secs_f64();
     let mut killed = Vec::new();
-    struck.live.retain(|(unit, _)| match units.get(*unit) {
-        Ok((at, store, guid)) if store.0.unit_health() == Some(0) => {
-            let tier = guid.and_then(|g| champions.tier_of(g.0)).unwrap_or(0);
-            killed.push((*unit, at.translation, tier));
-            false
-        }
-        Ok(_) => true,
-        Err(_) => false,
-    });
+    struck
+        .live
+        .retain(|(unit, _, damage, crit)| match units.get(*unit) {
+            Ok((at, store, guid)) if store.0.unit_health() == Some(0) => {
+                let tier = guid.and_then(|g| champions.tier_of(g.0)).unwrap_or(0);
+                let max = store.0.unit_max_health().unwrap_or(0);
+                let overkill = *crit || (max > 0 && damage.saturating_mul(4) >= max);
+                kills.write(ArpgKill {
+                    unit: *unit,
+                    at: at.translation,
+                    overkill,
+                });
+                killed.push((*unit, at.translation, tier));
+                false
+            }
+            Ok(_) => true,
+            Err(_) => false,
+        });
     // A corpse that is gone, or a unit alive again (a respawn reusing the entity), may burst anew.
     struck.burst.retain(|unit| {
         units

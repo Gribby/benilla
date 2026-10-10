@@ -74,8 +74,23 @@ fn on_tree(In(ev): In<SessionEvent>, mut state: ResMut<ArpgTreeState>) {
 
 /// The view's half: hand the window each tree, and send what it asks.
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, push_tree)
+    app.add_systems(Update, (forget_on_entry, push_tree).chain())
         .add_observer(on_tree_action);
+}
+
+/// A world entry (a new character, or the same one again) empties both tabs until the server
+/// sends this character's: another character's web never shows.
+fn forget_on_entry(
+    mut entered: MessageReader<crate::net::EnteredWorldMessage>,
+    mut state: ResMut<ArpgTreeState>,
+) {
+    if entered.read().count() == 0 {
+        return;
+    }
+    state.tree = Some(ArpgTree::default());
+    state.generation += 1;
+    state.skills = Some(ArpgSkills::default());
+    state.skills_generation += 1;
 }
 
 /// `s` as a Lua string literal.

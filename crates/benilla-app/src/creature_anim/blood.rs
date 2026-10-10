@@ -26,7 +26,23 @@ const ATTACH_BACK: u16 = 16;
 
 /// The `UnitBlood` and `UnitBloodLevels` tables; absent, no spurts.
 #[derive(Resource)]
-pub(super) struct BloodTables(pub(super) BloodCatalog);
+pub(crate) struct BloodTables(pub(super) BloodCatalog);
+
+/// Fork-only, not 1.12.1: the ground-splat textures of a unit of `display_id` (1.12 ships them and
+/// never draws them), for the ARPG view's kill splats: the same row the spurt resolves.
+pub(crate) fn kill_splats(
+    blood: &BloodTables,
+    creatures: &crate::entities::Creatures,
+    display_id: u32,
+) -> Vec<String> {
+    let Some((disp_blood, model_blood)) = creatures.blood_candidates(display_id) else {
+        return Vec::new();
+    };
+    let Some(blood_id) = blood.0.level_key(disp_blood, model_blood) else {
+        return Vec::new();
+    };
+    blood.0.splats(blood_id as i32, VIOLENCE_LEVEL).to_vec()
+}
 
 /// Load the blood tables off the patch chain at startup.
 pub(super) fn load_blood_tables(mut commands: Commands, assets: Option<Res<WorldAssets>>) {

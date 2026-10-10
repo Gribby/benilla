@@ -1045,6 +1045,7 @@ fn writer_loop(
                     ClientCommand::ArpgDodge { x, y } => w.arpg_dodge(x, y),
                     ClientCommand::ArpgFlask => w.arpg_flask(),
                     ClientCommand::ArpgTownPortal => w.arpg_town_portal(),
+                    ClientCommand::ArpgGlobe { id } => w.arpg_globe(id),
                     ClientCommand::ArpgTier { tier } => w.arpg_tier(tier),
                     ClientCommand::ArpgUnseal { node } => w.arpg_unseal(node),
                     ClientCommand::ArpgSocket { skill, rune } => w.arpg_socket(skill, rune),

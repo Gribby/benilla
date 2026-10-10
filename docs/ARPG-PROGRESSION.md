@@ -238,6 +238,27 @@ roll out of, so the monsters' dangerous attacks are ones a player can see coming
   health (a 10 yard ring round it, 1 second, then the nova). Rolling dodges both.
 - The marks lie over the ground under them (each point set down on the floor or terrain), so a
   hillside or a stair shows the whole shape.
+- **Every creature has a move** (amber marks, lighter than an elite's): short wind-ups of 0.6 to
+  1 second, about a tenth of the player's health, every 8 to 13 seconds, so a pack keeps the
+  player moving. By what it is:
+  - wolves, cats, raptors, hyenas, birds, bats: a lunge down a line, leaping at the end;
+  - boars and tallstriders: a charge down a longer line;
+  - bears, gorillas, crocolisks: a maul in a cone;
+  - spiders: a web at the player's feet that slows; scorpids: a stinging cone that slows;
+  - crabs, turtles, elementals, demons, giants: a slam ring;
+  - kobolds: a candle bomb thrown at the player's feet;
+  - humanoids and undead: a cleave cone, a rogue's dash down a line, and a caster backs away
+    from a player who closes in, to cast again (its bolts can be sidestepped);
+  - murlocs: the first one pulled brings every murloc within 22 yards.
+  Dungeon trash, which has no heavy attack, has its move too; elites, champions and bosses keep
+  their heavy attacks instead.
+- **Health globes:** a kill sometimes drops a red orb where the creature fell (a rare or boss
+  always, a champion half the time, anything else 7%, 15% while the killer is under half health);
+  walking onto it heals a fifth of maximum health. It fades after a minute.
+- **The weight of a blow** (client only): a crit or a heavy hit freezes both models for a few
+  frames; every hit pushes the struck model back along the blow; a heavy killing blow flings the
+  corpse a couple of yards on a short arc; and every kill leaves the creature's own blood splat on
+  the ground (the textures 1.12 ships and never draws), fading over half a minute.
 - `SMSG_ARPG_TELEGRAPH` (0x344): the wind-up (shape, grade, place, facing, radius, wind-up time)
   and its breaking off.
 

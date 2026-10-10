@@ -36,6 +36,8 @@
 mod actions;
 mod champions;
 mod fx;
+mod globes;
+mod impact;
 mod juice;
 mod loot;
 mod threats;
@@ -264,6 +266,7 @@ pub(super) fn plugin(app: &mut App) {
     champions::register_net(app);
     actions::register_net(app);
     threats::register_net(app);
+    globes::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -277,6 +280,10 @@ pub(super) fn plugin(app: &mut App) {
     juice::plugin(app);
     // Telegraphed attacks on the ground.
     threats::plugin(app);
+    // Hit-stop, stagger, corpse flings and blood on the ground.
+    impact::plugin(app);
+    // Health globes.
+    globes::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
     // The skill tree window's feed and requests.

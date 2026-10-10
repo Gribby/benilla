@@ -17,7 +17,9 @@ use std::f32::consts::TAU;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 
-use benilla_protocol::messages::arpg::{TELEGRAPH_BROKEN, TELEGRAPH_CONE, TELEGRAPH_WIND_UP};
+use benilla_protocol::messages::arpg::{
+    TELEGRAPH_BROKEN, TELEGRAPH_CONE, TELEGRAPH_LINE, TELEGRAPH_WIND_UP,
+};
 use benilla_protocol::messages::ArpgTelegraph;
 use benilla_protocol::{SessionEvent, SessionEventKind};
 
@@ -42,18 +44,22 @@ const EDGE_ALPHA: f32 = 0.7;
 const FLASH_ALPHA: f32 = 0.75;
 /// The colours, by grade: an elite's and a champion's orange, a rare's and a boss's red, a raid
 /// boss's deep crimson. A broken one goes grey.
-const GRADE_RGB: [[f32; 3]; 5] = [
+const GRADE_RGB: [[f32; 3]; 6] = [
     [1.0, 0.55, 0.12],
     [1.0, 0.45, 0.10],
     [1.0, 0.25, 0.08],
     [1.0, 0.18, 0.08],
     [0.85, 0.05, 0.12],
+    // An ordinary creature's move: a lighter amber.
+    [1.0, 0.78, 0.25],
 ];
 const BROKEN_RGB: [f32; 3] = [0.55, 0.55, 0.55];
 /// The draped grid: rings from the centre out, and spokes round a full circle (a cone keeps its
 /// share of them).
 const RINGS: usize = 8;
 const CIRCLE_SPOKES: usize = 40;
+/// A line's columns across its width.
+const LINE_COLUMNS: usize = 5;
 /// The ground under a mark point is looked for from this far above the ground found one ring in,
 /// this far down, in yards: walking out along each spoke, a mark climbs a slope or a stair and
 /// stays under a low ceiling. A rise steeper than the first try is looked for again from higher.
@@ -110,10 +116,14 @@ struct TelegraphPart {
 #[derive(Clone, Debug)]
 struct Drape {
     radius: f32,
+    /// A circle's or a cone's: each spoke's flat direction out from the centre. A line's: each
+    /// column's flat offset across the line from its axis.
     spokes: Vec<Vec3>,
-    /// A circle's spokes go all the way round and join; a cone's stop at its edges.
+    /// A circle's spokes go all the way round and join; a cone's and a line's stop at the edges.
     closed: bool,
     heights: Vec<f32>,
+    /// A line's flat direction from its start: its rings run along it.
+    line: Option<Vec3>,
 }
 
 impl Drape {
@@ -166,6 +176,54 @@ impl Drape {
             spokes,
             closed,
             heights,
+            line: None,
+        }
+    }
+
+    /// A line of `length` from `start` along `dir`, `half_width` either side, set down as
+    /// [`Self::new`] sets a circle: each column walked out from its start.
+    fn line(
+        start: Vec3,
+        length: f32,
+        dir: Vec3,
+        half_width: f32,
+        mut ground: impl FnMut(Vec3, f32) -> Option<f32>,
+    ) -> Self {
+        let across = Vec3::new(-dir.z, 0.0, dir.x);
+        let spokes: Vec<Vec3> = (0..LINE_COLUMNS)
+            .map(|i| across * half_width * (2.0 * i as f32 / (LINE_COLUMNS - 1) as f32 - 1.0))
+            .collect();
+        let n = spokes.len();
+        let start_y = ground(start, start.y + PROBE_UP)
+            .filter(|y| *y >= start.y - CENTRE_DROP)
+            .unwrap_or(start.y);
+        let mut heights = vec![start_y; (RINGS + 1) * n];
+        for (s, offset) in spokes.iter().enumerate() {
+            let mut prev = ground(start + *offset, start_y + PROBE_UP).unwrap_or(start_y);
+            heights[s] = prev;
+            for ring in 1..=RINGS {
+                let p = start + *offset + dir * length * ring as f32 / RINGS as f32;
+                let y = ground(p, prev + PROBE_UP)
+                    .or_else(|| ground(p, prev + PROBE_UP_STEEP))
+                    .unwrap_or(prev);
+                heights[ring * n + s] = y;
+                prev = y;
+            }
+        }
+        Self {
+            radius: length,
+            spokes,
+            closed: false,
+            heights,
+            line: Some(dir),
+        }
+    }
+
+    /// The flat offset from the centre of the point `frac` of the way out along spoke `spoke`.
+    fn flat(&self, frac: f32, spoke: usize) -> Vec3 {
+        match self.line {
+            Some(dir) => dir * self.radius * frac + self.spokes[spoke],
+            None => self.spokes[spoke] * self.radius * frac,
         }
     }
 
@@ -182,7 +240,7 @@ impl Drape {
 
     /// A point of the mark, relative to its centre on the ground plane, at its ground height.
     fn point(&self, frac: f32, spoke: usize, lift: f32) -> [f32; 3] {
-        let flat = self.spokes[spoke] * self.radius * frac;
+        let flat = self.flat(frac, spoke);
         [flat.x, self.height(frac, spoke) + lift, flat.z]
     }
 
@@ -213,7 +271,7 @@ impl Drape {
             return;
         }
         for spoke in [0, self.spokes.len() - 1] {
-            let dir = self.spokes[spoke];
+            let dir = self.line.unwrap_or(self.spokes[spoke]);
             let across = Vec3::new(-dir.z, 0.0, dir.x) * (width * 0.5);
             let base = out.positions.len() as u32;
             for j in 0..=RINGS {
@@ -269,6 +327,10 @@ fn edge_mesh(drape: &Drape) -> Mesh {
     let mut out = MeshParts::default();
     drape.band(1.0 - EDGE, 1.0, 1, LIFT + 0.02, &mut out);
     drape.sides(drape.radius * EDGE, LIFT + 0.02, &mut out);
+    // A line's start is an edge too.
+    if drape.line.is_some() {
+        drape.band(0.0, EDGE, 1, LIFT + 0.02, &mut out);
+    }
     out.into_mesh()
 }
 
@@ -278,8 +340,10 @@ struct Live {
     centre: Vec3,
     facing: Vec3,
     radius: f32,
-    /// The cone's half angle, 0 for a circle.
+    /// The cone's half angle, 0 for a circle; a line's half width.
     half_angle: f32,
+    /// A line: from `centre` along `facing` for `radius`.
+    line: bool,
     rgb: [f32; 3],
     caster: u64,
     born: f64,
@@ -315,6 +379,14 @@ fn bevy_facing(at: [f32; 3], o: f32) -> Vec3 {
 /// Whether `point` stands inside the mark (its flat footprint, the body's reach added).
 fn inside(live: &Live, point: Vec3, reach: f32) -> bool {
     let d = Vec3::new(point.x - live.centre.x, 0.0, point.z - live.centre.z);
+    if live.line {
+        let along = d.dot(live.facing);
+        let across = d.dot(Vec3::new(-live.facing.z, 0.0, live.facing.x));
+        return (point.y - live.centre.y).abs() <= 6.0
+            && along >= -reach
+            && along <= live.radius + reach
+            && across.abs() <= live.half_angle + reach;
+    }
     let dist = d.length();
     if dist > live.radius + reach || (point.y - live.centre.y).abs() > 6.0 {
         return false;
@@ -368,8 +440,11 @@ fn take_telegraphs(
             continue;
         }
         let cone = t.shape == TELEGRAPH_CONE && t.half_angle > 0.0;
+        let line = t.shape == TELEGRAPH_LINE && t.half_angle > 0.0 && t.half_angle < 20.0;
         let half_angle = if cone {
             t.half_angle.min(std::f32::consts::PI)
+        } else if line {
+            t.half_angle
         } else {
             0.0
         };
@@ -377,7 +452,7 @@ fn take_telegraphs(
         let facing = bevy_facing(t.pos, t.orientation);
         let rgb = GRADE_RGB[usize::from(t.grade).min(GRADE_RGB.len() - 1)];
         // Each grid point down on the floor or terrain under it, walking out from the centre.
-        let drape = Drape::new(centre, t.radius, facing, half_angle, |p, from_y| {
+        let ground = |p: Vec3, from_y: f32| {
             let from = Vec3::new(p.x, from_y, p.z);
             spatial
                 .cast_ray_predicate(
@@ -389,7 +464,12 @@ fn take_telegraphs(
                     &|e| occluders.contains(e),
                 )
                 .map(|hit| from.y - hit.distance)
-        });
+        };
+        let drape = if line {
+            Drape::line(centre, t.radius, facing, half_angle, ground)
+        } else {
+            Drape::new(centre, t.radius, facing, half_angle, ground)
+        };
         let area = meshes.add(area_mesh(&drape));
         let fill = meshes.add(fill_mesh(&drape, 0.01));
         let edge = meshes.add(edge_mesh(&drape));
@@ -424,6 +504,7 @@ fn take_telegraphs(
                 facing,
                 radius: t.radius,
                 half_angle,
+                line,
                 rgb,
                 caster: t.caster,
                 born: now,
@@ -569,6 +650,7 @@ mod tests {
             facing: Vec3::NEG_Z,
             radius: 10.0,
             half_angle,
+            line: false,
             rgb: GRADE_RGB[0],
             caster: 1,
             born: 0.0,
@@ -633,6 +715,22 @@ mod tests {
         let mut sides = MeshParts::default();
         cone.sides(0.3, 0.0, &mut sides);
         assert_eq!(sides.indices.len(), 2 * RINGS * 6);
+    }
+
+    #[test]
+    fn a_line_runs_from_its_start_and_holds_what_is_on_it() {
+        let drape = Drape::line(Vec3::ZERO, 8.0, Vec3::NEG_Z, 1.0, |_, _| Some(0.0));
+        let [x, _, z] = drape.point(1.0, LINE_COLUMNS / 2, 0.0);
+        assert!(x.abs() < 1e-5 && (z + 8.0).abs() < 1e-5);
+        let [x, _, _] = drape.point(0.0, 0, 0.0);
+        assert!((x.abs() - 1.0).abs() < 1e-5);
+        let mut lane = live(0.0);
+        lane.line = true;
+        lane.radius = 8.0;
+        lane.half_angle = 1.0;
+        assert!(inside(&lane, Vec3::new(0.5, 0.0, -6.0), 0.4));
+        assert!(!inside(&lane, Vec3::new(2.0, 0.0, -6.0), 0.4));
+        assert!(!inside(&lane, Vec3::new(0.0, 0.0, 3.0), 0.4));
     }
 
     #[test]

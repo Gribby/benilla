@@ -45,6 +45,7 @@ const KIND_TIER: u8 = 19;
 const KIND_UNSEAL: u8 = 20;
 const KIND_SOCKET: u8 = 21;
 const KIND_TOWN_PORTAL: u8 = 22;
+const KIND_GLOBE: u8 = 23;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -269,6 +270,13 @@ impl WorldWriter {
     /// Drink a charge of the flask.
     pub fn arpg_flask(&mut self) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &[KIND_FLASK])
+    }
+
+    /// Take health globe `id`, walked onto (cmangos `Arpg/ArpgActions.h`).
+    pub fn arpg_globe(&mut self, id: u32) -> Result<()> {
+        let mut body = vec![KIND_GLOBE];
+        body.extend_from_slice(&id.to_le_bytes());
+        self.send(CMSG_ARPG_ACTION, &body)
     }
 
     /// Open a town portal, or go back through the open one (cmangos `Arpg/ArpgActions.h`).

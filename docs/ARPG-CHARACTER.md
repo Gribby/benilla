@@ -40,8 +40,8 @@ building blocks here.
 ```mermaid
 flowchart LR
   subgraph Character
-    L[Level] -->|1 point per level| W[Passive web]
-    L -->|2 skill points per level| ST[Skill trees x5]
+    L[Level] -->|1 point per 2 levels| W[Passive web]
+    L -->|1 skill point per level| ST[Skill trees x5]
   end
   I[Items] -->|+skill levels| ST
   D[Boss and champion drops] -->|Codex pages: capstones| ST
@@ -127,9 +127,10 @@ drops gate the biggest upgrades; and spells have no ranks.
 - **The bar is the build:** a specialised skill sits on the ARPG bar (left-click, right-click,
   keys 1 to 4), so what's on the bar is what the character is. Buffs, Blessings and utility spells
   stay castable from the spellbook, without a tree.
-- **Skill points: two per level from level 2 to 51,** 100 in all, which fills five trees of 20 by
-  level 51. Levels past 51 still give passive web points. Points go into whichever specialised
-  skill you like, so a character can rush one skill early.
+- **Skill points: one per level from level 2,** 59 at 60 against five trees of 20, so a character
+  fills two or three skills and dabbles in the rest (playtest at 20: two a level was far too
+  strong). Points go into whichever specialised skill you like, so a character can rush one skill
+  early. A character with more spent than its level gives gets them all back at login.
 - **Items raise a skill past 20:** "+2 to Judgement" raises that skill's cap to 22 and gives the 2
   points, spendable only in Judgement.
 - **Respec is free:** points move freely within and between trees, and unslotting a skill refunds
@@ -262,8 +263,8 @@ nodes joined by paths, spreading out from a start node in the middle.
   best vanilla talents as single strong nodes ("Vengeance" in one point, not five).
 - **Keystones** (5 per class, at the region edges): rules that change how the class plays, with
   a cost attached.
-- **Points:** one per level (59 at 60), plus one for the first kill of each dungeon and raid final
-  boss (about 20 more). A level 60 takes about 80 of 90, so the last few choices still matter, and
+- **Points:** one every second level (30 at 60), plus one for the first kill of each dungeon and
+  raid final boss (about 20 more), about 50 of the web's 88 nodes. A level 60 takes about 80 of 90, so the last few choices still matter, and
   raid progress grows the build.
 - **Respec:** free, out of combat.
 
@@ -613,8 +614,8 @@ for capstones and hooks:
 
 ### What phase 2 built
 
-- **Slots and points** as "Specialisation" says: five slots at 1/10/20/30/40, two points a level
-  from 2 to 51, 20 at most in one skill. The window's Skills tab (the talent key) lists the slots
+- **Slots and points** as "Specialisation" says: five slots at 1/10/20/30/40, one point a level
+  from 2, 20 at most in one skill. The window's Skills tab (the talent key) lists the slots
   and the skills; Specialise puts the shown skill in the chosen slot (or the first open one),
   Take Out empties its slot and gives its points back. A skill moved between slots keeps them.
 - **Not yet:** a slotted skill isn't placed on a bar; spells stay on the stock action bar. The

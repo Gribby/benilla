@@ -1038,6 +1038,10 @@ pub(crate) enum ClientCommand {
     ArpgFlask,
     /// Fork-only: open an ARPG town portal, or go back through it.
     ArpgTownPortal,
+    /// Fork-only: take ARPG health globe `id`.
+    ArpgGlobe {
+        id: u32,
+    },
     /// Fork-only: ask for ARPG dungeon difficulty `tier`.
     ArpgTier {
         tier: u8,

@@ -34,6 +34,8 @@ Client (`crates/`):
 | Hostile bolts at the player fly at the point the player stood on and strike the ground there when the player stepped out of the line | `benilla-app/src/entities/missile.rs` (`Aim::Unit::fixed`, `in_bolt_path`) |
 | The cursor sees through walls, roofs and tree crowns (never terrain) to the unit, object or floor behind them | `benilla-world/src/cutaway.rs` (`PickThrough`), `benilla-app/src/target/hover.rs` |
 | Portal culling seeds from the player, not the high camera, so a camera inside or over a building no longer hides the world round the player; with the indoor cut open, the exterior is never limited to the doorways the camera sees | `benilla-world/src/cutaway.rs` (`SeedFromViewer`), `benilla-world/src/wmo_portal/mod.rs` |
+| Hit-stop, stagger, corpse fling (root-bone offsets in `PosePost`), kill blood splats (decals) | `benilla-app/src/player/arpg/impact.rs` |
+| Health globes (`SMSG_ARPG_GLOBE` 0x345), walk-over pickup (`CMSG_ARPG_ACTION` kind 23) | `benilla-app/src/player/arpg/globes.rs` |
 | Kill feedback: a burst ring at each kill (champion blue, rare yellow, bigger), a camera kick on crits and kills; a new drop's glow pops in and its beam rises, and a corpse's best blue/purple/orange-or-unique drop chimes once (`MapPing`, `igQuestListComplete`, `LEVELUP`) | `benilla-app/src/player/arpg/juice.rs`, `loot.rs` |
 | Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |

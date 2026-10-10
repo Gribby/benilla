@@ -40,9 +40,9 @@ to find.
 Jeff's calls: the tree replaces talents, points are generous, respecs are free, and the three
 paladin keystones stand.
 
-- **One point per level past the first: 59 at 60.** The paladin tree holds 71 ranks, so a level 60
-  fills two branches and part of a third. Points beyond vanilla's 51 are extra power. That's fine
-  for a solo ARPG, and it's the first thing to trim if the tuning feels loose.
+- **Web points: one every second level, 30 at 60,** plus a point per final boss first killed;
+  skill points one a level (59 at 60). Halved after the level 20 playtest, where two skill points
+  and a web point a level were far too strong.
 - **Three branches with three tiers and a keystone each.** A tier opens at 5 and 10 points spent in
   its branch, the keystone at 20. A talent rank or a taught spell also waits for the level vanilla
   gives that spell at (Holy Shock at 40), so a low-level character can't skip ahead of its spells.

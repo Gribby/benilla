@@ -398,6 +398,8 @@ pub enum ServerPacket {
     ArpgItemAffixes(Vec<(u64, String)>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_TELEGRAPH`, a telegraphed attack.
     ArpgTelegraph(crate::messages::ArpgTelegraph),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_GLOBE`, a health globe dropped or taken.
+    ArpgGlobe(crate::messages::ArpgGlobe),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1376,6 +1378,7 @@ impl ServerPacket {
             ServerPacket::ArpgStatus(_) => "SMSG_ARPG_STATUS".into(),
             ServerPacket::ArpgItemAffixes(_) => "SMSG_ARPG_ITEM_AFFIXES".into(),
             ServerPacket::ArpgTelegraph(_) => "SMSG_ARPG_TELEGRAPH".into(),
+            ServerPacket::ArpgGlobe(_) => "SMSG_ARPG_GLOBE".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),
