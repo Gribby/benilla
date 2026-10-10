@@ -344,7 +344,7 @@ local ARPG_OPTION_ROWS = {
         0, 5, 1, nil, { "Normal", "Hard", "Brutal", "Torment I", "Torment II", "Torment III" } },
     -- Developer: test loot, which a server with Arpg.DevTools = 1 drops at your feet.
     { "RowDevLootQuality", "arpgDevLootQuality", "Test Loot Quality", "ARPG_TOOLTIP_DEV_LOOT",
-        0, 6, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Orange" } },
+        0, 7, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Orange", "Codex" } },
     { "RowDevLootCount", "arpgDevLootCount", "Test Loot Count", "ARPG_TOOLTIP_DEV_LOOT",
         1, 16, 1, "%d" },
     { "RowDevLootLevel", "arpgDevLootLevel", "Test Loot Level", "ARPG_TOOLTIP_DEV_LOOT",
@@ -875,9 +875,17 @@ local function skillRank(k, id)
     return 0
 end
 
+-- Whether bit `bit` of `mask` is set (Lua 5.0 has no bit operators).
+local function bitSet(mask, bit)
+    local m = mask or 0
+    for _ = 1, bit do m = math.floor(m / 2) end
+    return m - math.floor(m / 2) * 2 == 1
+end
+
 -- Why a rank cannot go into node `n` of skill `k` now, or nil when it can.
 local function skillBlocked(k, n)
     if not skillSlot(k.id) then return "Specialise " .. k.name .. " in a slot first" end
+    if n.sealed then return "Sealed: read its Codex page first" end
     if n.rank >= n.max then return "Fully learned" end
     if skillRank(k, n.parent) == 0 then return "Needs a rank in the node above" end
     if k.spent >= k.cap then return k.name .. " has all " .. k.cap .. " points it can take" end
@@ -893,6 +901,18 @@ local function skillShowTip(button)
     local rgb = SKILL_KIND_RGB[n.kind] or SKILL_KIND_RGB[1]
     GameTooltip:AddLine((SKILL_KIND_NAME[n.kind] or "") .. "   Rank " .. n.rank .. "/" .. n.max, rgb[1], rgb[2], rgb[3])
     GameTooltip:AddLine(n.text, 1, 0.82, 0, 1)
+    if n.sealed then
+        GameTooltip:AddLine("Sealed", 0.64, 0.21, 0.93)
+        if n.home and n.home ~= "" then
+            GameTooltip:AddLine("Its Codex page drops from " .. n.home .. ".", 0.8, 0.8, 0.8, 1)
+        end
+        local have, need = skillsData.fragments or 0, skillsData.perPage or 5
+        if have >= need and skillSlot(k.id) then
+            GameTooltip:AddLine("Shift-click to unseal it with " .. need .. " Codex fragments (you have " .. have .. ")", 0, 1, 0, 1)
+        else
+            GameTooltip:AddLine(need .. " Codex fragments also unseal it (you have " .. have .. ")", 0.6, 0.6, 0.6, 1)
+        end
+    end
     local blocked = skillBlocked(k, n)
     if blocked then
         GameTooltip:AddLine(blocked, 1, 0.13, 0.13)
@@ -920,6 +940,12 @@ local function skillMakeNode(parent, i)
     b:SetScript("OnClick", function()
         local n, k = this.node, this.skill
         if not n or not k or n.kind == 0 then return end
+        if n.sealed then
+            if IsShiftKeyDown() and skillSlot(k.id) and (skillsData.fragments or 0) >= (skillsData.perPage or 5) then
+                treeAsk(10, n.id)
+            end
+            return
+        end
         if arg1 == "RightButton" then
             if n.rank > 0 then treeAsk(7, n.id) end
         elseif not skillBlocked(k, n) then
@@ -1030,8 +1056,97 @@ local function skillsBuild(f)
     p.treeText:SetPoint("TOPLEFT", p.tree, "TOPLEFT", 12, -32)
     p.treeText:SetJustifyH("LEFT")
     p.nodes, p.lines, p.branches = {}, {}, {}
+    -- The Codex fragments held, and the shown skill's rune socket.
+    p.fragments = p.tree:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    p.fragments:SetPoint("TOPRIGHT", p.tree, "TOPRIGHT", -12, -12)
+    p.socket = CreateFrame("Button", "ArpgRuneSocket", p.tree)
+    p.socket:SetWidth(36)
+    p.socket:SetHeight(36)
+    p.socket:SetPoint("TOPRIGHT", p.tree, "TOPRIGHT", -14, -32)
+    p.socket.ring = p.socket:CreateTexture(nil, "BACKGROUND")
+    p.socket.ring:SetPoint("TOPLEFT", p.socket, "TOPLEFT", -3, 3)
+    p.socket.ring:SetPoint("BOTTOMRIGHT", p.socket, "BOTTOMRIGHT", 3, -3)
+    p.socket.icon = p.socket:CreateTexture(nil, "ARTWORK")
+    p.socket.icon:SetAllPoints(p.socket)
+    p.socket.label = p.socket:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    p.socket.label:SetPoint("RIGHT", p.socket, "LEFT", -8, 0)
+    p.socket:SetScript("OnEnter", function() ArpgRuneSocket_Tip(this) end)
+    p.socket:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    p.socket:SetScript("OnClick", function() ArpgRuneSocket_Menu(this) end)
+    p.runeMenu = CreateFrame("Frame", "ArpgRuneMenu", p, "UIDropDownMenuTemplate")
     f.skillPane = p
     return p
+end
+
+local function runeById(id)
+    if not skillsData or not skillsData.runes then return nil end
+    for _, r in ipairs(skillsData.runes) do
+        if r.id == id then return r end
+    end
+    return nil
+end
+
+-- How many of rune `id` are free to socket in skill `skillId`: held, less those in other skills.
+local function runeFree(id, skillId)
+    local r = runeById(id)
+    if not r then return 0 end
+    local used = 0
+    for _, k in ipairs(skillsData.skills) do
+        if k.rune == id and k.id ~= skillId then used = used + 1 end
+    end
+    return r.held - used
+end
+
+function ArpgRuneSocket_Tip(button)
+    local k = skillsData and skillById(skillSel)
+    if not k then return end
+    GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+    GameTooltip:SetText("Rune Socket", 1, 1, 1)
+    local r = runeById(k.rune)
+    if r then
+        GameTooltip:AddLine(r.name, 0, 0.44, 0.87)
+        GameTooltip:AddLine(r.text, 1, 0.82, 0, 1)
+    elseif k.spent < (k.socketAt or 10) then
+        GameTooltip:AddLine("Opens with " .. (k.socketAt or 10) .. " points in " .. k.name .. ".", 0.8, 0.8, 0.8, 1)
+    else
+        GameTooltip:AddLine("Empty. Runes drop from champions, rares and bosses.", 0.8, 0.8, 0.8, 1)
+    end
+    if skillSlot(k.id) and k.spent >= (k.socketAt or 10) then
+        GameTooltip:AddLine("Click to choose a rune", 0, 1, 0)
+    end
+    GameTooltip:Show()
+end
+
+function ArpgRuneSocket_Menu(button)
+    local k = skillsData and skillById(skillSel)
+    if not k or not skillSlot(k.id) or k.spent < (k.socketAt or 10) then return end
+    local menu = getglobal("ArpgRuneMenu")
+    UIDropDownMenu_Initialize(menu, function()
+        local any = false
+        for _, r in ipairs(skillsData.runes or {}) do
+            if bitSet(r.fits, k.id) and runeFree(r.id, k.id) > 0 then
+                local info = {}
+                local id = r.id
+                info.text = r.name .. " (" .. runeFree(r.id, k.id) .. ")"
+                info.checked = k.rune == r.id
+                info.func = function() treeAsk(11, k.id * 100 + id) end
+                UIDropDownMenu_AddButton(info)
+                any = true
+            end
+        end
+        if k.rune ~= 0 then
+            local info = {}
+            info.text = "Empty the socket"
+            info.func = function() treeAsk(11, k.id * 100) end
+            UIDropDownMenu_AddButton(info)
+        elseif not any then
+            local info = {}
+            info.text = "No rune that fits " .. k.name
+            info.disabled = 1
+            UIDropDownMenu_AddButton(info)
+        end
+    end, "MENU")
+    ToggleDropDownMenu(1, nil, menu, button:GetName(), 0, 0)
 end
 
 local function skillsPaint()
@@ -1086,9 +1201,26 @@ local function skillsPaint()
     for _, b in pairs(p.nodes) do b:Hide() end
     for _, line in pairs(p.lines) do lineDots(line, p.tree, "BORDER", 0) end
     for _, l in pairs(p.branches) do l:Hide() end
-    if not k then return end
+    if not k then
+        p.socket:Hide()
+        return
+    end
     p.treeTitle:SetText(k.name .. "   " .. k.spent .. "/" .. k.cap)
     p.treeText:SetText(k.text)
+    p.fragments:SetText("Codex fragments: " .. (skillsData.fragments or 0))
+    local rune = runeById(k.rune)
+    local open = skillSlot(k.id) and k.spent >= (k.socketAt or 10)
+    if rune then
+        p.socket.icon:SetTexture(rune.icon ~= "" and rune.icon or "Interface\\Icons\\INV_Misc_Rune_01")
+        p.socket.ring:SetTexture(0, 0.44, 0.87, 0.95)
+        p.socket.label:SetText(rune.name)
+    else
+        p.socket.icon:SetTexture("Interface\\Buttons\\UI-EmptySlot")
+        p.socket.ring:SetTexture(0.3, 0.3, 0.35, open and 0.9 or 0.4)
+        p.socket.label:SetText(open and "Rune socket" or ("Socket at " .. (k.socketAt or 10) .. " points"))
+    end
+    p.socket.icon:SetDesaturated(not open and 1 or nil)
+    p.socket:Show()
     -- The tree's size from the window's own (set, not anchored), as its layout may not have run yet.
     local width, height = f:GetWidth() - 286, f:GetHeight() - 86
     local left = (width - 2 * SKILL_COL_W) / 2
@@ -1118,7 +1250,11 @@ local function skillsPaint()
         local blocked = n.kind ~= 0 and skillBlocked(k, n)
         local lit = n.kind == 0 or n.rank > 0 or not blocked
         b.icon:SetDesaturated(not lit and 1 or nil)
-        if n.kind == 0 then
+        if n.sealed then
+            b.border:SetTexture(0.64, 0.21, 0.93, 0.9)
+            b.rank:SetText("Sealed")
+            b.rank:SetTextColor(0.75, 0.45, 1)
+        elseif n.kind == 0 then
             b.border:SetTexture(1, 0.82, 0, 1)
             b.rank:SetText("")
         else

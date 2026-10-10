@@ -165,6 +165,23 @@ pub struct ArpgSkillNode {
     pub icon_spell: u32,
     pub name: String,
     pub text: String,
+    /// A capstone sealed until its Codex page is read (version 2).
+    pub sealed: bool,
+    /// Where a capstone's page drops ("Herod, Scarlet Monastery"); empty for other nodes.
+    pub page_home: String,
+}
+
+/// A rune: a portable mechanic socketed in a skill tree (version 2).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArpgRune {
+    pub id: u8,
+    pub icon_spell: u32,
+    pub name: String,
+    pub text: String,
+    /// How many the character holds, socketed ones included.
+    pub held: u8,
+    /// The skills it fits, a bit per skill id.
+    pub fits: u8,
 }
 
 /// A skill that can be specialised, with its tree.
@@ -177,6 +194,9 @@ pub struct ArpgSkill {
     /// Points in its tree, and the most it takes.
     pub spent: u8,
     pub cap: u8,
+    /// The rune in its socket (0 none), and the points the socket opens at (version 2).
+    pub rune: u8,
+    pub socket_points: u8,
     pub branches: Vec<String>,
     pub nodes: Vec<ArpgSkillNode>,
 }
@@ -190,21 +210,29 @@ pub struct ArpgSkills {
     pub level: u8,
     pub slots: Vec<ArpgSkillSlot>,
     pub skills: Vec<ArpgSkill>,
+    /// Codex fragments held, and how many unseal a capstone (version 2).
+    pub fragments: u16,
+    pub fragments_per_page: u8,
+    pub runes: Vec<ArpgRune>,
 }
 
 /// `SMSG_ARPG_SKILLS`: `u8` version (1), `u16` points total and spent, `u8` level; `u8` slot count,
 /// per slot `u8` level and skill; `u8` skill count, per skill `u8` id, `u32` icon spell, C strings
 /// name and text, `u8` spent and cap, `u8` branch count and a C string each, `u8` node count, per
 /// node `u16` id, `u8` kind, column and row, `u16` parent, `u8` max rank and rank, `u32` icon
-/// spell, C strings name and text.
+/// spell, C strings name and text. Version 2 adds, per skill after the cap, `u8` socketed rune and
+/// the points the socket opens at; per node after the text, `u8` sealed and a C string page home;
+/// and at the end `u16` fragments, `u8` fragments a page takes, `u8` rune count and per rune `u8`
+/// id, `u32` icon spell, C strings name and text, `u8` held and `u8` the skills it fits.
 pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
     let version = read_u8(r)?;
-    if version != 1 {
+    if version != 1 && version != 2 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("ARPG skills version {version}, this client reads 1"),
+            format!("ARPG skills version {version}, this client reads 1 and 2"),
         ));
     }
+    let v2 = version >= 2;
     let points_total = read_u16_le(r)?;
     let points_spent = read_u16_le(r)?;
     let level = read_u8(r)?;
@@ -225,6 +253,11 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
         let text = read_cstring(r)?;
         let spent = read_u8(r)?;
         let cap = read_u8(r)?;
+        let (rune, socket_points) = if v2 {
+            (read_u8(r)?, read_u8(r)?)
+        } else {
+            (0, 0)
+        };
         let nb = read_u8(r)?;
         let mut branches = Vec::with_capacity(capacity_hint(nb, 8));
         for _ in 0..nb {
@@ -233,7 +266,7 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
         let nn = read_u8(r)?;
         let mut nodes = Vec::with_capacity(capacity_hint(nn, 32));
         for _ in 0..nn {
-            nodes.push(ArpgSkillNode {
+            let mut node = ArpgSkillNode {
                 id: read_u16_le(r)?,
                 kind: read_u8(r)?,
                 column: read_u8(r)?,
@@ -244,7 +277,14 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
                 icon_spell: read_u32_le(r)?,
                 name: read_cstring(r)?,
                 text: read_cstring(r)?,
-            });
+                sealed: false,
+                page_home: String::new(),
+            };
+            if v2 {
+                node.sealed = read_u8(r)? != 0;
+                node.page_home = read_cstring(r)?;
+            }
+            nodes.push(node);
         }
         skills.push(ArpgSkill {
             id,
@@ -253,9 +293,28 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
             text,
             spent,
             cap,
+            rune,
+            socket_points,
             branches,
             nodes,
         });
+    }
+    let (mut fragments, mut fragments_per_page, mut runes) = (0, 0, Vec::new());
+    if v2 {
+        fragments = read_u16_le(r)?;
+        fragments_per_page = read_u8(r)?;
+        let nr = read_u8(r)?;
+        runes.reserve(capacity_hint(nr, 16));
+        for _ in 0..nr {
+            runes.push(ArpgRune {
+                id: read_u8(r)?,
+                icon_spell: read_u32_le(r)?,
+                name: read_cstring(r)?,
+                text: read_cstring(r)?,
+                held: read_u8(r)?,
+                fits: read_u8(r)?,
+            });
+        }
     }
     Ok(ArpgSkills {
         points_total,
@@ -263,6 +322,9 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
         level,
         slots,
         skills,
+        fragments,
+        fragments_per_page,
+        runes,
     })
 }
 
@@ -460,9 +522,63 @@ mod tests {
                 icon_spell: 20186,
                 name: "Chain of Judgement".into(),
                 text: "Chains.".into(),
+                sealed: false,
+                page_home: String::new(),
             }
         );
-        assert!(read_arpg_skills(&mut [2u8].as_slice()).is_err());
+        assert!(skills.runes.is_empty());
+        assert!(read_arpg_skills(&mut [3u8].as_slice()).is_err());
+    }
+
+    #[test]
+    fn skills_v2_read_sockets_seals_fragments_and_runes() {
+        let mut body = vec![2];
+        body.extend_from_slice(&40u16.to_le_bytes());
+        body.extend_from_slice(&12u16.to_le_bytes());
+        body.push(30);
+        body.push(1);
+        body.extend_from_slice(&[1, 3]);
+        body.push(1);
+        body.push(3);
+        body.extend_from_slice(&20271u32.to_le_bytes());
+        body.extend_from_slice(b"Judgement\0Unleash your Seal.\0");
+        body.extend_from_slice(&[12, 20, 1, 10, 0]);
+        body.push(1);
+        body.extend_from_slice(&303u16.to_le_bytes());
+        body.extend_from_slice(&[4, 0, 3]);
+        body.extend_from_slice(&302u16.to_le_bytes());
+        body.extend_from_slice(&[1, 0]);
+        body.extend_from_slice(&20184u32.to_le_bytes());
+        body.extend_from_slice(b"Final Verdict\0Readies Judgement.\0");
+        body.push(1);
+        body.extend_from_slice(b"Scarlet Commander Mograine, Scarlet Monastery\0");
+        body.extend_from_slice(&7u16.to_le_bytes());
+        body.push(5);
+        body.push(1);
+        body.push(1);
+        body.extend_from_slice(&20186u32.to_le_bytes());
+        body.extend_from_slice(b"Rune of Chains\0Chains.\0");
+        body.extend_from_slice(&[2, 0b0010_1000]);
+        let skills = read_arpg_skills(&mut body.as_slice()).unwrap();
+        let judgement = &skills.skills[0];
+        assert_eq!((judgement.rune, judgement.socket_points), (1, 10));
+        assert!(judgement.nodes[0].sealed);
+        assert_eq!(
+            judgement.nodes[0].page_home,
+            "Scarlet Commander Mograine, Scarlet Monastery"
+        );
+        assert_eq!((skills.fragments, skills.fragments_per_page), (7, 5));
+        assert_eq!(
+            skills.runes,
+            vec![ArpgRune {
+                id: 1,
+                icon_spell: 20186,
+                name: "Rune of Chains".into(),
+                text: "Chains.".into(),
+                held: 2,
+                fits: 0b0010_1000,
+            }]
+        );
     }
 
     #[test]

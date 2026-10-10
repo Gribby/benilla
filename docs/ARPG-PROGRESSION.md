@@ -240,7 +240,8 @@ the whole way.
 2. Champions and rares: affixes, the client's names and rings. (Built.)
 3. Group scaling and damage caps, in dungeons first. (Built, but not the enrage timers.)
 4. Dungeon Wardens and Caches. (Built, but not the Warden's own unique.)
-5. Codex pages and runes, dropping from champions, Wardens and Caches.
+5. Codex pages and runes, dropping from champions, Wardens and Caches. (Built:
+   `ARPG-CHARACTER.md`, "Drops that unlock skills".)
 6. Difficulty tiers. (Built.)
 7. Raid attunements and Molten Core's small-group forms; the other raids one at a time.
 8. Bounties, and a paragon track past 60 (`ARPG-CHARACTER.md`'s open question).

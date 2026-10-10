@@ -1045,6 +1045,8 @@ fn writer_loop(
                     ClientCommand::ArpgDodge { x, y } => w.arpg_dodge(x, y),
                     ClientCommand::ArpgFlask => w.arpg_flask(),
                     ClientCommand::ArpgTier { tier } => w.arpg_tier(tier),
+                    ClientCommand::ArpgUnseal { node } => w.arpg_unseal(node),
+                    ClientCommand::ArpgSocket { skill, rune } => w.arpg_socket(skill, rune),
                     ClientCommand::ArpgTreeRespec => w.arpg_tree_respec(),
                     ClientCommand::ArpgTreeQuery => w.arpg_tree_query(),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {

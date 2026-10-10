@@ -11,7 +11,8 @@
 //! 100000 + node * 100 + nonce` with the nonce under 100 so a repeat still moves it (kind 1 take,
 //! 2 respec, 3 query, 4 give back; 5 slot, its node `slot * 100 + skill`; 6 take a skill rank,
 //! 7 give one back, 8 respec a skill, its node the skill; 9 the dev tools' test pack, its node
-//! `tier * 100 + size`), which [`on_tree_action`] turns into a `ClientCommand`.
+//! `tier * 100 + size`; 10 unseal a capstone with Codex fragments; 11 socket a rune, its node
+//! `skill * 100 + rune`, rune 0 emptying it), which [`on_tree_action`] turns into a `ClientCommand`.
 
 use benilla_protocol::messages::{ArpgSkills, ArpgTree};
 use benilla_protocol::{SessionEvent, SessionEventKind};
@@ -163,7 +164,7 @@ fn skills_chunk(skills: &ArpgSkills, icon: impl Fn(u32) -> Option<String>) -> St
                 .iter()
                 .map(|n| {
                     format!(
-                        "{{id={},kind={},col={},row={},parent={},max={},rank={},icon={},name={},text={}}}",
+                        "{{id={},kind={},col={},row={},parent={},max={},rank={},icon={},name={},text={},sealed={},home={}}}",
                         n.id,
                         n.kind,
                         n.column,
@@ -174,31 +175,54 @@ fn skills_chunk(skills: &ArpgSkills, icon: impl Fn(u32) -> Option<String>) -> St
                         icon_of(n.icon_spell),
                         lua_str(&n.name),
                         lua_str(&n.text),
+                        n.sealed,
+                        lua_str(&n.page_home),
                     )
                 })
                 .collect();
             format!(
-                "{{id={},icon={},name={},text={},spent={},cap={},branches={{{}}},nodes={{{}}}}}",
+                "{{id={},icon={},name={},text={},spent={},cap={},rune={},socketAt={},branches={{{}}},nodes={{{}}}}}",
                 k.id,
                 icon_of(k.icon_spell),
                 lua_str(&k.name),
                 lua_str(&k.text),
                 k.spent,
                 k.cap,
+                k.rune,
+                k.socket_points,
                 branches.join(","),
                 nodes.join(",\n"),
             )
         })
         .collect();
+    let runes: Vec<String> = skills
+        .runes
+        .iter()
+        .map(|r| {
+            format!(
+                "{{id={},icon={},name={},text={},held={},fits={}}}",
+                r.id,
+                icon_of(r.icon_spell),
+                lua_str(&r.name),
+                lua_str(&r.text),
+                r.held,
+                r.fits,
+            )
+        })
+        .collect();
     format!(
         "if not ArpgSkills_Update then return false end\n\
-         ArpgSkills_Update({{total={},spent={},level={},slots={{{}}},skills={{{}}}}})\n\
+         ArpgSkills_Update({{total={},spent={},level={},slots={{{}}},skills={{{}}},\
+         fragments={},perPage={},runes={{{}}}}})\n\
          return true",
         skills.points_total,
         skills.points_spent,
         skills.level,
         slots.join(","),
         list.join(",\n"),
+        skills.fragments,
+        skills.fragments_per_page,
+        runes.join(",\n"),
     )
 }
 
@@ -252,10 +276,26 @@ enum TreeAction {
     Respec,
     Query,
     Refund(u16),
-    Slot { slot: u8, skill: u8 },
-    SkillNode { node: u16, refund: bool },
+    Slot {
+        slot: u8,
+        skill: u8,
+    },
+    SkillNode {
+        node: u16,
+        refund: bool,
+    },
     SkillRespec(u8),
-    DevPack { size: u8, tier: u8 },
+    DevPack {
+        size: u8,
+        tier: u8,
+    },
+    /// Unseal a capstone with Codex fragments.
+    Unseal(u16),
+    /// Socket a rune (0 empties the socket) in a skill.
+    Socket {
+        skill: u8,
+        rune: u8,
+    },
 }
 
 fn parse_action(value: &str) -> Option<TreeAction> {
@@ -292,6 +332,16 @@ fn parse_action(value: &str) -> Option<TreeAction> {
                 tier: u8::try_from(field / 100).ok()?,
             })
         }
+        10 => u16::try_from(code % 100_000 / 100)
+            .ok()
+            .map(TreeAction::Unseal),
+        11 => {
+            let field = code % 100_000 / 100;
+            Some(TreeAction::Socket {
+                skill: u8::try_from(field / 100).ok()?,
+                rune: u8::try_from(field % 100).ok()?,
+            })
+        }
         _ => None,
     }
 }
@@ -312,6 +362,8 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
         }
         Some(TreeAction::SkillRespec(skill)) => ClientCommand::ArpgSkillRespec { skill },
         Some(TreeAction::DevPack { size, tier }) => ClientCommand::ArpgDevPack { size, tier },
+        Some(TreeAction::Unseal(node)) => ClientCommand::ArpgUnseal { node },
+        Some(TreeAction::Socket { skill, rune }) => ClientCommand::ArpgSocket { skill, rune },
         None => return,
     };
     let _ = net.0.send(command);
@@ -354,6 +406,11 @@ mod tests {
             parse_action("920507"),
             Some(TreeAction::DevPack { size: 5, tier: 2 })
         );
+        assert_eq!(parse_action("1030301"), Some(TreeAction::Unseal(303)));
+        assert_eq!(
+            parse_action("1130102"),
+            Some(TreeAction::Socket { skill: 3, rune: 1 })
+        );
         assert_eq!(parse_action("0"), None);
         assert_eq!(parse_action("spend"), None);
     }
@@ -372,6 +429,8 @@ mod tests {
                 text: "Unleash your Seal.".into(),
                 spent: 2,
                 cap: 20,
+                rune: 0,
+                socket_points: 10,
                 branches: vec!["Chain".into()],
                 nodes: vec![ArpgSkillNode {
                     id: 301,
@@ -384,7 +443,19 @@ mod tests {
                     icon_spell: 20186,
                     name: "Chain of Judgement".into(),
                     text: "Chains.".into(),
+                    sealed: false,
+                    page_home: String::new(),
                 }],
+            }],
+            fragments: 3,
+            fragments_per_page: 5,
+            runes: vec![benilla_protocol::messages::ArpgRune {
+                id: 1,
+                icon_spell: 20186,
+                name: "Rune of Chains".into(),
+                text: "Chains.".into(),
+                held: 1,
+                fits: 0b0010_1000,
             }],
         };
         let chunk = skills_chunk(&skills, |_| Some("Interface\\Icons\\Spell_Holy".into()));

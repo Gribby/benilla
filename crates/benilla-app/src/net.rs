@@ -1040,6 +1040,15 @@ pub(crate) enum ClientCommand {
     ArpgTier {
         tier: u8,
     },
+    /// Fork-only: unseal ARPG capstone `node` with Codex fragments.
+    ArpgUnseal {
+        node: u16,
+    },
+    /// Fork-only: socket ARPG `rune` (0 empties the socket) in `skill`.
+    ArpgSocket {
+        skill: u8,
+        rune: u8,
+    },
     /// Fork-only: give back every point in ARPG skill `skill`.
     ArpgSkillRespec {
         skill: u8,

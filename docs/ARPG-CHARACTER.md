@@ -197,6 +197,29 @@ gate two things on top: the capstones, and a rune socket per skill.
 | Command | Control | The control effect spreads to 1 enemy nearby |
 | Sanctity | Holy | +15% damage, and the skill counts as Area for Area bonuses |
 
+**Built (Codex pages and runes):** `Arpg/ArpgSkills.{h,cpp}` and `Arpg/ArpgCodex.{h,cpp}` on the
+server; the Skills tab on the client.
+- *Pages:* each of the eleven built capstones is sealed until its page is read (Dual Aura waits for
+  the Auras tree). A page is an item the server writes into `item_template` itself at start, so no
+  SQL needs applying; picked up, it is read at once rather than going into the bags. Home bosses
+  drop their page 35% of the time, plus 7 points per difficulty tier. A page already read tears
+  into two fragments. Capstones taken before pages existed count as read.
+- *Fragments:* champions 12%, rares 40%, other dungeon bosses 25%, Wardens two, Caches one and a
+  50% chance at another (each tier adds a quarter). Five unseal any capstone of a specialised
+  skill: Shift-click it in the Skills tab.
+- *Runes:* the socket (top right of a skill's tree) opens at 10 points; click it to choose. Nine
+  runes, each fitting some skills: Chains (Judgement), Shattering (Judgement, Seals), Expanse
+  (Consecration), Lingering (Consecration, Hammer of Justice), Haste (Judgement, Consecration,
+  Hammer), Leech (Strike, Seals, Judgement), Command (Hammer), Sanctity (Seals, Judgement,
+  Consecration), Fury (Strike). A kit rune on a skill whose tree already has that kit adds to it
+  (Chains: one more jump on Chain of Judgement; Shattering: +15% on Hammer of Light). Runes drop
+  from champions 2%, rares 8%, dungeon bosses 12%, Wardens 30%, Caches 40%. Socketing is free and
+  the rune stays held; unslotting the skill empties its socket.
+- *Dev tools:* the ARPG View page's Test Loot Quality has a **Codex** stop, which drops a page,
+  fragments and runes.
+- Saved in `character_arpg_codex`, `character_arpg_held` and `character_arpg_socket`, which the
+  server creates.
+
 ### Levels past 20
 
 "+N to <skill>" item affixes are the only route past 20, so the third source of skill power is

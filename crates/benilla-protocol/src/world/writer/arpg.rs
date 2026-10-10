@@ -42,9 +42,13 @@ const KIND_DEV_PACK: u8 = 16;
 const KIND_DODGE: u8 = 17;
 const KIND_FLASK: u8 = 18;
 const KIND_TIER: u8 = 19;
+const KIND_UNSEAL: u8 = 20;
+const KIND_SOCKET: u8 = 21;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
+/// Dev loot's quality byte for Codex pages, fragments and runes.
+pub const DEV_LOOT_CODEX: u8 = 0xFE;
 
 /// What an ARPG cast aims at, by the spell's own target word: the server resolves the unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -269,6 +273,17 @@ impl WorldWriter {
     /// Ask for dungeon difficulty `tier` (0 Normal to 5 Torment III).
     pub fn arpg_tier(&mut self, tier: u8) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &[KIND_TIER, tier])
+    }
+
+    /// Unseal capstone `node` with Codex fragments.
+    pub fn arpg_unseal(&mut self, node: u16) -> Result<()> {
+        let [lo, hi] = node.to_le_bytes();
+        self.send(CMSG_ARPG_ACTION, &[KIND_UNSEAL, lo, hi])
+    }
+
+    /// Socket `rune` (0 empties the socket) in `skill`.
+    pub fn arpg_socket(&mut self, skill: u8, rune: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_SOCKET, skill, rune])
     }
 }
 

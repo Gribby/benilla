@@ -178,8 +178,10 @@ fn dev_loot_request(cvars: &crate::cvars::Cvars) -> (u8, u8, u8) {
             .round()
             .clamp(0.0, max) as u8
     };
-    let quality = match num(CVAR_DEV_LOOT_QUALITY, 0.0, 6.0) {
+    let quality = match num(CVAR_DEV_LOOT_QUALITY, 0.0, 7.0) {
         0 => benilla_protocol::world::DEV_LOOT_MIXED,
+        // Codex pages, fragments and runes (cmangos `Arpg/ArpgCodex.h`).
+        7 => benilla_protocol::world::DEV_LOOT_CODEX,
         q => q - 1,
     };
     (
