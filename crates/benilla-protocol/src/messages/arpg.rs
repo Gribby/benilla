@@ -3,7 +3,9 @@
 
 use std::io;
 
-use crate::wire::{capacity_hint, read_cstring, read_u16_le, read_u32_le, read_u64_le, read_u8};
+use crate::wire::{
+    capacity_hint, read_cstring, read_f32_le, read_u16_le, read_u32_le, read_u64_le, read_u8,
+};
 
 /// What a corpse holds for this player, shown on the ground around it: `u64` corpse, `u32` gold,
 /// `u8` count, then per item `u8` loot slot, `u32` item id, `u32` display id, `u8` quality,
@@ -372,6 +374,54 @@ pub fn read_arpg_status(r: &mut impl io::Read) -> io::Result<ArpgStatus> {
     })
 }
 
+/// A telegraphed attack winding up or broken off (cmangos `Arpg/ArpgThreats.h`).
+pub const SMSG_ARPG_TELEGRAPH: u16 = 0x0344;
+
+/// A telegraph's message kinds.
+pub const TELEGRAPH_WIND_UP: u8 = 1;
+pub const TELEGRAPH_BROKEN: u8 = 2;
+/// Its shapes: a ring round the caster, a cone in front of it, a circle at a player's feet.
+pub const TELEGRAPH_RING: u8 = 1;
+pub const TELEGRAPH_CONE: u8 = 2;
+pub const TELEGRAPH_BLAST: u8 = 3;
+
+/// One telegraph: where it lands and when.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ArpgTelegraph {
+    /// [`TELEGRAPH_WIND_UP`] or [`TELEGRAPH_BROKEN`].
+    pub kind: u8,
+    pub serial: u32,
+    pub caster: u64,
+    pub shape: u8,
+    /// 0 elite, 1 champion, 2 rare, 3 boss, 4 raid boss.
+    pub grade: u8,
+    /// The centre, or the cone's apex, in WoW coordinates.
+    pub pos: [f32; 3],
+    /// The cone's facing, radians, WoW's.
+    pub orientation: f32,
+    pub radius: f32,
+    /// The cone's half angle, radians.
+    pub half_angle: f32,
+    pub wind_up_ms: u32,
+}
+
+/// `SMSG_ARPG_TELEGRAPH`: `u8` kind, `u32` serial, `u64` caster, `u8` shape, `u8` grade, `f32`
+/// x y z, `f32` orientation, `f32` radius, `f32` half angle, `u32` wind-up ms.
+pub fn read_arpg_telegraph(r: &mut impl io::Read) -> io::Result<ArpgTelegraph> {
+    Ok(ArpgTelegraph {
+        kind: read_u8(r)?,
+        serial: read_u32_le(r)?,
+        caster: read_u64_le(r)?,
+        shape: read_u8(r)?,
+        grade: read_u8(r)?,
+        pos: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+        orientation: read_f32_le(r)?,
+        radius: read_f32_le(r)?,
+        half_angle: read_f32_le(r)?,
+        wind_up_ms: read_u32_le(r)?,
+    })
+}
+
 /// A champion or rare: its tier (1 champion, 2 rare), its own name (empty: the creature's), and
 /// its affixes' names.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -606,6 +656,34 @@ mod tests {
                 0x4000_0000_0000_0123,
                 "+8 Strength\n+5% Holy damage".to_string()
             )]
+        );
+    }
+
+    #[test]
+    fn a_telegraph_reads_its_shape_place_and_wind_up() {
+        let mut body = vec![1];
+        body.extend_from_slice(&7u32.to_le_bytes());
+        body.extend_from_slice(&0xF130_0000_0000_0042u64.to_le_bytes());
+        body.extend_from_slice(&[2, 3]);
+        for f in [10.0f32, -20.0, 5.5, 1.25, 14.0, 0.785] {
+            body.extend_from_slice(&f.to_le_bytes());
+        }
+        body.extend_from_slice(&1500u32.to_le_bytes());
+        let t = read_arpg_telegraph(&mut body.as_slice()).unwrap();
+        assert_eq!(
+            t,
+            ArpgTelegraph {
+                kind: TELEGRAPH_WIND_UP,
+                serial: 7,
+                caster: 0xF130_0000_0000_0042,
+                shape: TELEGRAPH_CONE,
+                grade: 3,
+                pos: [10.0, -20.0, 5.5],
+                orientation: 1.25,
+                radius: 14.0,
+                half_angle: 0.785,
+                wind_up_ms: 1500,
+            }
         );
     }
 

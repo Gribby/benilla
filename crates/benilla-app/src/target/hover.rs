@@ -24,6 +24,13 @@ use benilla_world::view::WorldCamera;
 
 use super::{Hovered, HoveredObject, PickOcclusion};
 
+/// Fork-only, not 1.12.1: what the ARPG view gives the pick ray ([`update_pick_occlusion`]).
+type ArpgPickInputs<'w, 's> = (
+    Option<Res<'w, benilla_world::cutaway::Cutaway>>,
+    Option<Res<'w, benilla_world::cutaway::PickThrough>>,
+    Query<'w, 's, (), With<benilla_world::collision::TerrainSurface>>,
+);
+
 /// Trace this frame's world hit, the reference's `CWorld::Intersect` leg of the scene trace
 /// (`0x480df0`), through the [`PickOccluder`] set: terrain, the WMO walk-bake faces (about the
 /// `0x84` reject mask) and static doodad hulls. Net entities are the object trace, not occluders,
@@ -34,9 +41,11 @@ pub(super) fn update_pick_occlusion(
     spatial: avian3d::prelude::SpatialQuery,
     occluders: Query<(), With<PickOccluder>>,
     mut occlusion: ResMut<PickOcclusion>,
-    // Fork-only, not 1.12.1: the ARPG cutaway, whose cut geometry the ray passes through.
-    cutaway: Option<Res<benilla_world::cutaway::Cutaway>>,
+    // Fork-only, not 1.12.1: the ARPG cutaway, whose cut geometry the ray passes through, and the
+    // ARPG cursor's pass through walls and roofs over terrain.
+    arpg: ArpgPickInputs,
 ) {
+    let (cutaway, pick_through, terrain) = arpg;
     *occlusion = PickOcclusion::default();
     let (Ok((camera, cam_tf)), Ok(window)) = (camera.single(), window.single()) else {
         return;
@@ -51,8 +60,14 @@ pub(super) fn update_pick_occlusion(
     // Fork-only, not 1.12.1: a hit in the ARPG cutaway is geometry the player cannot see, so the
     // ray goes on through it to what is drawn (the floor under a cut ceiling). Stock casts once.
     let cut = cutaway.as_deref().copied().unwrap_or_default();
+    let through = pick_through.as_deref().copied().unwrap_or_default();
+    let passes = if through.0.is_some() {
+        THROUGH_PASSES
+    } else {
+        CUT_PASSES
+    };
     let mut travelled = 0.0;
-    for pass in 0..CUT_PASSES {
+    for pass in 0..passes {
         let origin = ray.origin + *ray.direction * travelled;
         let Some(hit) = spatial.cast_ray_predicate(
             origin,
@@ -72,7 +87,11 @@ pub(super) fn update_pick_occlusion(
         // ray stops at it as at anything drawn.
         // A floor the cut spares (a ramp or ledge above the player, off the sightline) is drawn,
         // so the ray stops at it.
-        if !cut.dither && cut.cuts(point) && !cut.spares(point, hit.normal.y, ray.origin) {
+        let cut_away =
+            !cut.dither && cut.cuts(point) && !cut.spares(point, hit.normal.y, ray.origin);
+        // The ARPG cursor sees through a wall or a roof (never terrain) to what is behind it.
+        let seen_through = !terrain.contains(hit.entity) && through.passes(point, hit.normal.y);
+        if cut_away || seen_through {
             travelled = distance + CUT_STEP;
             continue;
         }
@@ -85,6 +104,8 @@ pub(super) fn update_pick_occlusion(
 /// Fork-only, not 1.12.1: how many cut surfaces the pick ray passes before it gives up (a roof, a
 /// floor above, a beam), and how far past each it restarts, in yards.
 const CUT_PASSES: usize = 6;
+/// The ARPG cursor's passes, which may cross a whole building: both walls, a beam, a roof.
+const THROUGH_PASSES: usize = 16;
 const CUT_STEP: f32 = 0.05;
 
 /// The model instances whose parts are `unit`'s pick geometry: the body, everything it wears, and

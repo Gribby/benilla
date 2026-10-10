@@ -60,6 +60,7 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::ArpgChampions(champions) => vec![SessionEvent::ArpgChampions { champions }],
         ServerPacket::ArpgStatus(status) => vec![SessionEvent::ArpgStatus { status }],
         ServerPacket::ArpgItemAffixes(items) => vec![SessionEvent::ArpgItemAffixes { items }],
+        ServerPacket::ArpgTelegraph(telegraph) => vec![SessionEvent::ArpgTelegraph { telegraph }],
         ServerPacket::Weather {
             weather_type,
             grade,

@@ -201,16 +201,18 @@ local function refreshOrbs()
 end
 
 -- The flask (Q) and the dodge roll (Space): the server's charges and cooldown, which the client
--- passes on through ArpgHud_Status. The flask's charges stand as vials beside the health orb, the
--- next one filling as kills come in; the roll's bar beside the power orb fills back up after a
--- roll.
+-- passes on through ArpgHud_Status. The flask's charges stand as vials left of the skill bar, the
+-- next one filling as kills come in; the roll's bar right of it fills back up after a roll.
 local VIAL_W, VIAL_H, VIAL_GAP = 12, 34, 5
+-- Where the skill bar's ends are (the bottom's layout, below): half its width, and its foot.
+local BAR_HALF, BAR_FOOT = (12 * 36 + 11 * 6) / 2 + 8, 8
 local vials = {}
 local function makeVial(i)
     local v = CreateFrame("Frame", nil, UIParent)
     v:SetWidth(VIAL_W)
     v:SetHeight(VIAL_H)
-    v:SetPoint("BOTTOMLEFT", healthOrb, "BOTTOMRIGHT", 6 + (i - 1) * (VIAL_W + VIAL_GAP), 4)
+    -- Right to left from the skill bar's left end, so they grow toward the health orb.
+    v:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOM", -(BAR_HALF + 14 + (i - 1) * (VIAL_W + VIAL_GAP)), BAR_FOOT)
     v:SetFrameStrata("MEDIUM")
     local back = v:CreateTexture(nil, "BACKGROUND")
     back:SetAllPoints(v)
@@ -224,14 +226,14 @@ local function makeVial(i)
 end
 
 local flaskLabel = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-flaskLabel:SetPoint("BOTTOMLEFT", healthOrb, "BOTTOMRIGHT", 6, VIAL_H + 8)
+flaskLabel:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOM", -(BAR_HALF + 14), BAR_FOOT + VIAL_H + 4)
 flaskLabel:SetText("Q")
 flaskLabel:Hide()
 
 local dodgeBar = CreateFrame("StatusBar", nil, UIParent)
 dodgeBar:SetWidth(70)
 dodgeBar:SetHeight(8)
-dodgeBar:SetPoint("BOTTOMRIGHT", powerOrb, "BOTTOMLEFT", -8, 8)
+dodgeBar:SetPoint("BOTTOMLEFT", UIParent, "BOTTOM", BAR_HALF + 14, BAR_FOOT + 6)
 dodgeBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 dodgeBar:SetStatusBarColor(0.85, 0.8, 0.55)
 dodgeBar:SetMinMaxValues(0, 1)
@@ -298,6 +300,127 @@ orbDriver:SetScript("OnUpdate", function()
         refreshDodge()
     end
 end)
+
+-- ── The bottom of the screen ──
+-- The stock main bar is a 1024-pixel strip of art, gryphons, paging arrows, micro-menu and bag
+-- buttons, which covers the orbs' neighbours and takes the world's clicks along the bottom. The
+-- ARPG view keeps only what it plays with: the twelve action buttons in a compact row centred
+-- between the orbs on a dark plate, a slim XP line above them, the flask's vials (Q) on its left
+-- and the roll (Space) on its right. The rest is parked in a hidden frame; its keys (C, P, B, M,
+-- Esc and the rest) still open their windows. The stance, pet and cast bars sit above the row.
+
+local BAR_BUTTON, BAR_GAP, BAR_BOTTOM = 36, 6, 14
+local BAR_WIDTH = 12 * BAR_BUTTON + 11 * BAR_GAP
+local XP_HEIGHT = 5
+
+local parked = CreateFrame("Frame", "ArpgHudParked", UIParent)
+parked:Hide()
+
+-- Piece by piece: the action buttons are the art frame's children, so it stays (empty).
+local PARK = {
+    "MainMenuBarLeftEndCap", "MainMenuBarRightEndCap",
+    "MainMenuBarTexture0", "MainMenuBarTexture1", "MainMenuBarTexture2", "MainMenuBarTexture3",
+    "MainMenuBarPageNumber", "ActionBarUpButton", "ActionBarDownButton",
+    "MainMenuBarBackpackButton", "CharacterBag0Slot", "CharacterBag1Slot", "CharacterBag2Slot",
+    "CharacterBag3Slot", "KeyRingButton",
+    "CharacterMicroButton", "SpellbookMicroButton", "TalentMicroButton", "QuestLogMicroButton",
+    "SocialsMicroButton", "WorldMapMicroButton", "MainMenuMicroButton", "HelpMicroButton",
+    "MainMenuBarPerformanceBarFrame", "MainMenuBarMaxLevelBar", "ReputationWatchBar",
+    "MainMenuXPBarTexture0", "MainMenuXPBarTexture1", "MainMenuXPBarTexture2",
+    "MainMenuXPBarTexture3", "BonusActionBarTexture0", "BonusActionBarTexture1",
+}
+
+local plate = CreateFrame("Frame", "ArpgHudBar", UIParent)
+plate:SetWidth(BAR_WIDTH + 16)
+plate:SetHeight(BAR_BUTTON + XP_HEIGHT + 20)
+plate:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, BAR_BOTTOM - 8)
+plate:SetFrameStrata("BACKGROUND")
+local plateBack = plate:CreateTexture(nil, "BACKGROUND")
+plateBack:SetAllPoints(plate)
+plateBack:SetTexture(0.04, 0.035, 0.03, 0.78)
+local plateEdge = plate:CreateTexture(nil, "BORDER")
+plateEdge:SetPoint("TOPLEFT", plate, "TOPLEFT", 0, 0)
+plateEdge:SetPoint("TOPRIGHT", plate, "TOPRIGHT", 0, 0)
+plateEdge:SetHeight(1)
+plateEdge:SetTexture(0.55, 0.45, 0.25, 0.8)
+
+local function park(name)
+    local f = getglobal(name)
+    if not f then
+        return
+    end
+    if f.SetParent then
+        f:SetParent(parked)
+    end
+    f:Hide()
+end
+
+-- Lay the bottom out again: at load, and after every stock re-layout.
+function ArpgHud_LayoutBar()
+    if not MainMenuBar or not ActionButton1 then
+        return
+    end
+    for _, name in ipairs(PARK) do
+        park(name)
+    end
+    -- The empty strip must not eat the world's clicks.
+    MainMenuBar:EnableMouse(false)
+    if MainMenuBarArtFrame then
+        MainMenuBarArtFrame:EnableMouse(false)
+    end
+    ActionButton1:ClearAllPoints()
+    ActionButton1:SetPoint("BOTTOMLEFT", UIParent, "BOTTOM", -BAR_WIDTH / 2, BAR_BOTTOM)
+    for i = 2, 12 do
+        local b = getglobal("ActionButton" .. i)
+        if b then
+            b:ClearAllPoints()
+            b:SetPoint("LEFT", getglobal("ActionButton" .. (i - 1)), "RIGHT", BAR_GAP, 0)
+        end
+    end
+    -- A stance's or a form's bar (warrior, druid, stealth) lies over the same twelve slots.
+    for i = 1, 12 do
+        local b = getglobal("BonusActionButton" .. i)
+        local under = getglobal("ActionButton" .. i)
+        if b and under then
+            b:ClearAllPoints()
+            b:SetPoint("CENTER", under, "CENTER", 0, 0)
+        end
+    end
+    if MainMenuExpBar then
+        MainMenuExpBar:ClearAllPoints()
+        MainMenuExpBar:SetPoint("BOTTOMLEFT", ActionButton1, "TOPLEFT", 0, 6)
+        MainMenuExpBar:SetWidth(BAR_WIDTH)
+        MainMenuExpBar:SetHeight(XP_HEIGHT)
+    end
+    local above = MainMenuExpBar or ActionButton1
+    if ShapeshiftBarFrame then
+        ShapeshiftBarFrame:ClearAllPoints()
+        ShapeshiftBarFrame:SetPoint("BOTTOMLEFT", above, "TOPLEFT", 0, 8)
+    end
+    -- The pet bar slides in by itself from its parent's left edge (PetActionBar_OnUpdate): only
+    -- its offset moves, over the left of the row (a pet class has no stance bar).
+    if PETACTIONBAR_XPOS and MainMenuBar.GetWidth then
+        PETACTIONBAR_XPOS = math.floor((MainMenuBar:GetWidth() - BAR_WIDTH) / 2 + 0.5)
+    end
+    -- Bags open above the orbs, not over the power orb.
+    if CONTAINER_OFFSET_Y then
+        CONTAINER_OFFSET_Y = math.max(CONTAINER_OFFSET_Y, 150)
+    end
+    if CastingBarFrame then
+        CastingBarFrame:ClearAllPoints()
+        CastingBarFrame:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, BAR_BOTTOM + BAR_BUTTON + XP_HEIGHT + 64)
+    end
+end
+
+-- The stock re-layout moves the stance, pet and cast bars back over the old strip: follow it.
+if UIParent_ManageFramePositions then
+    local stockManage = UIParent_ManageFramePositions
+    UIParent_ManageFramePositions = function(a1, a2, a3)
+        stockManage(a1, a2, a3)
+        ArpgHud_LayoutBar()
+    end
+end
+ArpgHud_LayoutBar()
 
 -- ── The options window's ARPG page ──
 -- benilla's options window (BenillaOptionsFrame) gains an "ARPG View" category under its own

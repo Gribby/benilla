@@ -4478,6 +4478,34 @@ fn the_guild_line_greys_with_player_names_and_the_follow_speed_with_the_style() 
     assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
 }
 
+/// Fork-only: the ARPG HUD addon clears the stock bar's art and buttons off the bottom of the
+/// screen, keeps the twelve action buttons, and lets the world have the strip's clicks.
+#[test]
+fn the_arpg_hud_keeps_only_the_action_buttons_at_the_bottom() {
+    benilla_formats::wow_data_or_skip!();
+    let s = harness();
+    s.register_cvars(crate::cvars::registered_pairs());
+    s.run(include_str!("../player/arpg_hud.lua")).unwrap();
+    for gone in [
+        "MainMenuBarLeftEndCap",
+        "MainMenuBarRightEndCap",
+        "CharacterMicroButton",
+        "MainMenuBarBackpackButton",
+        "ActionBarUpButton",
+    ] {
+        assert!(!s.frame_visible(gone), "{gone} still shows");
+    }
+    assert!(s.frame_visible("ActionButton1"));
+    assert!(s.frame_visible("ActionButton12"));
+    assert!(!s
+        .eval::<bool>("return MainMenuBar:IsMouseEnabled()")
+        .unwrap());
+    // A stock re-layout leaves them gone.
+    s.run("UIParent_ManageFramePositions()").unwrap();
+    assert!(!s.frame_visible("MainMenuBarLeftEndCap"));
+    assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
+}
+
 /// Fork-only: the ARPG HUD addon's passive web window lays out what the server sends, opens on
 /// the talent key's toggle, and takes a node joined to the web through `arpgTreeAction`.
 #[test]

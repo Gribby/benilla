@@ -101,8 +101,9 @@ making the stat mandatory:
 | **Intellect** | Mana, spell crit | Spell area: bigger Consecration, Holy Wrath, Blizzard | +1% radius per 10 Int | +40% |
 | **Spirit** | Regeneration | Cooldown recovery | +1% per 10 Spirit | +30% |
 
-Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting (2% of the maximum per
-swing that lands, 1% per skill hit, 5% per kill), and two seconds out of combat health and mana
+Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting (1% of the maximum per
+swing that lands, 1% per skill hit, 3% per kill, and each swing and skill hit adds the mana on
+hit of the web's Bloodthirst and Devotion nodes and the "+N mana on hit" item affix), and two seconds out of combat health and mana
 flow back at 8% a second, so nobody sits down to drink. Every class spell's global cooldown is a
 third of vanilla's (0.5 sec) and its cast time half.
 

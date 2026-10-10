@@ -94,6 +94,11 @@ pub(crate) fn track_collider_removals(
 #[derive(Component)]
 pub struct GroundDecalSurface;
 
+/// Fork-only, not 1.12.1: the collider is the open-world terrain, which the ARPG view's cursor
+/// never sees through ([`crate::cutaway::PickThrough`]).
+#[derive(Component)]
+pub struct TerrainSurface;
+
 /// Marks a static collider that occludes the mouse pick: the reference traces the world too and
 /// drops the object hit when the world hit is strictly nearer (`0x480df0` at `0x480eb4`,
 /// `CWorld::Intersect` `0x672170`, mask `0x1000114`), so a unit behind a wall is not hoverable.

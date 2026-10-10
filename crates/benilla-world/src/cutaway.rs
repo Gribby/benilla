@@ -29,6 +29,42 @@ pub const SIGHT_RADIUS: f32 = 3.5;
 /// (Naxxramas' upper floors), not a ramp, and is cut like a ceiling; `ARPG_FLOOR_RISE`.
 pub const FLOOR_RISE: f32 = 3.0;
 
+/// Fork-only, not 1.12.1: seed the WMO portal flood from the player (the [`crate::view::Viewer`])
+/// rather than the camera. The ARPG camera hangs high over the player, so it is often inside a
+/// building the player stands beside, or over a roof the player stands under; seeded from it, the
+/// flood would hide the world round the player. Off by default; the ARPG client turns it on.
+/// While it is on and the indoor cut is open, the exterior (terrain, other buildings) is never
+/// limited to the doorways the camera sees: the cut roof shows it.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct SeedFromViewer(pub bool);
+
+/// Fork-only, not 1.12.1: the ARPG view's cursor sees through buildings and props. With the
+/// player's feet here, the pick ray passes every wall-like surface (its normal under
+/// [`FLOOR_UP`]), and every surface more than [`PICK_FLOOR_RISE`] above the feet within
+/// [`PICK_ROOF_REACH`] of the player (a roof, a tree crown or an upper storey over them), so a
+/// unit, an object or the floor behind a wall takes the click. A raised floor farther out (a
+/// bridge deck, a hilltop building's floor) still takes it. Terrain always stops it. `None`, the
+/// default, picks as the stock client does.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Debug)]
+pub struct PickThrough(pub Option<Vec3>);
+
+/// How far from the player, on the ground, a raised surface counts as overhead, in yards.
+pub const PICK_ROOF_REACH: f32 = 12.0;
+
+/// How far above the feet a floor-like surface still takes the cursor, in yards: a ramp or a
+/// stair the player can walk up does, a roof does not.
+pub const PICK_FLOOR_RISE: f32 = 2.5;
+
+impl PickThrough {
+    /// Whether the cursor ray passes a non-terrain surface hit at `point` with normal height `up`.
+    pub fn passes(&self, point: Vec3, up: f32) -> bool {
+        self.0.is_some_and(|feet| {
+            let near = Vec2::new(point.x - feet.x, point.z - feet.z).length() < PICK_ROOF_REACH;
+            up.abs() < FLOOR_UP || (near && point.y > feet.y + PICK_FLOOR_RISE)
+        })
+    }
+}
+
 /// The cutaway this frame; the default draws everything.
 #[derive(Resource, Default, Clone, Copy, PartialEq, Debug)]
 pub struct Cutaway {
@@ -106,6 +142,20 @@ impl Cutaway {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_arpg_cursor_passes_walls_and_roofs_but_not_the_floor() {
+        let through = PickThrough(Some(Vec3::new(0.0, 10.0, 0.0)));
+        // A wall at chest height, a roof above, a floor at the feet, a ramp a little up.
+        assert!(through.passes(Vec3::new(0.0, 11.0, 0.0), 0.1));
+        assert!(through.passes(Vec3::new(0.0, 16.0, 0.0), 0.9));
+        assert!(!through.passes(Vec3::new(0.0, 10.0, 0.0), 1.0));
+        assert!(!through.passes(Vec3::new(0.0, 11.5, 0.0), -0.95));
+        // A bridge deck far off still takes the click.
+        assert!(!through.passes(Vec3::new(20.0, 16.0, 0.0), 0.95));
+        // Off, the stock pick.
+        assert!(!PickThrough(None).passes(Vec3::new(0.0, 16.0, 0.0), 0.0));
+    }
+
     use super::*;
 
     fn on() -> Cutaway {

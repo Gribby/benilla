@@ -27,6 +27,11 @@ Client (`crates/`):
 | Wire format | `benilla-protocol/src/world/writer/arpg.rs` |
 | Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
 | Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
+| The bottom of the screen: the stock bar's art, gryphons, paging, micro-menu and bag buttons parked; the twelve action buttons centred between the orbs on a plate with a slim XP line; flask vials (Q) left, roll bar (Space) right; stance, pet and cast bars above; bags open above the orbs | `benilla-app/src/player/arpg_hud.lua` (`ArpgHud_LayoutBar`) |
+| Telegraphed attacks drawn on the ground (`SMSG_ARPG_TELEGRAPH` 0x344): area, growing fill, edge, landing flash, grey when broken off, a camera kick if you stand in one | `benilla-app/src/player/arpg/threats.rs` |
+| Hostile bolts at the player fly at the point the player stood on and strike the ground there when the player stepped out of the line | `benilla-app/src/entities/missile.rs` (`Aim::Unit::fixed`, `in_bolt_path`) |
+| The cursor sees through walls, roofs and tree crowns (never terrain) to the unit, object or floor behind them | `benilla-world/src/cutaway.rs` (`PickThrough`), `benilla-app/src/target/hover.rs` |
+| Portal culling seeds from the player, not the high camera, so a camera inside or over a building no longer hides the world round the player; with the indoor cut open, the exterior is never limited to the doorways the camera sees | `benilla-world/src/cutaway.rs` (`SeedFromViewer`), `benilla-world/src/wmo_portal/mod.rs` |
 | Kill feedback: a burst ring at each kill (champion blue, rare yellow, bigger), a camera kick on crits and kills; a new drop's glow pops in and its beam rises, and a corpse's best blue/purple/orange-or-unique drop chimes once (`MapPing`, `igQuestListComplete`, `LEVELUP`) | `benilla-app/src/player/arpg/juice.rs`, `loot.rs` |
 | Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |

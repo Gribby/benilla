@@ -38,6 +38,7 @@ mod champions;
 mod fx;
 mod juice;
 mod loot;
+mod threats;
 mod tree;
 mod uniques;
 
@@ -262,6 +263,7 @@ pub(super) fn plugin(app: &mut App) {
     tree::register_net(app);
     champions::register_net(app);
     actions::register_net(app);
+    threats::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -273,6 +275,8 @@ pub(super) fn plugin(app: &mut App) {
     fx::plugin(app);
     // The kill bursts and the camera's kick.
     juice::plugin(app);
+    // Telegraphed attacks on the ground.
+    threats::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
     // The skill tree window's feed and requests.
@@ -284,6 +288,11 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);
+    // The portal flood seeds from the player, not the high camera, and the cursor sees through
+    // walls and roofs to what is behind them.
+    app.insert_resource(benilla_world::cutaway::SeedFromViewer(true))
+        .init_resource::<benilla_world::cutaway::PickThrough>()
+        .add_systems(Update, publish_pick_through.before(pin_view));
     app.init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
         .insert_resource(ArpgMode)
@@ -848,6 +857,17 @@ fn turn_toward(from: f32, to: f32, dt: f32) -> f32 {
     wrap_pi(from + step.copysign(delta))
 }
 
+/// The cursor's see-through rule follows the player's feet.
+fn publish_pick_through(
+    player: Res<Player>,
+    mut through: ResMut<benilla_world::cutaway::PickThrough>,
+) {
+    let fresh = benilla_world::cutaway::PickThrough(Some(player.pos).filter(|p| p.is_finite()));
+    if *through != fresh {
+        *through = fresh;
+    }
+}
+
 /// The outdoor see-through for a player at `feet` under a camera turned `cam_yaw`: the camera
 /// looks along `(−sin, 0, −cos)` of its yaw ([`screen_facing`]), so it stands the other way.
 fn xray_cut(feet: Vec3, cam_yaw: f32) -> benilla_world::cutaway::Cutaway {
@@ -1133,7 +1153,19 @@ mod tests {
         let chunk = format!(
             "if not UIParent then CreateFrame(\"Frame\", \"UIParent\") end\n\
              for _, f in ipairs({{\"GameFontHighlight\", \"GameFontNormalSmall\"}}) do\n\
-             if not _G[f] then CreateFont(f) end end\n{HUD_LUA}\n\
+             if not _G[f] then CreateFont(f) end end\n\
+             CreateFrame(\"Frame\", \"MainMenuBar\", UIParent)\n\
+             CreateFrame(\"Frame\", \"MainMenuBarLeftEndCap\", MainMenuBar)\n\
+             for i = 1, 12 do CreateFrame(\"CheckButton\", \"ActionButton\" .. i, MainMenuBar) end\n\
+             MANAGED = 0\n\
+             function UIParent_ManageFramePositions() MANAGED = MANAGED + 1 end\n\
+             {HUD_LUA}\n\
+             assert(not MainMenuBarLeftEndCap:IsVisible())\n\
+             assert(ActionButton12:IsVisible())\n\
+             assert(not MainMenuBar:IsMouseEnabled())\n\
+             MainMenuBarLeftEndCap:SetParent(MainMenuBar)\nMainMenuBarLeftEndCap:Show()\n\
+             UIParent_ManageFramePositions()\n\
+             assert(MANAGED == 1 and not MainMenuBarLeftEndCap:IsVisible())\n\
              refresh()\nrefreshOrbs()\n\
              paintOrb(healthOrb, 0.5, HEALTH_COLOR, 50)\n\
              assert(healthOrb.filled == ORB_SLICES / 2, healthOrb.filled)\n\

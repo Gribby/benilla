@@ -188,14 +188,43 @@ Built (`Arpg/ArpgActions.{h,cpp}` on the server, `player/arpg/actions.rs` on the
   or the cursor with none held, every 2.5 seconds. The server sends it as a knockback, which the
   client flies and the anticheat expects; while airborne (0.45 s) every blow and hostile spell at
   the player is dodged. Not while rooted, stunned, feared, mounted, swimming or falling. A bar
-  beside the power orb shows the cooldown.
+  right of the skill bar shows the cooldown.
 - **Flask (Q, the Strafe Left binding; A still walks left):** three charges, starting full. A
   charge heals 15% of maximum health at once and 25% more over three seconds. Kills refill it
   (a follower 1 point, a mob 2, an elite 4, a champion 5, a rare 10, a boss 20; ten points a
-  charge), and out of combat a charge returns every 12 seconds. Vials beside the health orb show
+  charge), and out of combat a charge returns every 12 seconds. Vials left of the skill bar show
   the charges and the next one filling.
 - The server sends `SMSG_ARPG_STATUS` (0x342) on a change: the charges, the next charge's
   progress and the roll's cooldown.
+
+## Threats and the roll
+
+Built (`Arpg/ArpgThreats.{h,cpp}` on the server, `player/arpg/threats.rs` and
+`entities/missile.rs` on the client). The roll is only worth having if there is something to
+roll out of, so the monsters' dangerous attacks are ones a player can see coming and avoid.
+
+- **Bolts fly at a point.** A hostile creature's travelling spell at an ARPG player (a Frostbolt,
+  a Shadow Bolt, an archer's arrow: one target, no area) no longer follows the player. It flies at
+  the spot the player stood on when it left and hits only a player still on its line (within 2
+  yards, body included) when it arrives. Sidestepping a bolt from range works; one from up close
+  arrives too soon to. Rolling through one dodges it whatever. A bolt that misses strikes the
+  ground where the player stood, and the combat text says Miss or Dodge.
+- **Telegraphs.** Open-world elites, champions, rares, dungeon and raid bosses wind up a heavy
+  attack every 8 to 15 seconds: they stop, roar, and the ground shows where it lands (an orange to
+  crimson area with a bright edge and a fill that grows to the edge as the wind-up runs, 1.2 to
+  1.7 seconds). Three shapes: a ring round the creature, a 90° cone at the player, a circle at the
+  player's feet (a caster's). A boss cycles all three; any other creature keeps one.
+- It lands on every ARPG player still inside for a share of their maximum health: 20% from an
+  elite, 25% a champion, 30% a rare, 35% a dungeon boss, 45% a raid boss. That is past the
+  per-hit damage caps, on purpose: it is always avoidable, by walking out or rolling. Absorbs and
+  immunities (Divine Shield) still count.
+- A stun, fear or confuse on the creature during the wind-up breaks it off (the mark greys out):
+  Hammer of Justice is the answer to a telegraph. A creature being kited waits for the player to
+  come back in reach.
+- Dungeon trash does not telegraph (it is elite throughout, and a pull of five would be a carpet of
+  marks), only its champions and rares and the bosses.
+- `SMSG_ARPG_TELEGRAPH` (0x344): the wind-up (shape, grade, place, facing, radius, wind-up time)
+  and its breaking off.
 
 ## Raids: progression gated by dungeons
 

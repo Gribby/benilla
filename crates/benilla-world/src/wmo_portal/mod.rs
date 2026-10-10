@@ -294,6 +294,13 @@ fn group_world_bounds(
     (min, max)
 }
 
+/// Fork-only, not 1.12.1: what the ARPG view gives the flood ([`compute_wmo_pvs`]).
+type ArpgPvsInputs<'w> = (
+    Option<Res<'w, crate::cutaway::Cutaway>>,
+    Option<Res<'w, crate::cutaway::SeedFromViewer>>,
+    Option<Res<'w, crate::view::Viewer>>,
+);
+
 fn compute_wmo_pvs(
     wmos: Res<Assets<WmoModel>>,
     cam: Query<(&GlobalTransform, &Projection), With<WorldCamera>>,
@@ -304,9 +311,11 @@ fn compute_wmo_pvs(
     mut camera_fog: ResMut<CameraWmoFog>,
     mut camera_claim: ResMut<CameraInteriorClaim>,
     mut camera_windows: ResMut<ExteriorWindows>,
-    // Fork-only, not 1.12.1: the ARPG cutaway, which draws the buildings it opens whole.
-    cutaway: Option<Res<crate::cutaway::Cutaway>>,
+    // Fork-only, not 1.12.1: the ARPG cutaway, which draws the buildings it opens whole, and the
+    // seed from the player in place of the camera.
+    arpg: ArpgPvsInputs,
 ) {
+    let (cutaway, seed_from_viewer, viewer) = arpg;
     // No world camera yet: keep last frame's sets, all visible.
     let Some((cam_t, proj)) = cam.iter().next() else {
         return;
@@ -316,6 +325,15 @@ fn compute_wmo_pvs(
     probe.eye = eye_world;
     // The seed's terrain leg, sampled once for the camera's column (`0x6821f0`).
     let terrain = terrain_height_under(&streamer, &adt_tiles, eye_world);
+    // Fork-only: the ARPG view seeds from the player's head, as `track_current_interior` probes.
+    let seed_world = seed_from_viewer
+        .filter(|s| s.0)
+        .and(viewer.as_deref().and_then(|v| v.at))
+        .map(|at| at + Vec3::Y * interior::INTERIOR_PROBE_HEIGHT);
+    let seed_terrain = seed_world.and_then(|p| terrain_height_under(&streamer, &adt_tiles, p));
+    // Seeded at the player, the exterior is never limited to the doorways the high camera sees:
+    // they are the camera's, and the claim is the player's.
+    let arpg_open = seed_world.is_some();
     // `WOW_CULLDUMP=<path>` re-requests the dump every frame, last writer wins: a headless run has
     // no panel button, and a one-shot request at startup would catch an empty world.
     static ENV_DUMP: std::sync::OnceLock<Option<std::path::PathBuf>> = std::sync::OnceLock::new();
@@ -376,10 +394,17 @@ fn compute_wmo_pvs(
             .then(|| TraceLog::new(model, eye_local, terrain_local));
         // Compare, then write: a parked camera's flood repeats its answer, and a blind write would
         // mark every instance changed.
-        let mut fresh = compute_pvs_traced(
+        let seed = match seed_world {
+            Some(p) => (
+                bevy_to_wow(local_from_world.transform_point3(p)),
+                seed_terrain.map(|z| terrain_z_local(&local_from_world, p, z)),
+            ),
+            None => (eye_local, terrain_local),
+        };
+        let mut fresh = compute_pvs_seeded(
             model,
             eye_local,
-            terrain_local,
+            seed,
             &clip_from_world,
             &world_from_local,
             &mut (&mut tap, &mut log),
@@ -441,7 +466,7 @@ fn compute_wmo_pvs(
                                 .get(g)
                                 .filter(|n| n.flags & (EXTERIOR | EXTERIOR_LIT) == 0)
                         })
-                        .and_then(|n| select_wmo_fog(&model.fogs, n.fog_indices, eye_local));
+                        .and_then(|n| select_wmo_fog(&model.fogs, n.fog_indices, seed.0));
                     claim = Some(InteriorClaim {
                         room: WmoRoom {
                             instance: entity,
@@ -486,6 +511,7 @@ fn compute_wmo_pvs(
         camera_claim.0 = claim;
     }
     let want_windows = match windows {
+        Some(_) if arpg_open => ExteriorWindows::Unrestricted,
         Some(rects) => ExteriorWindows::Windows(rects),
         None => ExteriorWindows::Unrestricted,
     };
@@ -790,11 +816,35 @@ impl Flood<'_> {
     }
 }
 
-/// The portal flood with a [`FloodTrace`] tap on every decision, the flood the frame runs.
+/// The portal flood with a [`FloodTrace`] tap on every decision, seeded at the eye: the stock
+/// flood, which the frame runs as [`compute_pvs_seeded`].
+#[cfg(test)]
 fn compute_pvs_traced<T: FloodTrace>(
     model: &WmoModel,
     eye_local: [f32; 3],
     terrain_z: Option<f32>,
+    clip_from_world: &Mat4,
+    world_from_local: &Affine3A,
+    trace: &mut T,
+) -> GroupPvs {
+    compute_pvs_seeded(
+        model,
+        eye_local,
+        (eye_local, terrain_z),
+        clip_from_world,
+        world_from_local,
+        trace,
+    )
+}
+
+/// The flood with its down-ray seed taken at `seed` (a model-space point and the terrain under
+/// it) rather than at the eye; the eye still makes the portals' side test and the screen rects.
+/// Fork-only: the stock flood seeds at the eye ([`compute_pvs_traced`]); the ARPG view seeds at
+/// the player ([`crate::cutaway::SeedFromViewer`]).
+fn compute_pvs_seeded<T: FloodTrace>(
+    model: &WmoModel,
+    eye_local: [f32; 3],
+    seed: ([f32; 3], Option<f32>),
     clip_from_world: &Mat4,
     world_from_local: &Affine3A,
     trace: &mut T,
@@ -816,7 +866,7 @@ fn compute_pvs_traced<T: FloodTrace>(
     // the containing-group set `0xc7cd88` and visits each, `0x6b3bd4`–`0x6b3c10`). Over no surface
     // or an exterior one, the outside leg seeds every EXTERIOR group full-screen.
     let mut stack: Vec<Step> = Vec::new();
-    let seeds = down_ray_seeds(model, eye_local, terrain_z);
+    let seeds = down_ray_seeds(model, seed.0, seed.1);
     trace.seed(seeds);
     // The inside-leg flag `[0xcde5ac]`: Pass 1 of `0x6b3b20` alone records windows, and
     // `0x6b3b20` runs only with a containing map object, `[0xc7b748]`, whose writer rejects an

@@ -118,6 +118,9 @@ enum Aim {
         /// The wire's `SpellMissInfo` code for a miss, which arrives as the victim's defense clip
         /// instead of the impact; `None` for a hit.
         miss: Option<u8>,
+        /// Fork-only, not 1.12.1: in the ARPG view a hostile bolt at the player flies at the
+        /// point the player stood on at launch and does not home (cmangos `Arpg/ArpgThreats.h`).
+        fixed: Option<Vec3>,
     },
     /// The GO's destination point; arrival is the ground hand-off on the caster.
     Ground(Vec3),
@@ -134,6 +137,8 @@ pub(super) struct Missile {
     path: Option<String>,
     /// Remaining flight time in seconds, the arrive-on-time integrator's state.
     arrive_in: f32,
+    /// Where it left from, for an ARPG bolt's path ([`Aim::Unit`]'s `fixed`).
+    from: Vec3,
     parts_spawned: bool,
     /// The caster's ranged-weapon `SpellVisual`, resolved at GO, so a basic shot's impact kit
     /// resolves even if the caster despawns mid-flight.
@@ -173,6 +178,9 @@ pub(super) fn attach_world_pos(
 /// This frame's aim, re-solved every tick as the reference does.
 fn aim_point(aim: Aim, units: &AttachPosQuery, joints: &Query<&GlobalTransform>) -> Option<Vec3> {
     match aim {
+        Aim::Unit {
+            fixed: Some(at), ..
+        } => Some(at),
         Aim::Unit {
             target, dest_tag, ..
         } => attach_world_pos(
@@ -344,6 +352,7 @@ pub(super) struct ArrivalOut<'w> {
 fn arrival_handoff(
     missile: &Missile,
     at: Vec3,
+    target_at: Option<Vec3>,
     out: &mut ArrivalOut,
     play_seq: &mut crate::creature_anim::PlaySeq,
 ) {
@@ -355,6 +364,18 @@ fn arrival_handoff(
         seq: play_seq.next(),
     };
     match missile.aim {
+        // An ARPG bolt that finds the player out of its path strikes the ground where they
+        // stood; the server's miss line says so.
+        Aim::Unit {
+            miss: None,
+            fixed: Some(point),
+            ..
+        } if !target_at.is_some_and(|t| in_bolt_path(t, missile.from, point)) => {
+            out.impacts.write(event(
+                missile.caster,
+                CastEventKind::GroundImpact { pos: point },
+            ));
+        }
         Aim::Unit {
             target, miss: None, ..
         } => {
@@ -390,11 +411,37 @@ fn arrival_handoff(
     }
 }
 
+/// Whether `guid` is a creature's: high part `0xF130` (a pet is `0xF140`, a player 0).
+fn is_creature_guid(guid: u64) -> bool {
+    guid >> 48 == 0xF130
+}
+
+/// The server's reach of a bolt's line (cmangos `Arpg::BOLT_RADIUS`, 1.6 yd), with a player's
+/// body (0.4 yd).
+const BOLT_REACH: f32 = 2.0;
+
+/// Whether a body at `at` stands on the bolt's flat path from `from` to `to`, as the server rules.
+fn in_bolt_path(at: Vec3, from: Vec3, to: Vec3) -> bool {
+    if (at.y - to.y).abs() > 6.0 {
+        return false;
+    }
+    let flat = |v: Vec3| Vec2::new(v.x, v.z);
+    let (p, a, b) = (flat(at), flat(from), flat(to));
+    let ab = b - a;
+    let s = if ab.length_squared() > 0.0 {
+        ((p - a).dot(ab) / ab.length_squared()).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    p.distance(a + ab * s) <= BOLT_REACH
+}
+
 /// Launch one queued GO from `launch`: a missile per target, or the one ground shot, each flying
 /// `distance / speed − time queued` (`0x61ceb0`); one already past its deadline hands off at once.
 fn launch_go(
     go: &QueuedGo,
     launch: Vec3,
+    bolt_self: Option<Entity>,
     commands: &mut Commands,
     units: &AttachPosQuery,
     joints: &Query<&GlobalTransform>,
@@ -414,25 +461,42 @@ fn launch_go(
                 target,
                 dest_tag: go.spawn.dest_tag,
                 miss: miss.map(launch_outcome_code),
+                // Fixed below, once the launch knows where the target stands.
+                fixed: None,
             })
             .collect()
     };
-    for aim_at in aims {
+    for mut aim_at in aims {
         let Some(aim) = aim_point(aim_at, units, joints) else {
             continue; // target already gone
         };
+        if let Aim::Unit {
+            target,
+            miss: None,
+            ref mut fixed,
+            ..
+        } = aim_at
+        {
+            if bolt_self == Some(target) && go.spawn.caster != target {
+                *fixed = Some(aim);
+            }
+        }
         let missile = Missile {
             spell_id: go.spawn.spell_id,
             caster: go.spawn.caster,
             aim: aim_at,
             path: go.key.clone(),
             arrive_in: launch.distance(aim) / go.spawn.speed.max(f32::EPSILON) - go.queued,
+            from: launch,
             // An invisible flight has no parts to wait on.
             parts_spawned: go.key.is_none(),
             weapon_visual: go.spawn.weapon_visual,
         };
         if missile.arrive_in <= 0.0 {
-            arrival_handoff(&missile, aim, out, play_seq);
+            let target_at = bolt_self
+                .and_then(|e| units.get(e).ok())
+                .map(|u| u.0.translation());
+            arrival_handoff(&missile, aim, target_at, out, play_seq);
             continue;
         }
         let dir = (aim - launch).normalize_or(-Vec3::Z);
@@ -477,8 +541,21 @@ pub(super) fn spawn_missiles(
     mut sounds: MessageWriter<MissileSound>,
     mut out: ArrivalOut,
     mut play_seq: ResMut<crate::creature_anim::PlaySeq>,
+    arpg: (
+        Query<Entity, With<crate::net::SelfPlayer>>,
+        Query<&crate::net::Guid>,
+    ),
 ) {
     let Some(mut fx) = fx else { return };
+    let (selves, guids) = arpg;
+    let self_entity = crate::player::arpg_session()
+        .then(|| selves.single().ok())
+        .flatten();
+    // The server flies a creature's bolt at a point (cmangos `Arpg::AimsBolt`): never a player's
+    // or a pet's.
+    let bolt_self = |caster: Entity| {
+        self_entity.filter(|_| guids.get(caster).is_ok_and(|g| is_creature_guid(g.0)))
+    };
     // Resolve the model now, so it loads while the release animation plays.
     for spawn in spawns.read() {
         let key = match (&spawn.path, spawn.ammo_display_id) {
@@ -508,6 +585,7 @@ pub(super) fn spawn_missiles(
             launch_go(
                 &go,
                 launch,
+                bolt_self(spawn.caster),
                 &mut commands,
                 &units,
                 &joints,
@@ -532,6 +610,7 @@ pub(super) fn spawn_missiles(
             launch_go(
                 go,
                 launch,
+                bolt_self(go.spawn.caster),
                 &mut commands,
                 &units,
                 &joints,
@@ -574,6 +653,7 @@ pub(super) fn spawn_missiles(
             launch_go(
                 go,
                 launch,
+                bolt_self(go.spawn.caster),
                 &mut commands,
                 &units,
                 &joints,
@@ -665,7 +745,15 @@ pub(super) fn move_missiles(
         };
         let to_target = aim - transform.translation;
         if missile.arrive_in <= dt {
-            arrival_handoff(&missile, aim, &mut out, &mut play_seq);
+            let target_at = match missile.aim {
+                Aim::Unit {
+                    target,
+                    fixed: Some(_),
+                    ..
+                } => units.get(target).ok().map(|u| u.0.translation()),
+                _ => None,
+            };
+            arrival_handoff(&missile, aim, target_at, &mut out, &mut play_seq);
             sounds.write(MissileSound::Stop { entity });
             commands.entity(entity).despawn();
             continue;

@@ -530,6 +530,9 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_ITEM_AFFIXES => {
             ServerPacket::ArpgItemAffixes(super::arpg::read_arpg_item_affixes(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_TELEGRAPH => {
+            ServerPacket::ArpgTelegraph(super::arpg::read_arpg_telegraph(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_STATUS => {
             ServerPacket::ArpgStatus(super::arpg::read_arpg_status(&mut r)?)
         }
