@@ -325,6 +325,8 @@ pub(super) fn plugin(app: &mut App) {
 const HUD_TOC: &str = "## Interface: 11200\n## Title: ARPG Hud\n## Notes: The benilla ARPG \
 client's hover health bar, installed by the client.\nArpgHud.lua\n";
 const HUD_LUA: &str = include_str!("arpg_hud.lua");
+/// The addon's key commands: the town portal, which the key bindings window lists under ARPG.
+const HUD_BINDINGS: &str = "<Bindings>\n    <Binding name=\"ARPGTOWNPORTAL\" header=\"ARPG\">ArpgHud_TownPortal()</Binding>\n</Bindings>\n";
 
 /// Where the hover health bar addon lives, `AddOns/ArpgHud` in the config folder.
 fn hud_dir() -> Option<std::path::PathBuf> {
@@ -332,7 +334,7 @@ fn hud_dir() -> Option<std::path::PathBuf> {
 }
 
 /// Remove the hover health bar addon, if an ARPG session installed one, so the stock client does
-/// not run it. Only the two files the client writes go, and the folder if that empties it.
+/// not run it. Only the three files the client writes go, and the folder if that empties it.
 fn remove_hud() {
     let Some(dir) = hud_dir() else {
         return;
@@ -340,7 +342,7 @@ fn remove_hud() {
     if !dir.is_dir() {
         return;
     }
-    for name in ["ArpgHud.toc", "ArpgHud.lua"] {
+    for name in ["ArpgHud.toc", "ArpgHud.lua", "Bindings.xml"] {
         let _ = std::fs::remove_file(dir.join(name));
     }
     let _ = std::fs::remove_dir(&dir);
@@ -365,7 +367,8 @@ fn install_hud() {
     };
     let result = std::fs::create_dir_all(&dir)
         .and_then(|_| write("ArpgHud.toc", HUD_TOC))
-        .and_then(|_| write("ArpgHud.lua", HUD_LUA));
+        .and_then(|_| write("ArpgHud.lua", HUD_LUA))
+        .and_then(|_| write("Bindings.xml", HUD_BINDINGS));
     match result {
         Ok(()) => info!("arpg: the hover health bar addon is in {}", dir.display()),
         Err(e) => warn!(

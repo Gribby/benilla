@@ -487,7 +487,7 @@ fn learned_spell(
     if actions.spells.insert(spell_id) {
         actions.dirty = true;
     }
-    announce_learn(spell_id, spells, errors);
+    announce_learn(spell_id, spells, errors, &actions.spells);
     tab_flash.0.push(spell_id);
 }
 
@@ -496,13 +496,35 @@ fn learned_spell(
 /// [`benilla_formats::SpellDisplay::learn_announcement`]'s. Ids `0x37`/`0x38`/`0x39` are chat
 /// type 10 rows, so all three land on the system channel. An unknown id says nothing, the
 /// registrar's bail at `0x4b25c6`/`0x4b25d2`/`0x4b25e0`.
-fn announce_learn(spell_id: u32, spells: Option<&Spells>, errors: &mut UiErrorKeys) {
-    let Some(display) = spells.and_then(|s| s.catalog.get(spell_id)) else {
+fn announce_learn(
+    spell_id: u32,
+    spells: Option<&Spells>,
+    errors: &mut UiErrorKeys,
+    known: &std::collections::BTreeSet<u32>,
+) {
+    let Some(catalog) = spells.map(|s| &s.catalog) else {
+        return;
+    };
+    let Some(display) = catalog.get(spell_id) else {
         return;
     };
     let Some(kind) = display.learn_announcement() else {
         return;
     };
+    // Fork-only, not 1.12.1: the ARPG view hides ranks, so a new rank of a spell already known
+    // says it grew stronger rather than naming a spell the player already has.
+    if kind == LearnAnnouncement::Spell
+        && crate::player::arpg_session()
+        && known.iter().any(|&other| {
+            other != spell_id && catalog.get(other).is_some_and(|o| o.name == display.name)
+        })
+    {
+        errors.0.push(UiError::s(
+            "ERR_LEARN_SPELL_S",
+            format!("{} (stronger)", display.name),
+        ));
+        return;
+    }
     let (key, arg) = match kind {
         LearnAnnouncement::Spell => ("ERR_LEARN_SPELL_S", display.ranked_name()),
         LearnAnnouncement::Ability => ("ERR_LEARN_ABILITY_S", display.ranked_name()),
@@ -568,7 +590,10 @@ fn superceded_spell(
     // A rank-up announces once, like a first learn: the supersede pair `0x4b2f50` calls the
     // unlearn `0x4b2c50`, which prints nothing, then the registrar `0x4b25b0` with `edx = 1`
     // (`0x4b2f61`).
-    announce_learn(new_spell_id, spells, errors);
+    // The old rank still counts as known for the ARPG view's "stronger" line.
+    let mut known = actions.spells.clone();
+    known.insert(old_spell_id);
+    announce_learn(new_spell_id, spells, errors, &known);
     // The same flag flashes the tab of the new rank.
     tab_flash.0.push(new_spell_id);
 }

@@ -605,6 +605,69 @@ local function treeAsk(kind, node)
     SetCVar("arpgTreeAction", tostring(kind * 100000 + (node or 0) * 100 + treeNonce))
 end
 
+-- The town portal (T, and the button beside the roll): out of combat, two seconds still open a
+-- portal home; in town the same press goes back through it. The server answers in chat.
+BINDING_HEADER_ARPG = "ARPG"
+BINDING_NAME_ARPGTOWNPORTAL = "Town Portal"
+function ArpgHud_TownPortal()
+    treeAsk(12)
+end
+
+local portalButton = CreateFrame("Button", "ArpgHudPortalButton", UIParent)
+portalButton:SetWidth(28)
+portalButton:SetHeight(28)
+portalButton:SetPoint("BOTTOMLEFT", UIParent, "BOTTOM", BAR_HALF + 14 + 70 + 10, BAR_FOOT + 2)
+portalButton:SetFrameStrata("MEDIUM")
+local portalIcon = portalButton:CreateTexture(nil, "ARTWORK")
+portalIcon:SetAllPoints(portalButton)
+portalIcon:SetTexture("Interface\\Icons\\Spell_Arcane_PortalStormWind")
+local portalKey = portalButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+portalKey:SetPoint("BOTTOM", portalButton, "TOP", 0, 2)
+-- The key over the button: whatever the town portal is bound to, none shown when unbound.
+local function showPortalKey()
+    local key = GetBindingKey and GetBindingKey("ARPGTOWNPORTAL")
+    portalKey:SetText(key or "")
+end
+portalButton:SetScript("OnClick", function() ArpgHud_TownPortal() end)
+portalButton:SetScript("OnEnter", function()
+    if GameTooltip then
+        GameTooltip:SetOwner(this, "ANCHOR_TOP")
+        GameTooltip:SetText("Town Portal")
+        GameTooltip:AddLine("Out of combat, stand still for two seconds to open a portal home. "
+            .. "In town, use it again within 30 minutes to go back.", 1, 1, 1, 1)
+        GameTooltip:Show()
+    end
+end)
+portalButton:SetScript("OnLeave", function()
+    if GameTooltip then
+        GameTooltip:Hide()
+    end
+end)
+
+-- T opens the portal unless the player has bound T to something else; set once, on login.
+local portalBinder = CreateFrame("Frame")
+portalBinder:RegisterEvent("PLAYER_ENTERING_WORLD")
+portalBinder:SetScript("OnEvent", function()
+    this:UnregisterEvent("PLAYER_ENTERING_WORLD")
+    if not GetBindingKey or not SetBinding then
+        return
+    end
+    if GetBindingKey("ARPGTOWNPORTAL") then
+        showPortalKey()
+        return
+    end
+    local taken = GetBindingAction and GetBindingAction("T")
+    if taken == nil or taken == "" then
+        if SetBinding("T", "ARPGTOWNPORTAL") and SaveBindings and GetCurrentBindingSet then
+            SaveBindings(GetCurrentBindingSet())
+        end
+    end
+    showPortalKey()
+end)
+local portalKeyWatch = CreateFrame("Frame")
+portalKeyWatch:RegisterEvent("UPDATE_BINDINGS")
+portalKeyWatch:SetScript("OnEvent", showPortalKey)
+
 local function webTaken(id)
     local n = webById[id]
     return n and n.taken == 1

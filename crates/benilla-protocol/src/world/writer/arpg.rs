@@ -44,6 +44,7 @@ const KIND_FLASK: u8 = 18;
 const KIND_TIER: u8 = 19;
 const KIND_UNSEAL: u8 = 20;
 const KIND_SOCKET: u8 = 21;
+const KIND_TOWN_PORTAL: u8 = 22;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -268,6 +269,11 @@ impl WorldWriter {
     /// Drink a charge of the flask.
     pub fn arpg_flask(&mut self) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &[KIND_FLASK])
+    }
+
+    /// Open a town portal, or go back through the open one (cmangos `Arpg/ArpgActions.h`).
+    pub fn arpg_town_portal(&mut self) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_TOWN_PORTAL])
     }
 
     /// Ask for dungeon difficulty `tier` (0 Normal to 5 Torment III).

@@ -6,9 +6,16 @@
 //! the moment it lands. Then it flashes and fades; a wind-up the server breaks off (a stun on the
 //! caster, its death) greys out instead. Standing inside when it lands kicks the camera. The
 //! server decides the damage; walking out or rolling avoids it.
+//!
+//! A mark lies over the ground, not flat at the caster's height: it is a polar grid of rings and
+//! spokes, each point set down on the ground under it (a ray to the world's floors and terrain)
+//! when the mark arrives, so it follows a hillside or a stair.
 
 use std::collections::HashMap;
-use std::f32::consts::FRAC_PI_2;
+use std::f32::consts::TAU;
+
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{Indices, PrimitiveTopology};
 
 use benilla_protocol::messages::arpg::{TELEGRAPH_BROKEN, TELEGRAPH_CONE, TELEGRAPH_WIND_UP};
 use benilla_protocol::messages::ArpgTelegraph;
@@ -43,6 +50,21 @@ const GRADE_RGB: [[f32; 3]; 5] = [
     [0.85, 0.05, 0.12],
 ];
 const BROKEN_RGB: [f32; 3] = [0.55, 0.55, 0.55];
+/// The draped grid: rings from the centre out, and spokes round a full circle (a cone keeps its
+/// share of them).
+const RINGS: usize = 8;
+const CIRCLE_SPOKES: usize = 40;
+/// The ground under a mark point is looked for from this far above the ground found one ring in,
+/// this far down, in yards: walking out along each spoke, a mark climbs a slope or a stair and
+/// stays under a low ceiling. A rise steeper than the first try is looked for again from higher.
+const PROBE_UP: f32 = 1.5;
+const PROBE_UP_STEEP: f32 = 4.0;
+const PROBE_DOWN: f32 = 14.0;
+/// Ground found this far under the server's centre is not the caster's (a lake bed under a
+/// swimmer): the centre keeps the server's height.
+const CENTRE_DROP: f32 = 2.0;
+/// The fill is rebuilt when its reach moves by this share of the radius.
+const FILL_STEP: f32 = 0.01;
 
 /// The telegraphs the server sent, waiting for the view to draw them.
 #[derive(Resource, Default)]
@@ -83,6 +105,173 @@ struct TelegraphPart {
     material: Handle<StandardMaterial>,
 }
 
+/// A mark laid over the ground: the flat direction of each spoke and the ground's height at each
+/// ring of each spoke, `heights[ring * spokes + spoke]`.
+#[derive(Clone, Debug)]
+struct Drape {
+    radius: f32,
+    spokes: Vec<Vec3>,
+    /// A circle's spokes go all the way round and join; a cone's stop at its edges.
+    closed: bool,
+    heights: Vec<f32>,
+}
+
+impl Drape {
+    /// The spokes of a circle (`half_angle` 0) or of a cone opening along `facing`.
+    fn spokes(facing: Vec3, half_angle: f32) -> (Vec<Vec3>, bool) {
+        if half_angle <= 0.0 {
+            let spokes = (0..CIRCLE_SPOKES)
+                .map(|i| Quat::from_rotation_y(TAU * i as f32 / CIRCLE_SPOKES as f32) * facing)
+                .collect();
+            return (spokes, true);
+        }
+        let n = ((2.0 * half_angle / TAU * CIRCLE_SPOKES as f32).ceil() as usize).max(4) + 1;
+        let spokes = (0..n)
+            .map(|i| {
+                let t = -half_angle + 2.0 * half_angle * i as f32 / (n - 1) as f32;
+                Quat::from_rotation_y(t) * facing
+            })
+            .collect();
+        (spokes, false)
+    }
+
+    /// A mark of `radius`, each point set down by `ground(point, from)`: the height of the ground
+    /// under `point` looking down from height `from`, if any.
+    fn new(
+        centre: Vec3,
+        radius: f32,
+        facing: Vec3,
+        half_angle: f32,
+        mut ground: impl FnMut(Vec3, f32) -> Option<f32>,
+    ) -> Self {
+        let (spokes, closed) = Self::spokes(facing, half_angle);
+        let n = spokes.len();
+        let centre_y = ground(centre, centre.y + PROBE_UP)
+            .filter(|y| *y >= centre.y - CENTRE_DROP)
+            .unwrap_or(centre.y);
+        let mut heights = vec![centre_y; (RINGS + 1) * n];
+        for (s, dir) in spokes.iter().enumerate() {
+            let mut prev = centre_y;
+            for ring in 1..=RINGS {
+                let p = centre + *dir * radius * ring as f32 / RINGS as f32;
+                let y = ground(p, prev + PROBE_UP)
+                    .or_else(|| ground(p, prev + PROBE_UP_STEEP))
+                    .unwrap_or(prev);
+                heights[ring * n + s] = y;
+                prev = y;
+            }
+        }
+        Self {
+            radius,
+            spokes,
+            closed,
+            heights,
+        }
+    }
+
+    /// The ground's height `frac` of the way out along spoke `spoke`, between its rings.
+    fn height(&self, frac: f32, spoke: usize) -> f32 {
+        let n = self.spokes.len();
+        let x = frac.clamp(0.0, 1.0) * RINGS as f32;
+        let i = (x.floor() as usize).min(RINGS - 1);
+        let t = x - i as f32;
+        let a = self.heights[i * n + spoke];
+        let b = self.heights[(i + 1) * n + spoke];
+        a + (b - a) * t
+    }
+
+    /// A point of the mark, relative to its centre on the ground plane, at its ground height.
+    fn point(&self, frac: f32, spoke: usize, lift: f32) -> [f32; 3] {
+        let flat = self.spokes[spoke] * self.radius * frac;
+        [flat.x, self.height(frac, spoke) + lift, flat.z]
+    }
+
+    /// The band of the mark from `f0` to `f1` of its radius, in `steps` rings, into `out`.
+    fn band(&self, f0: f32, f1: f32, steps: usize, lift: f32, out: &mut MeshParts) {
+        let n = self.spokes.len();
+        let base = out.positions.len() as u32;
+        for j in 0..=steps {
+            let f = f0 + (f1 - f0) * j as f32 / steps as f32;
+            for s in 0..n {
+                out.positions.push(self.point(f, s, lift));
+            }
+        }
+        let joins = if self.closed { n } else { n - 1 };
+        for j in 0..steps as u32 {
+            for s in 0..joins as u32 {
+                let s1 = (s + 1) % n as u32;
+                let (a, b) = (base + j * n as u32 + s, base + j * n as u32 + s1);
+                let (c, d) = (a + n as u32, b + n as u32);
+                out.indices.extend_from_slice(&[a, c, b, b, c, d]);
+            }
+        }
+    }
+
+    /// A cone's two straight edges, apex to rim, each `width` yards wide, into `out`.
+    fn sides(&self, width: f32, lift: f32, out: &mut MeshParts) {
+        if self.closed {
+            return;
+        }
+        for spoke in [0, self.spokes.len() - 1] {
+            let dir = self.spokes[spoke];
+            let across = Vec3::new(-dir.z, 0.0, dir.x) * (width * 0.5);
+            let base = out.positions.len() as u32;
+            for j in 0..=RINGS {
+                let f = j as f32 / RINGS as f32;
+                let [x, y, z] = self.point(f, spoke, lift);
+                out.positions.push([x - across.x, y, z - across.z]);
+                out.positions.push([x + across.x, y, z + across.z]);
+            }
+            for j in 0..RINGS as u32 {
+                let a = base + j * 2;
+                out.indices
+                    .extend_from_slice(&[a, a + 2, a + 1, a + 1, a + 2, a + 3]);
+            }
+        }
+    }
+}
+
+/// A mesh being built.
+#[derive(Default)]
+struct MeshParts {
+    positions: Vec<[f32; 3]>,
+    indices: Vec<u32>,
+}
+
+impl MeshParts {
+    fn into_mesh(self) -> Mesh {
+        let n = self.positions.len();
+        Mesh::new(
+            PrimitiveTopology::TriangleList,
+            RenderAssetUsages::default(),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; n])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; n])
+        .with_inserted_indices(Indices::U32(self.indices))
+    }
+}
+
+/// The area, the fill reaching `grow` of the way out, and the edge, as meshes.
+fn area_mesh(drape: &Drape) -> Mesh {
+    let mut out = MeshParts::default();
+    drape.band(0.0, 1.0, RINGS, LIFT, &mut out);
+    out.into_mesh()
+}
+
+fn fill_mesh(drape: &Drape, grow: f32) -> Mesh {
+    let mut out = MeshParts::default();
+    drape.band(0.0, grow.clamp(0.01, 1.0), RINGS, LIFT + 0.01, &mut out);
+    out.into_mesh()
+}
+
+fn edge_mesh(drape: &Drape) -> Mesh {
+    let mut out = MeshParts::default();
+    drape.band(1.0 - EDGE, 1.0, 1, LIFT + 0.02, &mut out);
+    drape.sides(drape.radius * EDGE, LIFT + 0.02, &mut out);
+    out.into_mesh()
+}
+
 /// A mark being drawn.
 struct Live {
     /// Where it lands in the world: the centre or the apex, and the cone's facing.
@@ -99,31 +288,21 @@ struct Live {
     broken_at: Option<f64>,
     /// The landing was seen (the kick is given once).
     landed: bool,
+    /// The caster was seen alive during the wind-up: only then does its death break the mark (a
+    /// champion's death burst is its corpse's).
+    caster_seen_alive: bool,
     parts: Vec<Entity>,
-    /// The parts' own materials, freed with the mark whatever became of the parts.
+    /// The parts' own materials and meshes, freed with the mark whatever became of the parts.
     materials: Vec<Handle<StandardMaterial>>,
+    meshes: Vec<Handle<Mesh>>,
+    /// The ground under it, the fill's mesh, and the reach that mesh was built at.
+    drape: Drape,
+    fill: Handle<Mesh>,
+    fill_at: f32,
 }
 
 #[derive(Resource, Default)]
 struct LiveTelegraphs(HashMap<u32, Live>);
-
-/// The meshes, made once: a unit circle and edge ring, and cone sectors by half angle (in
-/// thousandths of a radian).
-#[derive(Default)]
-struct Meshes {
-    circle: Option<Handle<Mesh>>,
-    edge: Option<Handle<Mesh>>,
-    sectors: HashMap<u32, Handle<Mesh>>,
-    sector_edges: HashMap<u32, Handle<Mesh>>,
-}
-
-/// The rotation that lays a 2D primitive (drawn in XY, a sector opening along +Y) on the ground,
-/// opening along `facing`.
-fn ground_rotation(facing: Vec3) -> Quat {
-    let lay = Quat::from_rotation_x(-FRAC_PI_2); // +Y to -Z, the normal up
-    let flat = Vec3::new(facing.x, 0.0, facing.z).normalize_or(Vec3::NEG_Z);
-    Quat::from_rotation_arc(Vec3::NEG_Z, flat) * lay
-}
 
 /// The WoW orientation `o` at WoW point `at`, as a flat Bevy direction.
 fn bevy_facing(at: [f32; 3], o: f32) -> Vec3 {
@@ -131,49 +310,6 @@ fn bevy_facing(at: [f32; 3], o: f32) -> Vec3 {
     let b = benilla_assets::coords::wow_to_bevy([at[0] + o.cos(), at[1] + o.sin(), at[2]]);
     let d = b - a;
     Vec3::new(d.x, 0.0, d.z).normalize_or(Vec3::NEG_Z)
-}
-
-/// A cone's outline at radius 1, drawn in XY and opening along +Y as [`CircularSector`] does: a
-/// band along the arc and one down each side to the apex, each [`EDGE`] wide.
-fn cone_edge_mesh(half_angle: f32) -> Mesh {
-    use bevy::asset::RenderAssetUsages;
-    use bevy::mesh::{Indices, PrimitiveTopology};
-    let segments = ((half_angle * 24.0) as u32).clamp(4, 64);
-    let mut positions: Vec<[f32; 3]> = Vec::new();
-    let mut indices: Vec<u32> = Vec::new();
-    let mut quad = |a: Vec2, b: Vec2, c: Vec2, d: Vec2| {
-        let base = positions.len() as u32;
-        for p in [a, b, c, d] {
-            positions.push([p.x, p.y, 0.0]);
-        }
-        indices.extend_from_slice(&[base, base + 1, base + 2, base, base + 2, base + 3]);
-    };
-    // The direction at angle `t` off +Y.
-    let at = |t: f32, r: f32| Vec2::new(-t.sin(), t.cos()) * r;
-    for i in 0..segments {
-        let t0 = -half_angle + 2.0 * half_angle * i as f32 / segments as f32;
-        let t1 = -half_angle + 2.0 * half_angle * (i + 1) as f32 / segments as f32;
-        quad(
-            at(t0, 1.0 - EDGE),
-            at(t0, 1.0),
-            at(t1, 1.0),
-            at(t1, 1.0 - EDGE),
-        );
-    }
-    for side in [-half_angle, half_angle] {
-        let tip = at(side, 1.0);
-        let across = Vec2::new(tip.y, -tip.x).normalize() * (EDGE * 0.5);
-        quad(-across, across, tip + across, tip - across);
-    }
-    let n = positions.len();
-    Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    )
-    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
-    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 0.0, 1.0]; n])
-    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; n])
-    .with_inserted_indices(Indices::U32(indices))
 }
 
 /// Whether `point` stands inside the mark (its flat footprint, the body's reach added).
@@ -204,7 +340,7 @@ fn material(
     })
 }
 
-/// Start each new mark, and break off the ones the server says.
+/// Start each new mark, set down on the ground under it, and break off the ones the server says.
 #[allow(clippy::too_many_arguments)]
 fn take_telegraphs(
     mut commands: Commands,
@@ -213,7 +349,8 @@ fn take_telegraphs(
     mut live: ResMut<LiveTelegraphs>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut art: Local<Meshes>,
+    spatial: avian3d::prelude::SpatialQuery,
+    occluders: Query<(), With<benilla_world::collision::PickOccluder>>,
 ) {
     let now = time.elapsed_secs_f64();
     for t in std::mem::take(&mut state.incoming) {
@@ -239,52 +376,39 @@ fn take_telegraphs(
         let centre = benilla_assets::coords::wow_to_bevy(t.pos);
         let facing = bevy_facing(t.pos, t.orientation);
         let rgb = GRADE_RGB[usize::from(t.grade).min(GRADE_RGB.len() - 1)];
-        let (fill_mesh, edge_mesh) = if cone {
-            let key = (half_angle * 1000.0) as u32;
-            let fill = art
-                .sectors
-                .entry(key)
-                .or_insert_with(|| meshes.add(CircularSector::new(1.0, half_angle)))
-                .clone();
-            let edge = art
-                .sector_edges
-                .entry(key)
-                .or_insert_with(|| meshes.add(cone_edge_mesh(half_angle)))
-                .clone();
-            (fill, edge)
-        } else {
-            let fill = art
-                .circle
-                .get_or_insert_with(|| meshes.add(Circle::new(1.0)))
-                .clone();
-            let edge = art
-                .edge
-                .get_or_insert_with(|| meshes.add(Annulus::new(1.0 - EDGE, 1.0)))
-                .clone();
-            (fill, edge)
-        };
-        let rotation = ground_rotation(facing);
+        // Each grid point down on the floor or terrain under it, walking out from the centre.
+        let drape = Drape::new(centre, t.radius, facing, half_angle, |p, from_y| {
+            let from = Vec3::new(p.x, from_y, p.z);
+            spatial
+                .cast_ray_predicate(
+                    from,
+                    Dir3::NEG_Y,
+                    PROBE_DOWN,
+                    true,
+                    &benilla_world::collision::WorldCollision::body_filter(),
+                    &|e| occluders.contains(e),
+                )
+                .map(|hit| from.y - hit.distance)
+        });
+        let area = meshes.add(area_mesh(&drape));
+        let fill = meshes.add(fill_mesh(&drape, 0.01));
+        let edge = meshes.add(edge_mesh(&drape));
+        let at = Transform::from_translation(Vec3::new(centre.x, 0.0, centre.z));
         let mut parts = Vec::new();
         let mut mats = Vec::new();
-        for (part, mesh, alpha, lift) in [
-            (Part::Area, fill_mesh.clone(), AREA_ALPHA, LIFT),
-            (Part::Fill, fill_mesh.clone(), FILL_ALPHA, LIFT + 0.01),
-            (Part::Edge, edge_mesh, EDGE_ALPHA, LIFT + 0.02),
+        for (part, mesh, alpha) in [
+            (Part::Area, area.clone(), AREA_ALPHA),
+            (Part::Fill, fill.clone(), FILL_ALPHA),
+            (Part::Edge, edge.clone(), EDGE_ALPHA),
         ] {
             let mat = material(&mut materials, rgb, alpha);
             mats.push(mat.clone());
-            let scale = match part {
-                Part::Fill => 0.01,
-                _ => t.radius,
-            };
             parts.push(
                 commands
                     .spawn((
                         Mesh3d(mesh),
                         MeshMaterial3d(mat.clone()),
-                        Transform::from_translation(centre + Vec3::Y * lift)
-                            .with_rotation(rotation)
-                            .with_scale(Vec3::splat(scale)),
+                        at,
                         TelegraphPart {
                             part,
                             material: mat,
@@ -306,8 +430,13 @@ fn take_telegraphs(
                 wind_up: (t.wind_up_ms as f32 / 1000.0).clamp(0.1, 10.0),
                 broken_at: None,
                 landed: false,
+                caster_seen_alive: false,
                 parts,
                 materials: mats,
+                meshes: vec![area, fill.clone(), edge],
+                drape,
+                fill,
+                fill_at: 0.01,
             },
         );
     }
@@ -353,8 +482,9 @@ fn run_telegraphs(
     mut commands: Commands,
     time: Res<Time>,
     mut live: ResMut<LiveTelegraphs>,
-    mut parts: Query<(&TelegraphPart, &mut Transform)>,
+    parts: Query<&TelegraphPart>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     index: Res<GuidIndex>,
     stores: Query<&ObjectStore>,
     me: Query<&GlobalTransform, With<SelfPlayer>>,
@@ -367,13 +497,15 @@ fn run_telegraphs(
         let age = (now - l.born) as f32;
         // A caster that died mid wind-up never lands it.
         if l.broken_at.is_none() && age < l.wind_up {
-            let dead = index
+            let health = index
                 .0
                 .get(&l.caster)
                 .and_then(|e| stores.get(*e).ok())
-                .is_some_and(|s| s.0.unit_health() == Some(0));
-            if dead {
-                l.broken_at = Some(now);
+                .and_then(|s| s.0.unit_health());
+            match health {
+                Some(0) if l.caster_seen_alive => l.broken_at = Some(now),
+                Some(h) if h > 0 => l.caster_seen_alive = true,
+                _ => {}
             }
         }
         let broken = l.broken_at.map(|at| (now - at) as f32);
@@ -387,8 +519,14 @@ fn run_telegraphs(
             None => spent.push(*serial),
             Some((grow, alphas, grey)) => {
                 let rgb = if grey { BROKEN_RGB } else { l.rgb };
+                if (grow - l.fill_at).abs() >= FILL_STEP {
+                    if let Some(mesh) = meshes.get_mut(&l.fill) {
+                        *mesh = fill_mesh(&l.drape, grow);
+                    }
+                    l.fill_at = grow;
+                }
                 for e in &l.parts {
-                    let Ok((part, mut tf)) = parts.get_mut(*e) else {
+                    let Ok(part) = parts.get(*e) else {
                         continue;
                     };
                     let alpha = match part.part {
@@ -396,9 +534,6 @@ fn run_telegraphs(
                         Part::Fill => alphas[1],
                         Part::Edge => alphas[2],
                     };
-                    if part.part == Part::Fill {
-                        tf.scale = Vec3::splat((l.radius * grow).max(0.01));
-                    }
                     if let Some(m) = materials.get_mut(&part.material) {
                         m.base_color = Color::srgba(rgb[0], rgb[1], rgb[2], alpha);
                     }
@@ -410,6 +545,9 @@ fn run_telegraphs(
         if let Some(l) = live.0.remove(&serial) {
             for m in &l.materials {
                 materials.remove(m);
+            }
+            for m in &l.meshes {
+                meshes.remove(m);
             }
             for e in l.parts {
                 if let Ok(mut ec) = commands.get_entity(e) {
@@ -425,6 +563,7 @@ mod tests {
     use super::*;
 
     fn live(half_angle: f32) -> Live {
+        let drape = Drape::new(Vec3::ZERO, 10.0, Vec3::NEG_Z, half_angle, |_, _| Some(0.0));
         Live {
             centre: Vec3::ZERO,
             facing: Vec3::NEG_Z,
@@ -436,19 +575,64 @@ mod tests {
             wind_up: 1.5,
             broken_at: None,
             landed: false,
+            caster_seen_alive: true,
             parts: Vec::new(),
             materials: Vec::new(),
+            meshes: Vec::new(),
+            drape,
+            fill: Handle::default(),
+            fill_at: 0.0,
         }
     }
 
     #[test]
-    fn the_cone_outline_has_its_arc_and_both_sides() {
-        let mesh = cone_edge_mesh(std::f32::consts::FRAC_PI_4);
-        let quads = mesh.count_vertices() / 4;
-        assert_eq!(
-            quads,
-            ((std::f32::consts::FRAC_PI_4 * 24.0) as usize).clamp(4, 64) + 2
+    fn a_mark_lies_on_the_slope_under_it() {
+        // A hill rising one yard per yard toward +X, found only from above it.
+        let hill = |p: Vec3, from: f32| (from >= p.x).then_some(p.x);
+        let drape = Drape::new(Vec3::ZERO, 8.0, Vec3::NEG_Z, 0.0, hill);
+        for s in 0..drape.spokes.len() {
+            let [x, y, _] = drape.point(1.0, s, 0.0);
+            assert!((y - x).abs() < 1e-3, "spoke {s}: {x} at {y}");
+            // Half way out, between rings, still on the hill.
+            let [x, y, _] = drape.point(0.55, s, 0.0);
+            assert!((y - x).abs() < 1e-3);
+        }
+    }
+
+    #[test]
+    fn a_swimmers_mark_stays_at_the_surface_and_a_ceiling_is_not_the_floor() {
+        // A lake bed 5 yards under the caster: the centre keeps the caster's height.
+        let lake = Drape::new(Vec3::ZERO, 4.0, Vec3::NEG_Z, 0.0, |_, _| Some(-5.0));
+        assert_eq!(lake.heights[0], 0.0);
+        // A ceiling 3 yards up and the floor at 0: the probes start under the ceiling.
+        let room = |_: Vec3, from: f32| Some(if from > 3.0 { 3.0 } else { 0.0 });
+        let drape = Drape::new(Vec3::ZERO, 6.0, Vec3::NEG_Z, 0.0, room);
+        assert!(drape.heights.iter().all(|h| *h == 0.0));
+    }
+
+    #[test]
+    fn a_circle_joins_round_and_a_cone_keeps_its_edges() {
+        let ring = Drape::new(Vec3::ZERO, 5.0, Vec3::NEG_Z, 0.0, |_, _| Some(0.0));
+        assert!(ring.closed && ring.spokes.len() == CIRCLE_SPOKES);
+        let cone = Drape::new(
+            Vec3::ZERO,
+            5.0,
+            Vec3::NEG_Z,
+            std::f32::consts::FRAC_PI_4,
+            |_, _| Some(0.0),
         );
+        assert!(!cone.closed);
+        let first = cone.spokes[0];
+        let last = *cone.spokes.last().unwrap();
+        assert!((first.angle_between(Vec3::NEG_Z) - std::f32::consts::FRAC_PI_4).abs() < 1e-4);
+        assert!((last.angle_between(Vec3::NEG_Z) - std::f32::consts::FRAC_PI_4).abs() < 1e-4);
+        // The area: RINGS bands of quads between the spokes; the edge adds the two sides.
+        let mut out = MeshParts::default();
+        cone.band(0.0, 1.0, RINGS, 0.0, &mut out);
+        assert_eq!(out.indices.len(), RINGS * (cone.spokes.len() - 1) * 6);
+        let mut sides = MeshParts::default();
+        cone.sides(0.3, 0.0, &mut sides);
+        assert_eq!(sides.indices.len(), 2 * RINGS * 6);
     }
 
     #[test]
@@ -479,15 +663,5 @@ mod tests {
         let (_, _, grey) = mark_at(0.5, 1.5, Some(0.1)).unwrap();
         assert!(grey);
         assert!(mark_at(0.5, 1.5, Some(BROKEN_SECS)).is_none());
-    }
-
-    #[test]
-    fn a_cone_lies_flat_and_opens_along_its_facing() {
-        let facing = Vec3::new(1.0, 0.0, 0.0);
-        let r = ground_rotation(facing);
-        // The sector opens along local +Y; laid down, that points along the facing.
-        assert!((r * Vec3::Y - facing).length() < 1e-5);
-        // Its face looks up.
-        assert!((r * Vec3::Z - Vec3::Y).length() < 1e-5);
     }
 }

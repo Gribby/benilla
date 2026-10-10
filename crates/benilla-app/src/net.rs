@@ -1036,6 +1036,8 @@ pub(crate) enum ClientCommand {
     },
     /// Fork-only: drink a charge of the ARPG flask.
     ArpgFlask,
+    /// Fork-only: open an ARPG town portal, or go back through it.
+    ArpgTownPortal,
     /// Fork-only: ask for ARPG dungeon difficulty `tier`.
     ArpgTier {
         tier: u8,

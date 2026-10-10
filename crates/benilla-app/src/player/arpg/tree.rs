@@ -12,7 +12,8 @@
 //! 2 respec, 3 query, 4 give back; 5 slot, its node `slot * 100 + skill`; 6 take a skill rank,
 //! 7 give one back, 8 respec a skill, its node the skill; 9 the dev tools' test pack, its node
 //! `tier * 100 + size`; 10 unseal a capstone with Codex fragments; 11 socket a rune, its node
-//! `skill * 100 + rune`, rune 0 emptying it), which [`on_tree_action`] turns into a `ClientCommand`.
+//! `skill * 100 + rune`, rune 0 emptying it; 12 the town portal, from the HUD's button and its
+//! key), which [`on_tree_action`] turns into a `ClientCommand`.
 
 use benilla_protocol::messages::{ArpgSkills, ArpgTree};
 use benilla_protocol::{SessionEvent, SessionEventKind};
@@ -296,6 +297,8 @@ enum TreeAction {
         skill: u8,
         rune: u8,
     },
+    /// Open a town portal, or go back through it.
+    TownPortal,
 }
 
 fn parse_action(value: &str) -> Option<TreeAction> {
@@ -342,6 +345,7 @@ fn parse_action(value: &str) -> Option<TreeAction> {
                 rune: u8::try_from(field % 100).ok()?,
             })
         }
+        12 => Some(TreeAction::TownPortal),
         _ => None,
     }
 }
@@ -364,6 +368,7 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
         Some(TreeAction::DevPack { size, tier }) => ClientCommand::ArpgDevPack { size, tier },
         Some(TreeAction::Unseal(node)) => ClientCommand::ArpgUnseal { node },
         Some(TreeAction::Socket { skill, rune }) => ClientCommand::ArpgSocket { skill, rune },
+        Some(TreeAction::TownPortal) => ClientCommand::ArpgTownPortal,
         None => return,
     };
     let _ = net.0.send(command);
@@ -411,6 +416,7 @@ mod tests {
             parse_action("1130102"),
             Some(TreeAction::Socket { skill: 3, rune: 1 })
         );
+        assert_eq!(parse_action("1200007"), Some(TreeAction::TownPortal));
         assert_eq!(parse_action("0"), None);
         assert_eq!(parse_action("spend"), None);
     }

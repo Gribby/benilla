@@ -196,6 +196,16 @@ Built (`Arpg/ArpgActions.{h,cpp}` on the server, `player/arpg/actions.rs` on the
   the charges and the next one filling.
 - The server sends `SMSG_ARPG_STATUS` (0x342) on a change: the charges, the next charge's
   progress and the roll's cooldown.
+- **Town portal (T, or the button right of the roll):** out of combat, two seconds standing still
+  open a portal home (the hearth's bind point). In town (resting, or near the bind point) the
+  same key goes back through it to the spot it opened from, into the same dungeon, for 30
+  minutes. Moving, a blow or combat in the two seconds closes it. T is only taken if nothing else
+  is bound to it; the key bindings window lists it under ARPG.
+- **Death:** releasing raises the character at once at half health and mana, at the dungeon's
+  entrance inside the dungeon, or at the nearest graveyard outside. No ghost walk, no corpse run;
+  the corpse turns to bones. The durability loss stays.
+- **Junk:** a grey item with a sell price turns into its price in gold when picked up, with a
+  line in chat, so the bags never fill with vendor trash.
 
 ## Threats and the roll
 
@@ -223,6 +233,11 @@ roll out of, so the monsters' dangerous attacks are ones a player can see coming
   come back in reach.
 - Dungeon trash does not telegraph (it is elite throughout, and a pull of five would be a carpet of
   marks), only its champions and rares and the bosses.
+- The champions' own dangers are marked the same way: Fire Enchanted's death burst (a 6 yard
+  circle on the corpse, 1.2 seconds, 15% of maximum health) and Cold Enchanted's Frost Nova at 30%
+  health (a 10 yard ring round it, 1 second, then the nova). Rolling dodges both.
+- The marks lie over the ground under them (each point set down on the floor or terrain), so a
+  hillside or a stair shows the whole shape.
 - `SMSG_ARPG_TELEGRAPH` (0x344): the wind-up (shape, grade, place, facing, radius, wind-up time)
   and its breaking off.
 
