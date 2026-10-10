@@ -96,10 +96,15 @@ making the stat mandatory:
 | Attribute | Vanilla (unchanged) | ARPG effect | Rate (proposed) | Cap |
 |---|---|---|---|---|
 | **Strength** | Attack power, block | Melee area: bigger arcs, cleaves and shockwaves | +1% size per 10 Str | +40% |
-| **Agility** | Crit, armour, dodge, ranged AP | Movement speed | +1% per 20 Agi | +20% |
+| **Agility** | Crit, armour, dodge, ranged AP | Movement speed (over a base +10%) | +1% per 20 Agi | +30% with the base |
 | **Stamina** | Health | Life on kill | Stamina ÷ 4 per kill | none |
 | **Intellect** | Mana, spell crit | Spell area: bigger Consecration, Holy Wrath, Blizzard | +1% radius per 10 Int | +40% |
 | **Spirit** | Regeneration | Cooldown recovery | +1% per 10 Spirit | +30% |
+
+Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting (2% of the maximum per
+swing that lands, 1% per skill hit, 5% per kill), and two seconds out of combat health and mana
+flow back at 8% a second, so nobody sits down to drink. Every class spell's global cooldown is a
+third of vanilla's (0.5 sec) and its cast time half.
 
 Other ARPG stats exist only on items and tree nodes, never as base attributes: area size,
 cooldown recovery, movement speed, life on kill, mana on hit, damage per tag, extra projectiles,

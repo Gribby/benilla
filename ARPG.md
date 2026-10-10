@@ -27,6 +27,7 @@ Client (`crates/`):
 | Wire format | `benilla-protocol/src/world/writer/arpg.rs` |
 | Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
 | Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
+| Kill feedback: a burst ring at each kill (champion blue, rare yellow, bigger), a camera kick on crits and kills; a new drop's glow pops in and its beam rises, and a corpse's best blue/purple/orange-or-unique drop chimes once (`MapPing`, `igQuestListComplete`, `LEVELUP`) | `benilla-app/src/player/arpg/juice.rs`, `loot.rs` |
 | Hover health bar, health/power orbs and the options window's ARPG View page (Lua addon the client installs) | `benilla-app/src/player/arpg_hud.lua` |
 | The Attack key toggles a swing at the enemy under the cursor | `ArpgAttackKey` in `player/arpg.rs`, `ui_action/drain.rs` |
 | Ground loot: glows, beams, labels, click to pick up, gold on walk-over | `benilla-app/src/player/arpg/loot.rs`, `benilla-protocol/src/messages/arpg.rs` |

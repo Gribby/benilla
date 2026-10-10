@@ -13,6 +13,8 @@
 //! The loot filter (`arpgLootFilter`, the options window's ARPG View page) hides the labels of
 //! the low qualities ([`label_shown`]); their glows stay, and Alt still shows them.
 //! A corpse that despawns or streams out takes its drops with it.
+//! A new drop's glow pops in and its beam rises out of the ground; a corpse's best drop of blue
+//! or better chimes, once ([`drop_chime`]).
 
 use std::collections::HashMap;
 use std::f32::consts::FRAC_PI_2;
@@ -176,11 +178,64 @@ struct LootArt(Option<Art>);
 #[derive(Resource, Default)]
 struct LootLabels(Vec<(Rect, LootKey)>);
 
-/// A drop's glow, which breathes gently so the ground does not look painted.
+/// A drop's glow, which pops in and then breathes gently so the ground does not look painted.
 #[derive(Component)]
 struct LootGlow {
     radius: f32,
     phase: f32,
+    born: f64,
+}
+
+/// A drop's beam, which rises out of the ground when the drop lands.
+#[derive(Component)]
+struct LootBeam {
+    height: f32,
+    born: f64,
+}
+
+/// How long a new drop's glow pops and its beam rises, in seconds; the glow overshoots its size by
+/// this share before it settles.
+const POP_SECS: f32 = 0.35;
+const POP_OVERSHOOT: f32 = 0.35;
+
+/// The chime a list's best new drop sounds, by its art index: none for white and below or the
+/// gold, the minimap ping for a blue, the quest-complete chime for a purple, the level-up fanfare
+/// for an orange or a unique. Names of the 1.12 `SoundEntries` table.
+fn drop_chime(art: usize, unique: bool) -> Option<&'static str> {
+    if unique {
+        return Some("LEVELUP");
+    }
+    match art {
+        3 => Some("MapPing"),
+        4 => Some("igQuestListComplete"),
+        5 | 6 => Some("LEVELUP"),
+        _ => None,
+    }
+}
+
+/// The glow's size share `age` seconds after it landed: up past full, back down to it.
+fn pop_glow(age: f32) -> f32 {
+    if age >= POP_SECS {
+        return 1.0;
+    }
+    let t = (age / POP_SECS).max(0.0);
+    // Rises to 1 + overshoot at two thirds, then settles to 1.
+    if t < 2.0 / 3.0 {
+        let u = t * 1.5;
+        (1.0 + POP_OVERSHOOT) * (1.0 - (1.0 - u).powi(2))
+    } else {
+        let u = (t - 2.0 / 3.0) * 3.0;
+        1.0 + POP_OVERSHOOT * (1.0 - u)
+    }
+}
+
+/// The beam's height share `age` seconds after it landed: a quick rise, easing out.
+fn rise_beam(age: f32) -> f32 {
+    if age >= POP_SECS {
+        return 1.0;
+    }
+    let t = (age / POP_SECS).max(0.0);
+    1.0 - (1.0 - t).powi(3)
 }
 
 /// A corpse's loot list, as the server sent it ([`SessionEvent::ArpgLoot`]).
@@ -225,9 +280,8 @@ pub(super) fn plugin(app: &mut App) {
         .add_systems(
             Update,
             (
-                (apply_lists, settle_drops).chain(),
+                (apply_lists, settle_drops, breathe).chain(),
                 ask_for_lists.in_set(crate::char_select::InWorldGated),
-                breathe,
                 hover_drops.before(super::pin_view),
                 walk_and_pick
                     .after(super::pin_view)
@@ -314,7 +368,11 @@ fn apply_lists(
     mut materials: ResMut<Assets<StandardMaterial>>,
     uniques: Option<Res<super::ArpgUniques>>,
     mut commands: Commands,
+    time: Option<Res<Time>>,
+    mut sounds: Option<ResMut<crate::sound::MessageSounds>>,
+    mut chimed: Local<std::collections::HashSet<u64>>,
 ) {
+    let now = time.map_or(0.0, |t| t.elapsed_secs_f64());
     for list in lists.read() {
         let corpse_pos = index
             .0
@@ -368,6 +426,8 @@ fn apply_lists(
             glow_mats,
             beam_mats,
         } = art(&mut loot_art, &mut meshes, &mut materials).clone();
+        // The best new drop's chime, once per corpse.
+        let mut chime: Option<(usize, &'static str)> = None;
         for (key, kind) in wanted {
             if ground.0.contains_key(&key) {
                 continue;
@@ -378,6 +438,13 @@ fn apply_lists(
                 DropKind::Gold(_) => GOLD_ART,
             };
             let lk = look(art_at);
+            let unique = is_unique(&kind, uniques.as_deref());
+            if let Some(name) = drop_chime(art_at, unique) {
+                let rank = if unique { 9 } else { art_at };
+                if chime.is_none_or(|(best, _)| rank > best) {
+                    chime = Some((rank, name));
+                }
+            }
             let mut visuals = vec![commands
                 .spawn((
                     Mesh3d(glow_mesh.clone()),
@@ -388,6 +455,7 @@ fn apply_lists(
                     LootGlow {
                         radius: lk.glow_radius,
                         phase: f32::from(key.slot) * 0.7,
+                        born: now,
                     },
                 ))
                 .id()];
@@ -399,6 +467,10 @@ fn apply_lists(
                             MeshMaterial3d(beam_mats[art_at].clone()),
                             Transform::from_translation(pos + Vec3::Y * (lk.beam_height * 0.5))
                                 .with_scale(Vec3::new(BEAM_RADIUS, lk.beam_height, BEAM_RADIUS)),
+                            LootBeam {
+                                height: lk.beam_height,
+                                born: now,
+                            },
                         ))
                         .id(),
                 );
@@ -416,6 +488,10 @@ fn apply_lists(
                                     BEAM_RADIUS * UNIQUE_CORE_RADIUS,
                                 ),
                             ),
+                            LootBeam {
+                                height: core,
+                                born: now,
+                            },
                         ))
                         .id(),
                 );
@@ -431,7 +507,14 @@ fn apply_lists(
                 },
             );
         }
+        if let (Some((_, name)), Some(sounds)) = (chime, sounds.as_deref_mut()) {
+            if chimed.insert(list.corpse) {
+                sounds.push_cue(name);
+            }
+        }
     }
+    // A corpse no longer in sight may chime again for a drop it gains.
+    chimed.retain(|c| index.0.contains_key(c));
     // A corpse that despawned or streamed out takes its drops with it.
     let gone: Vec<LootKey> = ground
         .0
@@ -532,12 +615,29 @@ fn settle_drops(
     }
 }
 
-/// The glows breathe: a slow swell of a tenth of their size.
-fn breathe(time: Res<Time>, mut glows: Query<(&LootGlow, &mut Transform)>) {
+/// The glows pop in, then breathe: a slow swell of a tenth of their size. The beams rise out of
+/// the ground, their foot staying where it lies.
+fn breathe(
+    time: Res<Time>,
+    mut glows: Query<(&LootGlow, &mut Transform), Without<LootBeam>>,
+    mut beams: Query<(&LootBeam, &mut Transform), Without<LootGlow>>,
+) {
+    let now = time.elapsed_secs_f64();
     let t = time.elapsed_secs();
     for (glow, mut tf) in &mut glows {
-        let s = glow.radius * (1.0 + 0.1 * (t * 2.2 + glow.phase).sin());
+        let pop = pop_glow((now - glow.born) as f32);
+        let s = glow.radius * pop.max(0.01) * (1.0 + 0.1 * (t * 2.2 + glow.phase).sin());
         tf.scale = Vec3::splat(s);
+    }
+    for (beam, mut tf) in &mut beams {
+        let rise = rise_beam((now - beam.born) as f32);
+        if rise >= 1.0 && tf.scale.y == beam.height {
+            continue;
+        }
+        let foot = tf.translation.y - tf.scale.y * 0.5;
+        let h = (beam.height * rise).max(0.01);
+        tf.scale.y = h;
+        tf.translation.y = foot + h * 0.5;
     }
 }
 
@@ -886,6 +986,42 @@ mod tests {
         assert!(app.world().resource::<GroundLoot>().0.is_empty());
         app.update();
         assert_eq!(visuals(&mut app), 0);
+    }
+
+    #[test]
+    fn a_new_drop_pops_in_and_settles_and_good_ones_chime() {
+        assert_eq!(pop_glow(0.0), 0.0);
+        assert!(pop_glow(POP_SECS * 2.0 / 3.0) > 1.0);
+        assert_eq!(pop_glow(POP_SECS), 1.0);
+        assert_eq!(rise_beam(0.0), 0.0);
+        assert!(rise_beam(POP_SECS * 0.5) > 0.5);
+        assert_eq!(rise_beam(POP_SECS), 1.0);
+        assert_eq!(drop_chime(2, false), None);
+        assert_eq!(drop_chime(GOLD_ART, false), None);
+        assert_eq!(drop_chime(3, false), Some("MapPing"));
+        assert_eq!(drop_chime(1, true), Some("LEVELUP"));
+    }
+
+    #[test]
+    fn a_corpse_chimes_once_for_its_best_drop() {
+        let (mut app, _) = lists_app();
+        app.init_resource::<crate::sound::MessageSounds>();
+        send(&mut app, 0, vec![item(0, 3), item(1, 4)]);
+        assert_eq!(
+            app.world()
+                .resource::<crate::sound::MessageSounds>()
+                .queued_cues(),
+            ["igQuestListComplete"]
+        );
+        // The list again (a re-query): no second chime.
+        send(&mut app, 0, vec![item(0, 3), item(1, 4), item(2, 3)]);
+        assert_eq!(
+            app.world()
+                .resource::<crate::sound::MessageSounds>()
+                .queued_cues()
+                .len(),
+            1
+        );
     }
 
     #[test]

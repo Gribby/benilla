@@ -42,6 +42,13 @@ pub(super) fn register_net(app: &mut App) {
         .net_handler(SessionEventKind::ArpgChampions, on_champions);
 }
 
+impl ArpgChampions {
+    /// The champion tier of the unit with `guid` (1 a champion, 2 a rare), if it is one.
+    pub(super) fn tier_of(&self, guid: u64) -> Option<u8> {
+        self.by_guid.get(&guid).map(|c| c.tier)
+    }
+}
+
 fn on_champions(In(ev): In<SessionEvent>, mut state: ResMut<ArpgChampions>) {
     if let SessionEvent::ArpgChampions { champions } = ev {
         for champion in champions {

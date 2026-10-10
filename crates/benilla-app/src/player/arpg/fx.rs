@@ -49,7 +49,7 @@ fn flash_at(age: f32, peak: f32) -> f32 {
 
 /// Whether a combat text is a damage number: it starts with a digit, where a miss, a dodge or an
 /// immune is a word.
-fn is_damage_number(text: &str) -> bool {
+pub(super) fn is_damage_number(text: &str) -> bool {
     text.trim_start().starts_with(|c: char| c.is_ascii_digit())
 }
 

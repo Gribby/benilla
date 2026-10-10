@@ -9,8 +9,9 @@
 //! camera draw see-through instead (a dither). Each is a saved setting the options window's ARPG
 //! page moves live ([`ARPG_KNOBS`]); its `WOW_ARPG_*` variable seeds it for one session.
 //!
-//! A unit the player hits flashes white (`fx`), and the character turns to a new facing quickly
-//! rather than snapping ([`TURN_RATE`]).
+//! A unit the player hits flashes white (`fx`), a kill bursts and kicks the camera (`juice`), a
+//! good drop rises in and chimes (`loot`), and the character turns to a new facing quickly rather
+//! than snapping ([`TURN_RATE`]).
 //!
 //! WASD then walk relative to that camera, not the character ([`steer`]): W is up the screen, S
 //! down, A left, D right, and the character turns to face the way it walks.
@@ -35,6 +36,7 @@
 mod actions;
 mod champions;
 mod fx;
+mod juice;
 mod loot;
 mod tree;
 mod uniques;
@@ -269,6 +271,8 @@ pub(super) fn plugin(app: &mut App) {
     crate::target::arpg_soft::plugin(app);
     // The struck unit's white flash.
     fx::plugin(app);
+    // The kill bursts and the camera's kick.
+    juice::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
     // The skill tree window's feed and requests.
