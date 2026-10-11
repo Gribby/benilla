@@ -414,6 +414,92 @@ pub fn read_arpg_globe(r: &mut impl io::Read) -> io::Result<ArpgGlobe> {
     })
 }
 
+/// A proc's line for the combat log (cmangos `Arpg/ArpgCombat.h`).
+pub const SMSG_ARPG_PROC: u16 = 0x0346;
+/// Its kinds: a heal or mana on the player (its amount floats over them), a hit, anything else.
+pub const PROC_HEAL: u8 = 1;
+pub const PROC_MANA: u8 = 2;
+pub const PROC_DAMAGE: u8 = 3;
+pub const PROC_EFFECT: u8 = 4;
+
+/// A proc: the mechanic that fired, said in one line, its name already in the proc colour.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgProc {
+    /// [`PROC_HEAL`], [`PROC_MANA`], [`PROC_DAMAGE`] or [`PROC_EFFECT`].
+    pub kind: u8,
+    /// The health or mana it gave the player; 0 for the others.
+    pub amount: u32,
+    pub line: String,
+}
+
+/// `SMSG_ARPG_PROC`: `u8` kind, `u32` amount, cstring line.
+pub fn read_arpg_proc(r: &mut impl io::Read) -> io::Result<ArpgProc> {
+    Ok(ArpgProc {
+        kind: read_u8(r)?,
+        amount: read_u32_le(r)?,
+        line: read_cstring(r)?,
+    })
+}
+
+/// The character sheet (cmangos `Arpg/ArpgCharacter.h`): what the attributes do and what adds to
+/// each skill, at the character's own numbers.
+pub const SMSG_ARPG_SHEET: u16 = 0x0347;
+
+/// The sheet; every text is lines with `\n` between, colour escapes included.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgSheet {
+    /// Strength, Agility, Stamina, Intellect, Spirit.
+    pub attributes: Vec<String>,
+    /// By skill id, the skill's "what adds to it".
+    pub skills: Vec<(u8, String)>,
+    /// Movement, cooldowns, areas, damage by tag and the worn uniques.
+    pub summary: String,
+}
+
+/// `SMSG_ARPG_SHEET`: `u8` version, `u8` attribute count and a cstring each, `u8` skill count and
+/// per skill `u8` id and a cstring, then the summary cstring.
+pub fn read_arpg_sheet(r: &mut impl io::Read) -> io::Result<ArpgSheet> {
+    let _version = read_u8(r)?;
+    let count = read_u8(r)?;
+    let mut attributes = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        attributes.push(read_cstring(r)?);
+    }
+    let count = read_u8(r)?;
+    let mut skills = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let id = read_u8(r)?;
+        skills.push((id, read_cstring(r)?));
+    }
+    Ok(ArpgSheet {
+        attributes,
+        skills,
+        summary: read_cstring(r)?,
+    })
+}
+
+/// A share hit's impact (cmangos `Arpg/ArpgUniques.h`): an added hit with no missile of its own,
+/// to land with the spell's own hit visual.
+pub const SMSG_ARPG_IMPACT: u16 = 0x0348;
+
+/// One share hit's impact.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ArpgImpact {
+    pub unit: u64,
+    pub spell: u32,
+    /// The hit's school mask, for a spell with no impact kit of its own.
+    pub school_mask: u32,
+}
+
+/// `SMSG_ARPG_IMPACT`: raw `u64` unit, `u32` spell, `u32` school mask.
+pub fn read_arpg_impact(r: &mut impl io::Read) -> io::Result<ArpgImpact> {
+    Ok(ArpgImpact {
+        unit: read_u64_le(r)?,
+        spell: read_u32_le(r)?,
+        school_mask: read_u32_le(r)?,
+    })
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -703,6 +789,50 @@ mod tests {
                 pos: [1.0, 2.0, 3.0],
             }
         );
+    }
+
+    #[test]
+    fn an_impact_reads_its_unit_spell_and_school() {
+        let mut body = 0xF130_0000_0000_0042u64.to_le_bytes().to_vec();
+        body.extend_from_slice(&25742u32.to_le_bytes());
+        body.extend_from_slice(&2u32.to_le_bytes());
+        assert_eq!(
+            read_arpg_impact(&mut body.as_slice()).unwrap(),
+            ArpgImpact {
+                unit: 0xF130_0000_0000_0042,
+                spell: 25742,
+                school_mask: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn a_proc_reads_its_kind_amount_and_line() {
+        let mut body = vec![PROC_HEAL];
+        body.extend_from_slice(&42u32.to_le_bytes());
+        body.extend_from_slice(b"Health Globe heals you for 42.\0");
+        assert_eq!(
+            read_arpg_proc(&mut body.as_slice()).unwrap(),
+            ArpgProc {
+                kind: PROC_HEAL,
+                amount: 42,
+                line: "Health Globe heals you for 42.".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn a_sheet_reads_attributes_skills_and_summary() {
+        let mut body = vec![1, 2];
+        body.extend_from_slice(b"+40 attack power.\0+20 armour.\0");
+        body.push(1);
+        body.push(2);
+        body.extend_from_slice(b"Tags: Holy\nDamage +12%\0");
+        body.extend_from_slice(b"Movement speed +10%\0");
+        let sheet = read_arpg_sheet(&mut body.as_slice()).unwrap();
+        assert_eq!(sheet.attributes, ["+40 attack power.", "+20 armour."]);
+        assert_eq!(sheet.skills, [(2, "Tags: Holy\nDamage +12%".to_string())]);
+        assert_eq!(sheet.summary, "Movement speed +10%");
     }
 
     #[test]

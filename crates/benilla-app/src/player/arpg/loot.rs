@@ -13,6 +13,10 @@
 //! The loot filter (`arpgLootFilter`, the options window's ARPG View page) hides the labels of
 //! the low qualities ([`label_shown`]); their glows stay, and Alt still shows them.
 //! A corpse that despawns or streams out takes its drops with it.
+//! The art is the game's own where it can be: the glow is the selection circle every target
+//! stands in (`UnitSelectTexture.blp`) in the drop's colour, turning slowly, and the beam a soft
+//! column of light that turns to the camera, bright at its core and foot and fading out at its
+//! edges and top, added over the scene as a spell's glow is.
 //! A new drop's glow pops in and its beam rises out of the ground; a corpse's best drop of blue
 //! or better chimes, once ([`drop_chime`]).
 
@@ -66,8 +70,12 @@ const GOLDEN_ANGLE: f32 = 2.399_963;
 
 /// The glow's lift off the ground, against z-fighting, in yards.
 const GLOW_LIFT: f32 = 0.06;
-/// The beam's radius, in yards.
-const BEAM_RADIUS: f32 = 0.09;
+/// The beam's half width, in yards (its soft edges fade to nothing there).
+const BEAM_RADIUS: f32 = 0.32;
+/// The selection circle's texture, the glow's.
+const GLOW_TEXTURE: &str = "mpq://textures/unitselecttexture.blp";
+/// How fast a glow's ring turns, in radians a second.
+const GLOW_SPIN: f32 = 0.6;
 /// A unique's gold beam core: this share of the beam's radius, this much taller, and never
 /// shorter than [`UNIQUE_CORE_MIN`] yards.
 const UNIQUE_CORE_RADIUS: f32 = 0.45;
@@ -111,10 +119,10 @@ fn look(art: usize) -> Look {
     let (glow_radius, glow_alpha, beam_height, beam_alpha) = match art {
         0 => (0.40, 0.45, 0.0, 0.0),
         1 => (0.45, 0.55, 0.0, 0.0),
-        2 => (0.50, 0.55, 2.5, 0.30),
-        3 => (0.55, 0.60, 4.5, 0.35),
-        4 => (0.60, 0.65, 6.5, 0.40),
-        5 | 6 => (0.65, 0.70, 9.0, 0.45),
+        2 => (0.50, 0.55, 2.5, 0.55),
+        3 => (0.55, 0.60, 4.5, 0.65),
+        4 => (0.60, 0.65, 6.5, 0.75),
+        5 | 6 => (0.65, 0.70, 9.0, 0.85),
         _ => (0.30, 0.50, 0.0, 0.0), // the gold
     };
     Look {
@@ -324,32 +332,70 @@ fn coin_text(copper: u32) -> String {
     parts.join(" ")
 }
 
+/// The beam: a quad one unit tall (centred) and two wide, in three columns and three rows, its
+/// vertex alpha full at the centre line's foot and nothing at its edges and top.
+fn beam_mesh() -> Mesh {
+    let mut positions = Vec::new();
+    let mut colors = Vec::new();
+    let mut uvs = Vec::new();
+    // Bottom to top: the foot full, a third of the way still strong, the top gone.
+    let rows = [(-0.5_f32, 1.0_f32), (-0.15, 0.7), (0.5, 0.0)];
+    for (y, fade) in rows {
+        for x in [-1.0_f32, 0.0, 1.0] {
+            let a = (1.0 - x.abs()) * fade;
+            positions.push([x, y, 0.0]);
+            colors.push([1.0, 1.0, 1.0, a]);
+            uvs.push([0.5 + 0.5 * x, 0.5 - y]);
+        }
+    }
+    let mut indices = Vec::new();
+    for row in 0..2u32 {
+        for col in 0..2u32 {
+            let a = row * 3 + col;
+            indices.extend_from_slice(&[a, a + 1, a + 3, a + 1, a + 4, a + 3]);
+        }
+    }
+    let n = positions.len();
+    Mesh::new(
+        bevy::mesh::PrimitiveTopology::TriangleList,
+        bevy::asset::RenderAssetUsages::default(),
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 0.0, 1.0]; n])
+    .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_COLOR, colors)
+    .with_inserted_indices(bevy::mesh::Indices::U32(indices))
+}
+
 /// The shared art, made once.
 fn art<'a>(
     art: &'a mut LootArt,
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
+    asset_server: Option<&AssetServer>,
 ) -> &'a Art {
     art.0.get_or_insert_with(|| {
-        let mut material = |rgb: [f32; 3], alpha: f32| {
+        let ring = asset_server.map(|a| a.load::<Image>(GLOW_TEXTURE));
+        // Unlit, depth-tested, added over the scene, two-sided, as a spell's glow draws.
+        let mut material = |rgb: [f32; 3], alpha: f32, texture: Option<Handle<Image>>| {
             materials.add(StandardMaterial {
                 base_color: Color::srgba(rgb[0], rgb[1], rgb[2], alpha),
-                // The raid marks' world-pass state: unlit, depth-tested, blended, two-sided.
+                base_color_texture: texture,
                 unlit: true,
-                alpha_mode: AlphaMode::Blend,
+                alpha_mode: AlphaMode::Add,
                 cull_mode: None,
                 ..default()
             })
         };
         let glows = (0..QUALITY_RGB.len())
-            .map(|i| material(QUALITY_RGB[i], look(i).glow_alpha))
+            .map(|i| material(QUALITY_RGB[i], look(i).glow_alpha, ring.clone()))
             .collect();
         let beams = (0..QUALITY_RGB.len())
-            .map(|i| material(QUALITY_RGB[i], look(i).beam_alpha))
+            .map(|i| material(QUALITY_RGB[i], look(i).beam_alpha, None))
             .collect();
         Art {
-            glow_mesh: meshes.add(Circle::new(1.0)),
-            beam_mesh: meshes.add(Cylinder::new(1.0, 1.0)),
+            glow_mesh: meshes.add(Rectangle::new(2.0, 2.0)),
+            beam_mesh: meshes.add(beam_mesh()),
             glow_mats: glows,
             beam_mats: beams,
         }
@@ -371,6 +417,7 @@ fn apply_lists(
     time: Option<Res<Time>>,
     mut sounds: Option<ResMut<crate::sound::MessageSounds>>,
     mut chimed: Local<std::collections::HashSet<u64>>,
+    asset_server: Option<Res<AssetServer>>,
 ) {
     let now = time.map_or(0.0, |t| t.elapsed_secs_f64());
     for list in lists.read() {
@@ -425,7 +472,13 @@ fn apply_lists(
             beam_mesh,
             glow_mats,
             beam_mats,
-        } = art(&mut loot_art, &mut meshes, &mut materials).clone();
+        } = art(
+            &mut loot_art,
+            &mut meshes,
+            &mut materials,
+            asset_server.as_deref(),
+        )
+        .clone();
         // The best new drop's chime, once per corpse.
         let mut chime: Option<(usize, &'static str)> = None;
         for (key, kind) in wanted {
@@ -466,7 +519,7 @@ fn apply_lists(
                             Mesh3d(beam_mesh.clone()),
                             MeshMaterial3d(beam_mats[art_at].clone()),
                             Transform::from_translation(pos + Vec3::Y * (lk.beam_height * 0.5))
-                                .with_scale(Vec3::new(BEAM_RADIUS, lk.beam_height, BEAM_RADIUS)),
+                                .with_scale(Vec3::new(BEAM_RADIUS, lk.beam_height, 1.0)),
                             LootBeam {
                                 height: lk.beam_height,
                                 born: now,
@@ -481,13 +534,8 @@ fn apply_lists(
                         .spawn((
                             Mesh3d(beam_mesh.clone()),
                             MeshMaterial3d(beam_mats[UNIQUE_ART].clone()),
-                            Transform::from_translation(pos + Vec3::Y * (core * 0.5)).with_scale(
-                                Vec3::new(
-                                    BEAM_RADIUS * UNIQUE_CORE_RADIUS,
-                                    core,
-                                    BEAM_RADIUS * UNIQUE_CORE_RADIUS,
-                                ),
-                            ),
+                            Transform::from_translation(pos + Vec3::Y * (core * 0.5))
+                                .with_scale(Vec3::new(BEAM_RADIUS * UNIQUE_CORE_RADIUS, core, 1.0)),
                             LootBeam {
                                 height: core,
                                 born: now,
@@ -621,6 +669,7 @@ fn breathe(
     time: Res<Time>,
     mut glows: Query<(&LootGlow, &mut Transform), Without<LootBeam>>,
     mut beams: Query<(&LootBeam, &mut Transform), Without<LootGlow>>,
+    camera: Query<&GlobalTransform, With<WorldCamera>>,
 ) {
     let now = time.elapsed_secs_f64();
     let t = time.elapsed_secs();
@@ -628,8 +677,18 @@ fn breathe(
         let pop = pop_glow((now - glow.born) as f32);
         let s = glow.radius * pop.max(0.01) * (1.0 + 0.1 * (t * 2.2 + glow.phase).sin());
         tf.scale = Vec3::splat(s);
+        tf.rotation =
+            Quat::from_rotation_x(-FRAC_PI_2) * Quat::from_rotation_z(t * GLOW_SPIN + glow.phase);
     }
+    let eye = camera.single().ok().map(|c| c.translation());
     for (beam, mut tf) in &mut beams {
+        // The column turns to the camera about its own upright.
+        if let Some(eye) = eye {
+            let d = eye - tf.translation;
+            if d.x * d.x + d.z * d.z > 1e-4 {
+                tf.rotation = Quat::from_rotation_y(d.x.atan2(d.z));
+            }
+        }
         let rise = rise_beam((now - beam.born) as f32);
         if rise >= 1.0 && tf.scale.y == beam.height {
             continue;

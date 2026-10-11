@@ -291,6 +291,18 @@ fn resolve_kit(
         .flatten()
 }
 
+/// Fork-only, not 1.12.1: `spell_id`'s impact kit, for the ARPG server's share hits (an arc, a
+/// burst, a cleave) that land with no missile of their own.
+pub(crate) fn impact_kit_id(
+    spells: &crate::ui_action::Spells,
+    visuals: &SpellVisuals,
+    spell_id: u32,
+) -> Option<u32> {
+    resolve_stages(spells, &visuals.0, spell_id, || None)
+        .map(|s| s.impact)
+        .filter(|&kit| kit != 0 && visuals.0.kit(kit).is_some())
+}
+
 /// [`resolve_kit`] plus one `fx` trace line saying why a basic shot's kit did or did not resolve:
 /// `weapon=not-consulted` (not ranged), `weapon=none` (no ranged visual) or the weapon visual id.
 fn resolve_kit_traced(

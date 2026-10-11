@@ -65,8 +65,9 @@ pub use action_bar::{
 pub use addons::{hidden_from_reply, SecureAddon, STANDARD_MODULUS_CRC, STOCK_SECURE_ADDONS};
 pub use area_trigger::area_trigger;
 pub use arpg::{
-    ArpgChampion, ArpgGlobe, ArpgLootItem, ArpgRune, ArpgSkill, ArpgSkillNode, ArpgSkillSlot,
-    ArpgSkills, ArpgStatus, ArpgTelegraph, ArpgTree, ArpgTreeNode, ArpgTreeRegion,
+    ArpgChampion, ArpgGlobe, ArpgImpact, ArpgLootItem, ArpgProc, ArpgRune, ArpgSheet, ArpgSkill,
+    ArpgSkillNode, ArpgSkillSlot, ArpgSkills, ArpgStatus, ArpgTelegraph, ArpgTree, ArpgTreeNode,
+    ArpgTreeRegion,
 };
 pub use attack::{attack_swing, AttackSwingError, AttackerState};
 pub use auction::{

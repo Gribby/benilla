@@ -545,8 +545,8 @@ mod blood;
 mod env_damage;
 pub(crate) mod net;
 pub(crate) mod spell_visual;
+pub(crate) use blood::{arpg_spurts, kill_splats, BloodTables};
 use blood::{blood_spurts, load_blood_tables};
-pub(crate) use blood::{kill_splats, BloodTables};
 use env_damage::{hard_landing_dust, load_env_damage_table};
 pub(crate) use env_damage::{EnvDamageTable, HardLanding, HARD_LANDING_DESCENT};
 use spell_visual::{

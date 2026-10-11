@@ -101,10 +101,12 @@ making the stat mandatory:
 | **Intellect** | Mana, spell crit | Spell area: bigger Consecration, Holy Wrath, Blizzard | +1% radius per 10 Int | +40% |
 | **Spirit** | Regeneration | Cooldown recovery | +1% per 10 Spirit | +30% |
 
-Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting (1% of the maximum per
-swing that lands, 1% per skill hit, 3% per kill, and each swing and skill hit adds the mana on
-hit of the web's Bloodthirst and Devotion nodes and the "+N mana on hit" item affix), and two seconds out of combat health and mana
-flow back at 8% a second, so nobody sits down to drink. Every class spell's global cooldown is a
+Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting, slowly enough that spells
+and drains show (0.5% of the maximum per swing that lands, 0.5% for a skill hit at most once a
+second, 2% per kill, and each swing and skill hit adds the mana on
+hit of the web's Bloodthirst and Devotion nodes and the "+N mana on hit" item affix), and five seconds out of a fight (out of combat, no hit dealt or
+taken) health flows back at 5% a second and mana at 2%, so nobody sits down to drink, but a run
+between packs is not a refill. Every class spell's global cooldown is a
 third of vanilla's (0.5 sec) and its cast time half.
 
 Other ARPG stats exist only on items and tree nodes, never as base attributes: area size,
@@ -173,7 +175,7 @@ gate two things on top: the capstones, and a rune socket per skill.
   whose theme fits it (Whirling Strikes from Herod, Walking Consecration from High Inquisitor
   Whitemane). Read once and it's yours for that character; then you still spend points on it.
 - **Each page has a home boss and a fallback.** The home boss drops it often enough that a few
-  runs find it. Champion packs (from the mob packs step) drop **Codex fragments**, and five
+  runs find it. Each dungeon's final boss drops one **Codex fragment** in its Cache, and five
   fragments make any page for a skill you have specialised. Bad luck is never a wall, only a
   slower road.
 - **Why capstones:** they're the build-defining part, so finding one is an event ("I finally got
@@ -211,8 +213,8 @@ server; the Skills tab on the client.
   SQL needs applying; picked up, it is read at once rather than going into the bags. Home bosses
   drop their page 35% of the time, plus 7 points per difficulty tier. A page already read tears
   into two fragments. Capstones taken before pages existed count as read.
-- *Fragments:* champions 12%, rares 40%, other dungeon bosses 25%, Wardens two, Caches one and a
-  50% chance at another (each tier adds a quarter). Five unseal any capstone of a specialised
+- *Fragments:* one from each final boss's Cache; no other kill drops them (a page already read
+  still tears into two). Five unseal any capstone of a specialised
   skill: Shift-click it in the Skills tab.
 - *Runes:* the socket (top right of a skill's tree) opens at 10 points; click it to choose. Nine
   runes, each fitting some skills: Chains (Judgement), Shattering (Judgement, Seals), Expanse
@@ -281,10 +283,15 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     in the item's fourth enchantment slot.
 - **Built (affixes):** `Arpg/ArpgAffixes.{h,cpp}` on the server. Every green, blue and purple
   weapon or armour piece dropped for an ARPG player (not a named unique) rolls 1, 2 or 3 affixes
-  from: +Strength, Agility, Stamina, Intellect, Spirit (4-20), +% Holy, Physical, Melee, Spell
-  damage (2-12 or 2-10), +% Area damage (3-15), +% healing (3-12), +% armour (3-15), +% block
-  chance (shields, 1-5), +% movement speed (boots, 2-8), +% cooldown recovery (2-10), +life on
-  kill (3-30), each at level 60 values scaled by item level. The roll is one seed per item, kept
+  (one more on a raid purple, one more from Torment I) from: +Strength, Agility, Stamina,
+  Intellect, Spirit (8-30), +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow damage (6-20),
+  +% Area (8-24), Projectile (6-18), Melee and Spell damage (5-16), +% healing (5-18), +% armour
+  (5-25, at most 60), +% block chance (shields, 2-6, at most 15), +% movement speed (boots, 3-8,
+  at most 15), +% cooldown recovery (3-10, at most 20), +life on kill (5-40), +mana on hit
+  (2-10). Those are item level 60 values on Normal: they grow by half again every nine item
+  levels or so (a level 20 drop rolls about a seventh of them, Molten Core a third more,
+  Blackwing Lair about twice, Naxxramas three to four times) and by the dungeon tier the item
+  dropped at (x1.15 Hard up to x2 Torment III, named over the affixes in the tooltip). The roll is one seed per item, kept
   in `character_arpg_item`; worn affixes add into the same totals as the web. The tooltip shows
   them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`, 0x343). The
   "+N to a skill" affixes are not built yet.

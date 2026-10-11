@@ -40,6 +40,8 @@ mod globes;
 mod impact;
 mod juice;
 mod loot;
+mod sheet;
+mod strikes;
 mod threats;
 mod tree;
 mod uniques;
@@ -267,6 +269,8 @@ pub(super) fn plugin(app: &mut App) {
     actions::register_net(app);
     threats::register_net(app);
     globes::register_net(app);
+    sheet::register_net(app);
+    strikes::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -284,6 +288,10 @@ pub(super) fn plugin(app: &mut App) {
     impact::plugin(app);
     // Health globes.
     globes::plugin(app);
+    // Procs in the combat log, and the character sheet for the HUD.
+    sheet::plugin(app);
+    // The added hits' impact kits, and the blood off crits and heavy kills.
+    strikes::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
     // The skill tree window's feed and requests.
@@ -1178,9 +1186,12 @@ mod tests {
              assert(MANAGED == 1 and not MainMenuBarLeftEndCap:IsVisible())\n\
              refresh()\nrefreshOrbs()\n\
              paintOrb(healthOrb, 0.5, HEALTH_COLOR, 50)\n\
-             assert(healthOrb.filled == ORB_SLICES / 2, healthOrb.filled)\n\
+             assert(healthOrb.target == 0.5, healthOrb.target)\n\
+             for i = 1, 60 do animateOrb(healthOrb, 0.1, i * 0.1) end\n\
+             assert(math.abs(healthOrb.shown - 0.5) < 0.01, healthOrb.shown)\n\
+             assert(healthOrb.cols[1].wet ~= nil)\n\
              paintOrb(powerOrb, 2, POWER_COLORS[1], 9)\n\
-             assert(powerOrb.filled == ORB_SLICES)\n"
+             assert(powerOrb.target == 1)\n"
         );
         script.run(&chunk).expect("the HUD addon runs");
     }

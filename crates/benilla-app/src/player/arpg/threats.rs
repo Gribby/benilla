@@ -7,6 +7,11 @@
 //! caster, its death) greys out instead. Standing inside when it lands kicks the camera. The
 //! server decides the damage; walking out or rolling avoids it.
 //!
+//! A mark wears the game's own ground-target art: the red circle a ground-targeted spell shows
+//! when it can't be cast there (`Spell-Shadow-Unacceptable.blp`, the reticle's), laid over the
+//! mark so a circle is the whole circle, a cone a slice of it and a line a strip from its centre
+//! to its rim, tinted toward the attacker's grade.
+//!
 //! A mark lies over the ground, not flat at the caster's height: it is a polar grid of rings and
 //! spokes, each point set down on the ground under it (a ray to the world's floors and terrain)
 //! when the mark arrives, so it follows a hillside or a stair.
@@ -27,6 +32,13 @@ use crate::net::{GuidIndex, NetHandlerApp, ObjectStore, SelfPlayer};
 
 use super::juice::CameraShake;
 use super::*;
+
+/// The ground-target reticle's out-of-range circle, the marks' texture.
+const MARK_TEXTURE: &str = "mpq://interface/spellshadow/spell-shadow-unacceptable.blp";
+/// How far a grade's colour tints the texture's own red (0 none, 1 all).
+const GRADE_TINT: f32 = 0.35;
+/// A line's strip of the circle: how much of its width either side of the centre line.
+const LINE_UV_HALF: f32 = 0.2;
 
 /// How long the landing flash and the broken fade last, in seconds.
 const FLASH_SECS: f32 = 0.3;
@@ -238,6 +250,23 @@ impl Drape {
         a + (b - a) * t
     }
 
+    /// Where a point of the mark falls on the circle texture: a circle's or a cone's at its polar
+    /// place, a line's along a strip from the circle's centre to its rim.
+    fn uv(&self, frac: f32, spoke: usize) -> [f32; 2] {
+        let f = frac.clamp(0.0, 1.0);
+        match self.line {
+            Some(_) => {
+                let n = self.spokes.len().max(2);
+                let across = 2.0 * spoke as f32 / (n - 1) as f32 - 1.0;
+                [0.5 + 0.5 * f, 0.5 + LINE_UV_HALF * across]
+            }
+            None => {
+                let d = self.spokes[spoke];
+                [0.5 + 0.5 * f * d.x, 0.5 + 0.5 * f * d.z]
+            }
+        }
+    }
+
     /// A point of the mark, relative to its centre on the ground plane, at its ground height.
     fn point(&self, frac: f32, spoke: usize, lift: f32) -> [f32; 3] {
         let flat = self.flat(frac, spoke);
@@ -252,6 +281,7 @@ impl Drape {
             let f = f0 + (f1 - f0) * j as f32 / steps as f32;
             for s in 0..n {
                 out.positions.push(self.point(f, s, lift));
+                out.uvs.push(self.uv(f, s));
             }
         }
         let joins = if self.closed { n } else { n - 1 };
@@ -279,6 +309,9 @@ impl Drape {
                 let [x, y, z] = self.point(f, spoke, lift);
                 out.positions.push([x - across.x, y, z - across.z]);
                 out.positions.push([x + across.x, y, z + across.z]);
+                let uv = self.uv(f, spoke);
+                out.uvs.push(uv);
+                out.uvs.push(uv);
             }
             for j in 0..RINGS as u32 {
                 let a = base + j * 2;
@@ -293,6 +326,7 @@ impl Drape {
 #[derive(Default)]
 struct MeshParts {
     positions: Vec<[f32; 3]>,
+    uvs: Vec<[f32; 2]>,
     indices: Vec<u32>,
 }
 
@@ -305,7 +339,7 @@ impl MeshParts {
         )
         .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, self.positions)
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, vec![[0.0, 1.0, 0.0]; n])
-        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, vec![[0.0, 0.0]; n])
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, self.uvs)
         .with_inserted_indices(Indices::U32(self.indices))
     }
 }
@@ -398,13 +432,21 @@ fn inside(live: &Live, point: Vec3, reach: f32) -> bool {
     angle <= live.half_angle + (reach / dist).atan()
 }
 
+/// The tint over the texture's own red: white leaned toward the grade's colour.
+fn tint(rgb: [f32; 3]) -> [f32; 3] {
+    rgb.map(|c| 1.0 + (c - 1.0) * GRADE_TINT)
+}
+
 fn material(
     materials: &mut Assets<StandardMaterial>,
+    texture: &Option<Handle<Image>>,
     rgb: [f32; 3],
     alpha: f32,
 ) -> Handle<StandardMaterial> {
+    let rgb = tint(rgb);
     materials.add(StandardMaterial {
         base_color: Color::srgba(rgb[0], rgb[1], rgb[2], alpha),
+        base_color_texture: texture.clone(),
         unlit: true,
         alpha_mode: AlphaMode::Blend,
         cull_mode: None,
@@ -423,8 +465,14 @@ fn take_telegraphs(
     mut materials: ResMut<Assets<StandardMaterial>>,
     spatial: avian3d::prelude::SpatialQuery,
     occluders: Query<(), With<benilla_world::collision::PickOccluder>>,
+    asset_server: Option<Res<AssetServer>>,
+    mut texture: Local<Option<Handle<Image>>>,
 ) {
     let now = time.elapsed_secs_f64();
+    if texture.is_none() {
+        *texture = asset_server.map(|a| a.load::<Image>(MARK_TEXTURE));
+    }
+    let texture = texture.clone();
     for t in std::mem::take(&mut state.incoming) {
         if t.kind == TELEGRAPH_BROKEN {
             if let Some(l) = live.0.get_mut(&t.serial) {
@@ -481,7 +529,7 @@ fn take_telegraphs(
             (Part::Fill, fill.clone(), FILL_ALPHA),
             (Part::Edge, edge.clone(), EDGE_ALPHA),
         ] {
-            let mat = material(&mut materials, rgb, alpha);
+            let mat = material(&mut materials, &texture, rgb, alpha);
             mats.push(mat.clone());
             parts.push(
                 commands
@@ -599,7 +647,7 @@ fn run_telegraphs(
         match mark_at(age, l.wind_up, broken) {
             None => spent.push(*serial),
             Some((grow, alphas, grey)) => {
-                let rgb = if grey { BROKEN_RGB } else { l.rgb };
+                let rgb = if grey { BROKEN_RGB } else { tint(l.rgb) };
                 if (grow - l.fill_at).abs() >= FILL_STEP {
                     if let Some(mesh) = meshes.get_mut(&l.fill) {
                         *mesh = fill_mesh(&l.drape, grow);

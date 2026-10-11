@@ -44,6 +44,38 @@ pub(crate) fn kill_splats(
     blood.0.splats(blood_id as i32, VIOLENCE_LEVEL).to_vec()
 }
 
+/// Fork-only, not 1.12.1: the ARPG view's spurts off the swing path, the same `UnitBlood` models
+/// the melee spurt plays: a crit's one in front, and a heavy kill's large pair, front and back.
+pub(crate) fn arpg_spurts(
+    blood: &BloodTables,
+    creatures: &crate::entities::Creatures,
+    visuals: &SpellVisuals,
+    display_id: u32,
+    large: bool,
+) -> Vec<FxSlot> {
+    let Some((disp_blood, model_blood)) = creatures.blood_candidates(display_id) else {
+        return Vec::new();
+    };
+    let Some(blood_id) = blood.0.level_key(disp_blood, model_blood) else {
+        return Vec::new();
+    };
+    let sides: &[bool] = if large { &[true, false] } else { &[true] };
+    sides
+        .iter()
+        .filter_map(|&front| {
+            let effect = blood
+                .0
+                .effect_id(blood_id as i32, VIOLENCE_LEVEL, front, large)?;
+            let path = visuals.0.effect_path(effect)?;
+            Some(FxSlot {
+                tag: if front { ATTACH_FRONT } else { ATTACH_BACK },
+                effect,
+                path: path.to_string(),
+            })
+        })
+        .collect()
+}
+
 /// Load the blood tables off the patch chain at startup.
 pub(super) fn load_blood_tables(mut commands: Commands, assets: Option<Res<WorldAssets>>) {
     let Some(assets) = assets else { return };

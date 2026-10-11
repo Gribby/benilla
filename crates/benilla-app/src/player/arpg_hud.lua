@@ -109,13 +109,17 @@ end)
 driver:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 driver:SetScript("OnEvent", refresh)
 
--- The health and power orbs, Diablo's globes, at the bottom corners of the screen. Each is a
--- stack of horizontal slices cut to a circle; the slices under the fill line take the orb's colour,
--- shaded darker toward the rim, and those above it stay dark glass. The power orb takes the
--- player's power colour: blue mana, red rage, yellow energy.
+-- The health and power orbs, Diablo's globes, at the bottom corners of the screen, each with
+-- the main bar's own gryphon (its end cap's art) perched on top. An orb is a glass circle in a
+-- bronze rim, cut into thin vertical columns; each column's liquid rises to the fill line, and
+-- the line sloshes: two slow waves run across its surface, it eases to a new level instead of
+-- jumping, and a few bubbles rise through it. The surface wears a bright meniscus. The power orb
+-- takes the player's power colour: blue mana, red rage, yellow energy.
 
-local ORB_RADIUS, ORB_SLICES, ORB_INSET = 56, 48, 18
-local RIM = 3
+local ORB_RADIUS, ORB_COLS, ORB_INSET = 56, 44, 18
+local RIM = 4
+local ORB_BUBBLES = 6
+local GRYPHON = "Interface\\MainMenuBar\\UI-MainMenuBar-EndCap-Human"
 
 local POWER_COLORS = {
     [0] = { 0.12, 0.30, 0.95 }, -- mana
@@ -125,7 +129,7 @@ local POWER_COLORS = {
 }
 local HEALTH_COLOR = { 0.80, 0.06, 0.06 }
 
-local function makeOrb(frameName, corner, x)
+local function makeOrb(frameName, corner, x, mirrored)
     local size = ORB_RADIUS * 2
     local orb = CreateFrame("Frame", frameName, UIParent)
     orb:SetWidth(size + RIM * 2)
@@ -133,63 +137,151 @@ local function makeOrb(frameName, corner, x)
     orb:SetPoint(corner, UIParent, corner, x, ORB_INSET)
     orb:SetFrameStrata("MEDIUM")
 
-    local step = size / ORB_SLICES
-    orb.slices = {}
-    orb.shade = {}
-    for i = 1, ORB_SLICES do
-        -- The slice's centre height over the orb's centre, and its half-width on the circle.
-        local y = (i - 0.5) * step - ORB_RADIUS
-        local half = math.sqrt(math.max(ORB_RADIUS * ORB_RADIUS - y * y, 0))
-        -- The rim: a dark band either side of the glass.
-        local rhalf = math.sqrt(math.max((ORB_RADIUS + RIM) * (ORB_RADIUS + RIM) - y * y, 0))
+    local step = size / ORB_COLS
+    orb.cols = {}
+    for i = 1, ORB_COLS do
+        -- The column's centre across the orb, and the circle's half-height there.
+        local cx = (i - 0.5) * step - ORB_RADIUS
+        local half = math.sqrt(math.max(ORB_RADIUS * ORB_RADIUS - cx * cx, 0))
+        local rhalf = math.sqrt(math.max((ORB_RADIUS + RIM) * (ORB_RADIUS + RIM) - cx * cx, 0))
         local rim = orb:CreateTexture(nil, "BACKGROUND")
-        rim:SetTexture(0.05, 0.04, 0.03, 0.9)
-        rim:SetWidth(math.max(rhalf * 2, 1))
-        rim:SetHeight(step + 0.5)
-        rim:SetPoint("BOTTOM", orb, "BOTTOM", 0, RIM + (i - 1) * step)
-
-        local slice = orb:CreateTexture(nil, "ARTWORK")
-        slice:SetWidth(math.max(half * 2, 1))
-        slice:SetHeight(step + 0.5)
-        slice:SetPoint("BOTTOM", orb, "BOTTOM", 0, RIM + (i - 1) * step)
-        orb.slices[i] = slice
-        -- Lighter in the upper middle, darker at the bottom: a little roundness.
-        orb.shade[i] = 0.55 + 0.45 * math.sqrt(math.sin(math.pi * (i - 0.5) / ORB_SLICES))
-            * (0.75 + 0.25 * (i / ORB_SLICES))
+        -- Bronze, lit from above.
+        rim:SetTexture(0.36, 0.27, 0.12, 1)
+        rim:SetWidth(step + 0.5)
+        rim:SetHeight(math.max(rhalf * 2, 1))
+        rim:SetPoint("CENTER", orb, "CENTER", cx, 0)
+        local glass = orb:CreateTexture(nil, "BORDER")
+        local k = 0.6 + 0.4 * math.cos(cx / ORB_RADIUS * 1.4)
+        glass:SetTexture(0.05 * k, 0.045 * k, 0.06 * k, 0.92)
+        glass:SetWidth(step + 0.5)
+        glass:SetHeight(math.max(half * 2, 1))
+        glass:SetPoint("CENTER", orb, "CENTER", cx, 0)
+        local liquid = orb:CreateTexture(nil, "ARTWORK")
+        liquid:SetWidth(step + 0.5)
+        liquid:SetPoint("BOTTOM", orb, "CENTER", cx, -half)
+        local foam = orb:CreateTexture(nil, "OVERLAY")
+        foam:SetWidth(step + 0.5)
+        foam:SetHeight(1.5)
+        liquid:Hide()
+        foam:Hide()
+        orb.cols[i] = { x = cx, half = half, liquid = liquid, foam = foam, wet = false, foamy = false,
+            -- Lighter left of centre, darker at the rim: a lit sphere.
+            shade = 0.45 + 0.55 * math.cos((cx + ORB_RADIUS * 0.25) / ORB_RADIUS * 1.25) }
     end
-    -- The glare: a pale streak on the glass's upper left.
+    orb.bubbles = {}
+    for i = 1, ORB_BUBBLES do
+        local b = orb:CreateTexture(nil, "OVERLAY")
+        b:SetWidth(2.5)
+        b:SetHeight(2.5)
+        b:Hide()
+        orb.bubbles[i] = { tex = b, x = 0, y = -ORB_RADIUS, speed = 0, live = false }
+    end
+    -- The glare: two pale streaks on the glass's upper left.
     local glare = orb:CreateTexture(nil, "OVERLAY")
-    glare:SetTexture(1, 1, 1, 0.12)
+    glare:SetTexture(1, 1, 1, 0.14)
     glare:SetWidth(ORB_RADIUS * 0.5)
-    glare:SetHeight(ORB_RADIUS * 0.22)
-    glare:SetPoint("CENTER", orb, "CENTER", -ORB_RADIUS * 0.3, ORB_RADIUS * 0.55)
+    glare:SetHeight(ORB_RADIUS * 0.16)
+    glare:SetPoint("CENTER", orb, "CENTER", -ORB_RADIUS * 0.32, ORB_RADIUS * 0.58)
+    local glint = orb:CreateTexture(nil, "OVERLAY")
+    glint:SetTexture(1, 1, 1, 0.22)
+    glint:SetWidth(ORB_RADIUS * 0.12)
+    glint:SetHeight(ORB_RADIUS * 0.12)
+    glint:SetPoint("CENTER", orb, "CENTER", -ORB_RADIUS * 0.55, ORB_RADIUS * 0.3)
+    -- The gryphon on top, facing the middle of the screen.
+    local perch = CreateFrame("Frame", nil, orb)
+    perch:SetFrameLevel(orb:GetFrameLevel() + 2)
+    perch:SetAllPoints(orb)
+    local gryphon = perch:CreateTexture(nil, "OVERLAY")
+    gryphon:SetTexture(GRYPHON)
+    gryphon:SetWidth(96)
+    gryphon:SetHeight(96)
+    gryphon:SetPoint("BOTTOM", orb, "TOP", mirrored and 14 or -14, -34)
+    if mirrored then gryphon:SetTexCoord(1, 0, 0, 1) end
 
-    orb.text = orb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    orb.text = perch:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     orb.text:SetPoint("CENTER", orb, "CENTER", 0, 0)
-    orb.filled = -1
-    orb.r, orb.g, orb.b = -1, -1, -1
+    orb.shown, orb.target = 0, 0
+    orb.r, orb.g, orb.b = 0.5, 0.5, 0.5
+    orb.phase = math.random() * 6.28
     return orb
 end
 
-local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET)
-local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET)
+local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET, false)
+local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET, true)
 
--- Paint the orb `fraction` full in this colour; only a change repaints the slices.
+-- The orb is to stand `fraction` full in this colour; animateOrb carries it there.
 local function paintOrb(orb, fraction, color, value)
-    local filled = math.floor(math.max(math.min(fraction, 1), 0) * ORB_SLICES + 0.5)
-    local r, g, b = color[1], color[2], color[3]
-    if filled ~= orb.filled or r ~= orb.r or g ~= orb.g or b ~= orb.b then
-        for i = 1, ORB_SLICES do
-            local k = orb.shade[i]
-            if i <= filled then
-                orb.slices[i]:SetTexture(r * k, g * k, b * k, 0.95)
-            else
-                orb.slices[i]:SetTexture(0.06 * k, 0.05 * k, 0.07 * k, 0.85)
+    orb.target = math.max(math.min(fraction, 1), 0)
+    orb.r, orb.g, orb.b = color[1], color[2], color[3]
+    orb.text:SetText(value)
+end
+
+-- One frame of an orb: the level eases toward its target, the surface waves, bubbles rise.
+local function animateOrb(orb, dt, t)
+    orb.shown = orb.shown + (orb.target - orb.shown) * math.min(1, dt * 6)
+    if math.abs(orb.target - orb.shown) < 0.001 then orb.shown = orb.target end
+    local level = -ORB_RADIUS + 2 * ORB_RADIUS * orb.shown
+    -- No waves on an empty or a brimming orb.
+    local calm = math.min(orb.shown, 1 - orb.shown) * 8
+    local amp = 2.2 * math.max(0, math.min(1, calm))
+    local r, g, b = orb.r, orb.g, orb.b
+    -- The colours only when they change (a shapeshift, a new power type).
+    local recolour = r ~= orb.pr or g ~= orb.pg or b ~= orb.pb
+    orb.pr, orb.pg, orb.pb = r, g, b
+    for i = 1, ORB_COLS do
+        local c = orb.cols[i]
+        if recolour then
+            local k = c.shade
+            c.liquid:SetTexture(r * k, g * k, b * k, 0.96)
+            c.foam:SetTexture(math.min(1, r * 0.6 + 0.45), math.min(1, g * 0.6 + 0.45), math.min(1, b * 0.6 + 0.45), 0.8)
+        end
+        local wave = amp * (math.sin(c.x * 0.11 + t * 2.1 + orb.phase) + 0.5 * math.sin(c.x * 0.29 - t * 3.3))
+        local top = math.min(level + wave, c.half)
+        local height = top + c.half
+        local wet = height > 0.5
+        local foamy = wet and top < c.half - 1
+        if wet ~= c.wet then
+            if wet then c.liquid:Show() else c.liquid:Hide() end
+            c.wet = wet
+        end
+        local moved = wet and math.abs(height - (c.height or -1)) > 0.25
+        if foamy ~= c.foamy then
+            if foamy then c.foam:Show() else c.foam:Hide() end
+            c.foamy = foamy
+            moved = moved or foamy
+        end
+        if moved then
+            c.liquid:SetHeight(height)
+            c.height = height
+            if foamy then
+                c.foam:ClearAllPoints()
+                c.foam:SetPoint("TOP", orb, "CENTER", c.x, top)
             end
         end
-        orb.filled, orb.r, orb.g, orb.b = filled, r, g, b
     end
-    orb.text:SetText(value)
+    for i = 1, ORB_BUBBLES do
+        local bub = orb.bubbles[i]
+        if not bub.live then
+            if orb.shown > 0.08 and math.random() < dt * 0.9 then
+                bub.live = true
+                bub.x = (math.random() - 0.5) * ORB_RADIUS * 1.2
+                bub.y = -ORB_RADIUS * 0.85
+                bub.speed = 10 + math.random() * 14
+            end
+        else
+            bub.y = bub.y + bub.speed * dt
+            local wobble = math.sin(t * 6 + i) * 1.2
+            if bub.y >= level - 2 then
+                bub.live = false
+                bub.tex:Hide()
+            else
+                bub.tex:SetTexture(math.min(1, r + 0.4), math.min(1, g + 0.4), math.min(1, b + 0.4), 0.55)
+                bub.tex:ClearAllPoints()
+                bub.tex:SetPoint("CENTER", orb, "CENTER", bub.x + wobble, bub.y)
+                bub.tex:Show()
+            end
+        end
+    end
 end
 
 local function refreshOrbs()
@@ -292,7 +384,12 @@ end
 
 local orbDriver = CreateFrame("Frame")
 local orbSince = 0
+local orbClock = 0
 orbDriver:SetScript("OnUpdate", function()
+    local dt = math.min(arg1 or 0, 0.1)
+    orbClock = orbClock + dt
+    if healthOrb:IsVisible() then animateOrb(healthOrb, dt, orbClock) end
+    if powerOrb:IsVisible() then animateOrb(powerOrb, dt, orbClock) end
     orbSince = orbSince + (arg1 or 0)
     if orbSince >= 0.05 then
         orbSince = 0
@@ -942,6 +1039,14 @@ local function treeBuild()
     respec:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 9)
     respec:SetText("Respec")
     respec:SetScript("OnClick", function() treeAsk(2) end)
+    -- The character's ARPG numbers, from the server's sheet (ArpgSheet_Update).
+    local totals = CreateFrame("Button", "ArpgTreeFrameTotals", f.webPane, "UIPanelButtonTemplate")
+    totals:SetWidth(90)
+    totals:SetHeight(22)
+    totals:SetPoint("RIGHT", respec, "LEFT", -6, 0)
+    totals:SetText("Totals")
+    totals:SetScript("OnEnter", function() ArpgSheet_SummaryTip(this) end)
+    totals:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- The viewport clips the canvas, which holds the lines, labels and node buttons.
     local view = CreateFrame("ScrollFrame", "ArpgTreeView", f.webPane)
@@ -1236,6 +1341,10 @@ local function skillsBuild(f)
     p.respec:SetScript("OnClick", function()
         if skillSel then treeAsk(8, skillSel) end
     end)
+    -- What adds to the shown skill: its tags' bonuses by source, its nodes, rune and uniques.
+    p.bonus = button("ArpgSkillBonus", "Bonuses", -360)
+    p.bonus:SetScript("OnEnter", function() ArpgSkillBonus_Tip(this) end)
+    p.bonus:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- The tree, right of the lists.
     p.tree = CreateFrame("Frame", "ArpgSkillTree", p)
     p.tree:SetPoint("TOPLEFT", p, "TOPLEFT", 270, -8)
@@ -1503,6 +1612,75 @@ end
 
 function ArpgSkills_Redraw()
     skillsPaint()
+end
+
+-- The character sheet (ArpgSheet_Update, from the server's SMSG_ARPG_SHEET): what each attribute
+-- does, what adds to each skill, and the ARPG totals, at the character's own numbers.
+local sheetData = nil
+
+-- Each "\n"-separated line of `text` into the open tooltip (the server colours them).
+local function tipLines(text)
+    if not text or text == "" then return end
+    local at = 1
+    while true do
+        local cut = string.find(text, "\n", at, 1)
+        local line = string.sub(text, at, cut and cut - 1 or string.len(text))
+        if line ~= "" then GameTooltip:AddLine(line, 1, 1, 1, 1) end
+        if not cut then break end
+        at = cut + 1
+    end
+end
+
+local STAT_NAMES = { "Strength", "Agility", "Stamina", "Intellect", "Spirit" }
+
+-- A paper doll stat row's tooltip: the stock first line (the value and its buffs), then what the
+-- attribute does here.
+local function statTip()
+    GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+    GameTooltip:SetText(this.tooltip or STAT_NAMES[this.arpgStat] or "", 1, 1, 1)
+    if sheetData and sheetData.attributes and sheetData.attributes[this.arpgStat] then
+        tipLines(sheetData.attributes[this.arpgStat])
+    else
+        GameTooltip:AddLine("Waiting for the server's character sheet.", 0.6, 0.6, 0.6)
+    end
+    GameTooltip:Show()
+end
+
+local function hookStats()
+    for i = 1, 5 do
+        local frame = getglobal("CharacterStatFrame" .. i)
+        if frame and not frame.arpgStat then
+            frame.arpgStat = i
+            frame:SetScript("OnEnter", statTip)
+            frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+    end
+end
+hookStats()
+
+function ArpgSheet_SummaryTip(button)
+    GameTooltip:SetOwner(button, "ANCHOR_TOPLEFT")
+    GameTooltip:SetText("Your ARPG totals", 1, 0.82, 0)
+    if sheetData then tipLines(sheetData.summary) else GameTooltip:AddLine("Waiting for the server.", 0.6, 0.6, 0.6) end
+    GameTooltip:Show()
+end
+
+function ArpgSkillBonus_Tip(button)
+    local skill = skillSel and skillById(skillSel)
+    GameTooltip:SetOwner(button, "ANCHOR_TOPLEFT")
+    GameTooltip:SetText(skill and (skill.name .. ": what adds to it") or "Pick a skill", 1, 0.82, 0)
+    local text = skill and sheetData and sheetData.skills and sheetData.skills[skill.id]
+    if text then
+        tipLines(text)
+    elseif skill then
+        GameTooltip:AddLine("Waiting for the server.", 0.6, 0.6, 0.6)
+    end
+    GameTooltip:Show()
+end
+
+function ArpgSheet_Update(sheet)
+    sheetData = sheet
+    hookStats()
 end
 
 function ArpgSkills_Update(skills)

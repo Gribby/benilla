@@ -447,6 +447,12 @@ pub enum SessionEvent {
     },
     /// Fork-only, not 1.12.1: a health globe dropped or taken (`SMSG_ARPG_GLOBE`).
     ArpgGlobe { globe: crate::messages::ArpgGlobe },
+    /// Fork-only, not 1.12.1: a proc's combat log line (`SMSG_ARPG_PROC`).
+    ArpgProc { proc_: crate::messages::ArpgProc },
+    /// Fork-only, not 1.12.1: a share hit's impact visual (`SMSG_ARPG_IMPACT`).
+    ArpgImpact { impact: crate::messages::ArpgImpact },
+    /// Fork-only, not 1.12.1: the character sheet (`SMSG_ARPG_SHEET`).
+    ArpgSheet { sheet: crate::messages::ArpgSheet },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

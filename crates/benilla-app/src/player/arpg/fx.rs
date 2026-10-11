@@ -20,9 +20,10 @@ use crate::net::SelfPlayer;
 
 /// How long a flash lasts, in seconds.
 const FLASH_SECS: f32 = 0.16;
-/// The white wash at the hit, for a normal hit and for a crit (category 2).
-const FLASH_PEAK: f32 = 0.5;
-const CRIT_PEAK: f32 = 0.8;
+/// The white wash at the hit, for a normal hit and for a crit (category 2): a touch, under the
+/// game's own impact and blood (`super::strikes`).
+const FLASH_PEAK: f32 = 0.25;
+const CRIT_PEAK: f32 = 0.45;
 /// The combat text category of a crit.
 const CATEGORY_CRIT: u8 = 2;
 

@@ -533,6 +533,13 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_GLOBE => {
             ServerPacket::ArpgGlobe(super::arpg::read_arpg_globe(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_IMPACT => {
+            ServerPacket::ArpgImpact(super::arpg::read_arpg_impact(&mut r)?)
+        }
+        super::arpg::SMSG_ARPG_PROC => ServerPacket::ArpgProc(super::arpg::read_arpg_proc(&mut r)?),
+        super::arpg::SMSG_ARPG_SHEET => {
+            ServerPacket::ArpgSheet(super::arpg::read_arpg_sheet(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_TELEGRAPH => {
             ServerPacket::ArpgTelegraph(super::arpg::read_arpg_telegraph(&mut r)?)
         }
