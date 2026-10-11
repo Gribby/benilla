@@ -109,17 +109,15 @@ end)
 driver:RegisterEvent("UPDATE_MOUSEOVER_UNIT")
 driver:SetScript("OnEvent", refresh)
 
--- The health and power orbs, Diablo's globes, at the bottom corners of the screen, each with
--- the main bar's own gryphon (its end cap's art) perched on top. An orb is a glass circle in a
--- bronze rim, cut into thin vertical columns; each column's liquid rises to the fill line, and
--- the line sloshes: two slow waves run across its surface, it eases to a new level instead of
+-- The health and power orbs, Diablo's globes, at the bottom corners of the screen. An orb is a
+-- glass circle in a bronze rim, cut into thin vertical columns; each column's liquid rises to the
+-- fill line, and the line sloshes: two slow waves run across its surface, it eases to a new level instead of
 -- jumping, and a few bubbles rise through it. The surface wears a bright meniscus. The power orb
 -- takes the player's power colour: blue mana, red rage, yellow energy.
 
 local ORB_RADIUS, ORB_COLS, ORB_INSET = 56, 44, 18
 local RIM = 4
 local ORB_BUBBLES = 6
-local GRYPHON = "Interface\\MainMenuBar\\UI-MainMenuBar-EndCap-Human"
 
 local POWER_COLORS = {
     [0] = { 0.12, 0.30, 0.95 }, -- mana
@@ -129,7 +127,7 @@ local POWER_COLORS = {
 }
 local HEALTH_COLOR = { 0.80, 0.06, 0.06 }
 
-local function makeOrb(frameName, corner, x, mirrored)
+local function makeOrb(frameName, corner, x)
     local size = ORB_RADIUS * 2
     local orb = CreateFrame("Frame", frameName, UIParent)
     orb:SetWidth(size + RIM * 2)
@@ -187,18 +185,11 @@ local function makeOrb(frameName, corner, x, mirrored)
     glint:SetWidth(ORB_RADIUS * 0.12)
     glint:SetHeight(ORB_RADIUS * 0.12)
     glint:SetPoint("CENTER", orb, "CENTER", -ORB_RADIUS * 0.55, ORB_RADIUS * 0.3)
-    -- The gryphon on top, facing the middle of the screen.
-    local perch = CreateFrame("Frame", nil, orb)
-    perch:SetFrameLevel(orb:GetFrameLevel() + 2)
-    perch:SetAllPoints(orb)
-    local gryphon = perch:CreateTexture(nil, "OVERLAY")
-    gryphon:SetTexture(GRYPHON)
-    gryphon:SetWidth(96)
-    gryphon:SetHeight(96)
-    gryphon:SetPoint("BOTTOM", orb, "TOP", mirrored and 14 or -14, -34)
-    if mirrored then gryphon:SetTexCoord(1, 0, 0, 1) end
-
-    orb.text = perch:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    -- The number, over the liquid and the glare.
+    local face = CreateFrame("Frame", nil, orb)
+    face:SetFrameLevel(orb:GetFrameLevel() + 2)
+    face:SetAllPoints(orb)
+    orb.text = face:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     orb.text:SetPoint("CENTER", orb, "CENTER", 0, 0)
     orb.shown, orb.target = 0, 0
     orb.r, orb.g, orb.b = 0.5, 0.5, 0.5
@@ -206,8 +197,8 @@ local function makeOrb(frameName, corner, x, mirrored)
     return orb
 end
 
-local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET, false)
-local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET, true)
+local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET)
+local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET)
 
 -- The orb is to stand `fraction` full in this colour; animateOrb carries it there.
 local function paintOrb(orb, fraction, color, value)
@@ -1791,7 +1782,6 @@ eventBarBack:SetTexture(0, 0, 0, 0.6)
 eventBlock:Hide()
 
 local bountyHeader = trackerText(tracker, "GameFontNormal", 1, 0.82, 0)
-bountyHeader:SetText("Bounties")
 local bountyRows = {}
 local bountyData = {}
 local bountyConfirm = { slot = nil, at = 0 }
@@ -1844,7 +1834,9 @@ local function trackerLayout()
     bountyHeader:SetPoint("TOPRIGHT", top, point, 0, eventBlock:IsShown() and -10 or 0)
     local prev = bountyHeader
     local n = table.getn(bountyData)
-    bountyHeader:SetText(n > 0 and "Bounties" or "")
+    -- The bounties are the zone's own: its name heads them.
+    local zone = GetZoneText and GetZoneText() or ""
+    bountyHeader:SetText(n > 0 and (zone ~= "" and ("Bounties: " .. zone) or "Bounties") or "")
     for i = 1, 3 do
         local row = bountyRow(i)
         local b = bountyData[i]

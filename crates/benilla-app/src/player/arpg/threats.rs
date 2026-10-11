@@ -7,10 +7,10 @@
 //! caster, its death) greys out instead. Standing inside when it lands kicks the camera. The
 //! server decides the damage; walking out or rolling avoids it.
 //!
-//! A mark wears the game's own ground-target art: the red circle a ground-targeted spell shows
-//! when it can't be cast there (`Spell-Shadow-Unacceptable.blp`, the reticle's), laid over the
-//! mark so a circle is the whole circle, a cone a slice of it and a line a strip from its centre
-//! to its rim, tinted toward the attacker's grade.
+//! A mark's area, fill and edge are flat colour in the attacker's grade. A circle or a cone also
+//! wears the game's own selection ring at its rim (`UnitSelectTexture.blp`, the circle under a
+//! selected unit), laid over the mark so a circle is the whole ring and a cone a slice of it; a
+//! line has no ring.
 //!
 //! A mark lies over the ground, not flat at the caster's height: it is a polar grid of rings and
 //! spokes, each point set down on the ground under it (a ray to the world's floors and terrain)
@@ -33,10 +33,12 @@ use crate::net::{GuidIndex, NetHandlerApp, ObjectStore, SelfPlayer};
 use super::juice::CameraShake;
 use super::*;
 
-/// The ground-target reticle's out-of-range circle, the marks' texture.
-const MARK_TEXTURE: &str = "mpq://interface/spellshadow/spell-shadow-unacceptable.blp";
-/// How far a grade's colour tints the texture's own red (0 none, 1 all).
-const GRADE_TINT: f32 = 0.35;
+/// The selection circle under a unit, the ring at a mark's rim.
+const MARK_TEXTURE: &str = "mpq://textures/unitselecttexture.blp";
+/// The ring's alpha, at the edge's full brightness.
+const RING_ALPHA: f32 = 0.95;
+/// The ring's lift over the area it shares a mesh with, in yards (over the edge's too).
+const RING_LIFT: f32 = 0.03;
 /// A line's strip of the circle: how much of its width either side of the centre line.
 const LINE_UV_HALF: f32 = 0.2;
 
@@ -114,6 +116,7 @@ enum Part {
     Area,
     Fill,
     Edge,
+    Ring,
 }
 
 /// One part of a mark on the ground.
@@ -432,18 +435,12 @@ fn inside(live: &Live, point: Vec3, reach: f32) -> bool {
     angle <= live.half_angle + (reach / dist).atan()
 }
 
-/// The tint over the texture's own red: white leaned toward the grade's colour.
-fn tint(rgb: [f32; 3]) -> [f32; 3] {
-    rgb.map(|c| 1.0 + (c - 1.0) * GRADE_TINT)
-}
-
 fn material(
     materials: &mut Assets<StandardMaterial>,
     texture: &Option<Handle<Image>>,
     rgb: [f32; 3],
     alpha: f32,
 ) -> Handle<StandardMaterial> {
-    let rgb = tint(rgb);
     materials.add(StandardMaterial {
         base_color: Color::srgba(rgb[0], rgb[1], rgb[2], alpha),
         base_color_texture: texture.clone(),
@@ -524,11 +521,22 @@ fn take_telegraphs(
         let at = Transform::from_translation(Vec3::new(centre.x, 0.0, centre.z));
         let mut parts = Vec::new();
         let mut mats = Vec::new();
-        for (part, mesh, alpha) in [
+        let mut kinds = vec![
             (Part::Area, area.clone(), AREA_ALPHA),
             (Part::Fill, fill.clone(), FILL_ALPHA),
             (Part::Edge, edge.clone(), EDGE_ALPHA),
-        ] {
+        ];
+        // The selection ring over the area's mesh (its texture coordinates run across the
+        // circle), a hair above the edge; a line's strip of it would be two smudges.
+        if !line {
+            kinds.push((Part::Ring, area.clone(), RING_ALPHA));
+        }
+        for (part, mesh, alpha) in kinds {
+            let texture = if part == Part::Ring {
+                texture.clone()
+            } else {
+                None
+            };
             let mat = material(&mut materials, &texture, rgb, alpha);
             mats.push(mat.clone());
             parts.push(
@@ -536,7 +544,11 @@ fn take_telegraphs(
                     .spawn((
                         Mesh3d(mesh),
                         MeshMaterial3d(mat.clone()),
-                        at,
+                        if part == Part::Ring {
+                            at.with_translation(at.translation + Vec3::Y * RING_LIFT)
+                        } else {
+                            at
+                        },
                         TelegraphPart {
                             part,
                             material: mat,
@@ -647,7 +659,7 @@ fn run_telegraphs(
         match mark_at(age, l.wind_up, broken) {
             None => spent.push(*serial),
             Some((grow, alphas, grey)) => {
-                let rgb = if grey { BROKEN_RGB } else { tint(l.rgb) };
+                let rgb = if grey { BROKEN_RGB } else { l.rgb };
                 if (grow - l.fill_at).abs() >= FILL_STEP {
                     if let Some(mesh) = meshes.get_mut(&l.fill) {
                         *mesh = fill_mesh(&l.drape, grow);
@@ -662,6 +674,7 @@ fn run_telegraphs(
                         Part::Area => alphas[0],
                         Part::Fill => alphas[1],
                         Part::Edge => alphas[2],
+                        Part::Ring => (alphas[2] / EDGE_ALPHA * RING_ALPHA).min(1.0),
                     };
                     if let Some(m) = materials.get_mut(&part.material) {
                         m.base_color = Color::srgba(rgb[0], rgb[1], rgb[2], alpha);

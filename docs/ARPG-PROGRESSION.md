@@ -336,19 +336,25 @@ orange column of light stands over the spot until the event ends.
 `SMSG_ARPG_EVENT` (0x349): `u8` state (1 live, 2 done, 3 failed, 4 none), `u32` id, `u8` kind,
 `f32` x y z, `f32` radius, `u16` have and need, `u32` ms left, cstring title and objective.
 
-**Bounties.** Each character carries three, for zones and dungeons near its level (from 2 levels
-below to 3 above): complete 2 events in a zone (30% of a level), slay 20-30 of a zone's creatures
-(none grey; 20%), slay 2-4 champions or rares there (25%), or defeat a dungeon's final boss (45%).
-They prefer the zone the player is in. A finished bounty pays at once, then a new one takes its
-slot:
+**Bounties** belong to the zone you are in. Each zone gives three, which the tracker heads with
+the zone's name:
+- complete 2 of its events (30% of a level);
+- slay 20-30 of its creatures (none grey; 20%);
+- slay 2-4 of its champions or rares (25%), or, 35% of the time when a dungeon suits the zone's
+  level, defeat that dungeon's final boss (45%).
+
+They are kept per zone, so going back finds them as you left them. A city, or a zone you have
+outlevelled by more than 5, has none. A dungeon keeps the bounties of the zone you entered it
+from. Nothing is handed in: a finished bounty pays at once, then a new one of its kind takes its
+slot. It pays:
 - that share of a level in XP;
 - gold (level² × 20, × 40 for a dungeon);
 - 1-3 orbs;
 - a rolled item: green, blue or purple. When the bags are full it comes by mail.
 
 Group members within 100 yards share kill credit. Right-click a bounty twice in the tracker to
-abandon it for another (`CMSG_ARPG_ACTION` kind 25, `u8` slot). Saved in `character_arpg_bounty`,
-which the server creates. `SMSG_ARPG_BOUNTIES` (0x34A): `u8` count, per bounty `u8` slot, `u8`
+abandon it for another (`CMSG_ARPG_ACTION` kind 25, `u8` slot). Saved in
+`character_arpg_zone_bounty` (by zone), which the server creates. `SMSG_ARPG_BOUNTIES` (0x34A): `u8` count, per bounty `u8` slot, `u8`
 kind, `u16` have and need, cstring title and reward.
 
 ## Build order
