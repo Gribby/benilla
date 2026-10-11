@@ -521,6 +521,136 @@ pub fn read_arpg_impact(r: &mut impl io::Read) -> io::Result<ArpgImpact> {
     })
 }
 
+/// The zone's event (cmangos `Arpg/ArpgEvents.h`): live, done, failed, or none here.
+pub const SMSG_ARPG_EVENT: u16 = 0x0349;
+
+/// An event's states.
+pub const EVENT_LIVE: u8 = 1;
+pub const EVENT_DONE: u8 = 2;
+pub const EVENT_FAILED: u8 = 3;
+pub const EVENT_GONE: u8 = 4;
+
+/// The zone's event, as the tracker shows it.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgEvent {
+    /// [`EVENT_LIVE`], [`EVENT_DONE`], [`EVENT_FAILED`] or [`EVENT_GONE`].
+    pub state: u8,
+    pub id: u32,
+    /// 1 purge, 2 hunt, 3 siege.
+    pub kind: u8,
+    pub pos: [f32; 3],
+    pub radius: f32,
+    pub have: u16,
+    pub need: u16,
+    pub ms_left: u32,
+    pub title: String,
+    pub objective: String,
+}
+
+/// `SMSG_ARPG_EVENT`: `u8` state, `u32` id, `u8` kind, `f32` x y z, `f32` radius, `u16` have,
+/// `u16` need, `u32` ms left, cstring title, cstring objective.
+pub fn read_arpg_event(r: &mut impl io::Read) -> io::Result<ArpgEvent> {
+    Ok(ArpgEvent {
+        state: read_u8(r)?,
+        id: read_u32_le(r)?,
+        kind: read_u8(r)?,
+        pos: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+        radius: read_f32_le(r)?,
+        have: read_u16_le(r)?,
+        need: read_u16_le(r)?,
+        ms_left: read_u32_le(r)?,
+        title: read_cstring(r)?,
+        objective: read_cstring(r)?,
+    })
+}
+
+/// The character's bounties (cmangos `Arpg/ArpgEvents.h`), on a change.
+pub const SMSG_ARPG_BOUNTIES: u16 = 0x034A;
+
+/// One bounty on the board.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgBounty {
+    pub slot: u8,
+    /// 1 events, 2 slay, 3 champions, 4 a dungeon's final boss.
+    pub kind: u8,
+    pub have: u16,
+    pub need: u16,
+    pub title: String,
+    pub reward: String,
+}
+
+/// `SMSG_ARPG_BOUNTIES`: `u8` count, per bounty `u8` slot, `u8` kind, `u16` have, `u16` need,
+/// cstring title, cstring reward.
+pub fn read_arpg_bounties(r: &mut impl io::Read) -> io::Result<Vec<ArpgBounty>> {
+    let n = read_u8(r)?;
+    let mut out = Vec::with_capacity(usize::from(n));
+    for _ in 0..n {
+        out.push(ArpgBounty {
+            slot: read_u8(r)?,
+            kind: read_u8(r)?,
+            have: read_u16_le(r)?,
+            need: read_u16_le(r)?,
+            title: read_cstring(r)?,
+            reward: read_cstring(r)?,
+        });
+    }
+    Ok(out)
+}
+
+/// The crafting purse (cmangos `Arpg/ArpgCraft.h`): orbs and shards held.
+pub const SMSG_ARPG_PURSE: u16 = 0x034B;
+
+/// One orb kind in the purse.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgOrb {
+    /// The craft op that uses it (1-7).
+    pub id: u8,
+    pub held: u16,
+    pub name: String,
+    pub text: String,
+}
+
+/// One shard kind in the purse.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgShard {
+    /// The affix id it adds or raises.
+    pub affix: u16,
+    pub held: u16,
+    pub name: String,
+}
+
+/// The purse.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgPurse {
+    pub orbs: Vec<ArpgOrb>,
+    pub shards: Vec<ArpgShard>,
+}
+
+/// `SMSG_ARPG_PURSE`: `u8` orb count, per orb `u8` id, `u16` held, cstring name, cstring text;
+/// `u16` shard count, per shard `u16` affix, `u16` held, cstring name.
+pub fn read_arpg_purse(r: &mut impl io::Read) -> io::Result<ArpgPurse> {
+    let n = read_u8(r)?;
+    let mut orbs = Vec::with_capacity(usize::from(n));
+    for _ in 0..n {
+        orbs.push(ArpgOrb {
+            id: read_u8(r)?,
+            held: read_u16_le(r)?,
+            name: read_cstring(r)?,
+            text: read_cstring(r)?,
+        });
+    }
+    let n = read_u16_le(r)?;
+    let mut shards = Vec::with_capacity(usize::from(n).min(256));
+    for _ in 0..n {
+        shards.push(ArpgShard {
+            affix: read_u16_le(r)?,
+            held: read_u16_le(r)?,
+            name: read_cstring(r)?,
+        });
+    }
+    Ok(ArpgPurse { orbs, shards })
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -814,6 +944,72 @@ mod tests {
                 id: 9,
                 pos: [1.0, 2.0, 3.0],
             }
+        );
+    }
+
+    #[test]
+    fn an_event_reads_its_state_place_progress_and_words() {
+        let mut body = vec![EVENT_LIVE];
+        body.extend_from_slice(&7u32.to_le_bytes());
+        body.push(3);
+        for f in [1.0f32, 2.0, 3.0, 45.0] {
+            body.extend_from_slice(&f.to_le_bytes());
+        }
+        body.extend_from_slice(&1u16.to_le_bytes());
+        body.extend_from_slice(&3u16.to_le_bytes());
+        body.extend_from_slice(&90_000u32.to_le_bytes());
+        body.extend_from_slice(b"Siege at Goldshire\0Hold out\0");
+        assert_eq!(
+            read_arpg_event(&mut body.as_slice()).unwrap(),
+            ArpgEvent {
+                state: EVENT_LIVE,
+                id: 7,
+                kind: 3,
+                pos: [1.0, 2.0, 3.0],
+                radius: 45.0,
+                have: 1,
+                need: 3,
+                ms_left: 90_000,
+                title: "Siege at Goldshire".into(),
+                objective: "Hold out".into(),
+            }
+        );
+    }
+
+    #[test]
+    fn bounties_and_the_purse_read_their_rows() {
+        let mut body = vec![1u8, 2, 2];
+        body.extend_from_slice(&4u16.to_le_bytes());
+        body.extend_from_slice(&25u16.to_le_bytes());
+        body.extend_from_slice(b"Elwynn Forest: slay 25 enemies\0gold\0");
+        assert_eq!(
+            read_arpg_bounties(&mut body.as_slice()).unwrap(),
+            vec![ArpgBounty {
+                slot: 2,
+                kind: 2,
+                have: 4,
+                need: 25,
+                title: "Elwynn Forest: slay 25 enemies".into(),
+                reward: "gold".into(),
+            }]
+        );
+        let mut body = vec![1u8, 4];
+        body.extend_from_slice(&3u16.to_le_bytes());
+        body.extend_from_slice(b"Fel Orb\0Rerolls\0");
+        body.extend_from_slice(&1u16.to_le_bytes());
+        body.extend_from_slice(&7u16.to_le_bytes());
+        body.extend_from_slice(&2u16.to_le_bytes());
+        body.extend_from_slice(b"Shard of Holy damage\0");
+        let purse = read_arpg_purse(&mut body.as_slice()).unwrap();
+        assert_eq!(purse.orbs[0].name, "Fel Orb");
+        assert_eq!(purse.orbs[0].held, 3);
+        assert_eq!(
+            purse.shards,
+            vec![ArpgShard {
+                affix: 7,
+                held: 2,
+                name: "Shard of Holy damage".into(),
+            }]
         );
     }
 

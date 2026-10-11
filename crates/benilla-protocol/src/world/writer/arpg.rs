@@ -46,6 +46,8 @@ const KIND_UNSEAL: u8 = 20;
 const KIND_SOCKET: u8 = 21;
 const KIND_TOWN_PORTAL: u8 = 22;
 const KIND_GLOBE: u8 = 23;
+const KIND_CRAFT: u8 = 24;
+const KIND_BOUNTY_ABANDON: u8 = 25;
 
 /// Dev loot's quality byte for a random mix of qualities.
 pub const DEV_LOOT_MIXED: u8 = 0xFF;
@@ -59,6 +61,12 @@ pub enum ArpgAim {
     Enemy,
     /// The friend nearest the aim point, else the caster.
     Ally,
+}
+
+/// The craft body: kind, `u8` op, `u8` bag, `u8` slot, `u16` affix.
+pub fn arpg_craft_body(op: u8, bag: u8, slot: u8, affix: u16) -> Vec<u8> {
+    let [lo, hi] = affix.to_le_bytes();
+    vec![KIND_CRAFT, op, bag, slot, lo, hi]
 }
 
 /// The hello body.
@@ -299,11 +307,31 @@ impl WorldWriter {
     pub fn arpg_socket(&mut self, skill: u8, rune: u8) -> Result<()> {
         self.send(CMSG_ARPG_ACTION, &[KIND_SOCKET, skill, rune])
     }
+
+    /// Craft on the item at `bag`/`slot` (bag 255 the equipped slots, 0 the backpack, 1-4 the
+    /// bags; slots from 1): `op` 1-7 an orb, 8 salvage, 9 the shard of `affix` (cmangos
+    /// `Arpg/ArpgCraft.h`).
+    pub fn arpg_craft(&mut self, op: u8, bag: u8, slot: u8, affix: u16) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &arpg_craft_body(op, bag, slot, affix))
+    }
+
+    /// Abandon bounty `slot` for a new one (cmangos `Arpg/ArpgEvents.h`).
+    pub fn arpg_bounty_abandon(&mut self, slot: u8) -> Result<()> {
+        self.send(CMSG_ARPG_ACTION, &[KIND_BOUNTY_ABANDON, slot])
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_craft_body_is_kind_op_bag_slot_and_the_affix() {
+        assert_eq!(
+            arpg_craft_body(9, 255, 16, 0x0107),
+            vec![KIND_CRAFT, 9, 255, 16, 7, 1]
+        );
+    }
 
     #[test]
     fn the_dodge_body_is_kind_then_the_point() {

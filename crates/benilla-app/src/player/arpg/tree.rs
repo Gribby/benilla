@@ -13,7 +13,7 @@
 //! 7 give one back, 8 respec a skill, its node the skill; 9 the dev tools' test pack, its node
 //! `tier * 100 + size`; 10 unseal a capstone with Codex fragments; 11 socket a rune, its node
 //! `skill * 100 + rune`, rune 0 emptying it; 12 the town portal, from the HUD's button and its
-//! key), which [`on_tree_action`] turns into a `ClientCommand`.
+//! key; 13 abandon the bounty in slot `node`), which [`on_tree_action`] turns into a `ClientCommand`.
 
 use benilla_protocol::messages::{ArpgSkills, ArpgTree};
 use benilla_protocol::{SessionEvent, SessionEventKind};
@@ -314,6 +314,8 @@ enum TreeAction {
     },
     /// Open a town portal, or go back through it.
     TownPortal,
+    /// Abandon the bounty in a slot for a new one.
+    AbandonBounty(u8),
 }
 
 fn parse_action(value: &str) -> Option<TreeAction> {
@@ -361,6 +363,9 @@ fn parse_action(value: &str) -> Option<TreeAction> {
             })
         }
         12 => Some(TreeAction::TownPortal),
+        13 => u8::try_from(code % 100_000 / 100)
+            .ok()
+            .map(TreeAction::AbandonBounty),
         _ => None,
     }
 }
@@ -384,6 +389,7 @@ fn on_tree_action(ev: On<crate::cvars::CvarChanged>, net: Res<NetCommands>) {
         Some(TreeAction::Unseal(node)) => ClientCommand::ArpgUnseal { node },
         Some(TreeAction::Socket { skill, rune }) => ClientCommand::ArpgSocket { skill, rune },
         Some(TreeAction::TownPortal) => ClientCommand::ArpgTownPortal,
+        Some(TreeAction::AbandonBounty(slot)) => ClientCommand::ArpgBountyAbandon { slot },
         None => return,
     };
     let _ = net.0.send(command);
@@ -432,6 +438,7 @@ mod tests {
             Some(TreeAction::Socket { skill: 3, rune: 1 })
         );
         assert_eq!(parse_action("1200007"), Some(TreeAction::TownPortal));
+        assert_eq!(parse_action("1300204"), Some(TreeAction::AbandonBounty(2)));
         assert_eq!(parse_action("0"), None);
         assert_eq!(parse_action("spend"), None);
     }

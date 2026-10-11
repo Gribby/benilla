@@ -1049,6 +1049,13 @@ fn writer_loop(
                     ClientCommand::ArpgTier { tier } => w.arpg_tier(tier),
                     ClientCommand::ArpgUnseal { node } => w.arpg_unseal(node),
                     ClientCommand::ArpgSocket { skill, rune } => w.arpg_socket(skill, rune),
+                    ClientCommand::ArpgCraft {
+                        op,
+                        bag,
+                        slot,
+                        affix,
+                    } => w.arpg_craft(op, bag, slot, affix),
+                    ClientCommand::ArpgBountyAbandon { slot } => w.arpg_bounty_abandon(slot),
                     ClientCommand::ArpgTreeRespec => w.arpg_tree_respec(),
                     ClientCommand::ArpgTreeQuery => w.arpg_tree_query(),
                     ClientCommand::CastSpellAtSource { spell_id, src } => {

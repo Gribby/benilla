@@ -550,8 +550,11 @@ pub(super) fn render_view(
     }
     // Fork-only, not 1.12.1: an ARPG unique's mechanic, in the Artifact colour (quality 6,
     // `e6cc80`) that no 1.12 item wears.
+    // One line each: a unique with a mechanic and a cross-skill proc has two.
     if let Some(text) = &v.arpg_unique {
-        addw((format!("Unique: {text}"), ARPG_UNIQUE))?;
+        for line in text.split('\n') {
+            addw((format!("Unique: {line}"), ARPG_UNIQUE))?;
+        }
     }
     if let Some(charges) = charges_phrase(v.charges.max(0) as u32, &get) {
         add((charges, WHITE))?;

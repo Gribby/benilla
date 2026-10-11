@@ -1745,3 +1745,525 @@ ToggleTalentFrame = ArpgTree_Toggle
 local treeEvents = CreateFrame("Frame")
 treeEvents:RegisterEvent("PLAYER_LEVEL_UP")
 treeEvents:SetScript("OnEvent", function() treeAsk(3) end)
+
+-- ---------------------------------------------------------------------------------------------
+-- The living world: the zone's event and the bounty board (cmangos Arpg/ArpgEvents.h), in a
+-- tracker under the minimap. The client hands them over: ArpgEvent_Update(event or nil) twice a
+-- second while one runs (with its clock and how far and which way its spot lies), and
+-- ArpgBounties_Update(rows) on a change.
+
+local EVENT_KIND = { "Purge", "Hunt", "Siege" }
+local tracker = CreateFrame("Frame", "ArpgTracker", UIParent)
+tracker:SetWidth(250)
+tracker:SetHeight(40)
+tracker:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -18, -220)
+tracker:SetFrameStrata("MEDIUM")
+
+local function trackerText(parent, font, r, g, b)
+    local s = parent:CreateFontString(nil, "OVERLAY", font)
+    s:SetJustifyH("RIGHT")
+    s:SetWidth(250)
+    if r then s:SetTextColor(r, g, b) end
+    return s
+end
+
+-- The event block: title, objective with progress, and the clock and the way there.
+local eventBlock = CreateFrame("Frame", nil, tracker)
+eventBlock:SetWidth(250)
+eventBlock:SetHeight(52)
+eventBlock:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", 0, 0)
+eventBlock.title = trackerText(eventBlock, "GameFontNormal", 1, 0.5, 0.05)
+eventBlock.title:SetPoint("TOPRIGHT", eventBlock, "TOPRIGHT", 0, 0)
+eventBlock.objective = trackerText(eventBlock, "GameFontHighlightSmall")
+eventBlock.objective:SetPoint("TOPRIGHT", eventBlock.title, "BOTTOMRIGHT", 0, -2)
+eventBlock.where = trackerText(eventBlock, "GameFontNormalSmall", 0.85, 0.85, 0.85)
+eventBlock.where:SetPoint("TOPRIGHT", eventBlock.objective, "BOTTOMRIGHT", 0, -2)
+eventBlock.bar = CreateFrame("StatusBar", nil, eventBlock)
+eventBlock.bar:SetWidth(160)
+eventBlock.bar:SetHeight(5)
+eventBlock.bar:SetPoint("TOPRIGHT", eventBlock.where, "BOTTOMRIGHT", 0, -3)
+eventBlock.bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+eventBlock.bar:SetStatusBarColor(1, 0.5, 0.05)
+eventBlock.bar:SetMinMaxValues(0, 1)
+local eventBarBack = eventBlock.bar:CreateTexture(nil, "BACKGROUND")
+eventBarBack:SetAllPoints(eventBlock.bar)
+eventBarBack:SetTexture(0, 0, 0, 0.6)
+eventBlock:Hide()
+
+local bountyHeader = trackerText(tracker, "GameFontNormal", 1, 0.82, 0)
+bountyHeader:SetText("Bounties")
+local bountyRows = {}
+local bountyData = {}
+local bountyConfirm = { slot = nil, at = 0 }
+
+local function bountyRow(i)
+    if bountyRows[i] then return bountyRows[i] end
+    local row = CreateFrame("Button", "ArpgBountyRow" .. i, tracker)
+    row:SetWidth(250)
+    row:SetHeight(26)
+    row.title = trackerText(row, "GameFontHighlightSmall")
+    row.title:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
+    row.progress = trackerText(row, "GameFontNormalSmall", 0.75, 0.75, 0.75)
+    row.progress:SetPoint("TOPRIGHT", row.title, "BOTTOMRIGHT", 0, -1)
+    row:RegisterForClicks("RightButtonUp")
+    row:SetScript("OnEnter", function()
+        local b = this.bounty
+        if not b or not GameTooltip then return end
+        GameTooltip:SetOwner(this, "ANCHOR_LEFT")
+        GameTooltip:SetText(b.title, 1, 0.82, 0)
+        GameTooltip:AddLine("Reward: " .. b.reward, 1, 1, 1, 1)
+        GameTooltip:AddLine("Right-click twice to abandon it for another.", 0.6, 0.6, 0.6, 1)
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    row:SetScript("OnClick", function()
+        local b = this.bounty
+        if not b then return end
+        local now = GetTime()
+        if bountyConfirm.slot == b.slot and now - bountyConfirm.at < 4 then
+            bountyConfirm.slot = nil
+            treeAsk(13, b.slot)
+        else
+            bountyConfirm.slot = b.slot
+            bountyConfirm.at = now
+            DEFAULT_CHAT_FRAME:AddMessage("|cffffd200Right-click the bounty again to abandon it.|r")
+        end
+    end)
+    bountyRows[i] = row
+    return row
+end
+
+local function trackerLayout()
+    local top = tracker
+    local point = "TOPRIGHT"
+    if eventBlock:IsShown() then
+        top = eventBlock.bar
+        point = "BOTTOMRIGHT"
+    end
+    bountyHeader:ClearAllPoints()
+    bountyHeader:SetPoint("TOPRIGHT", top, point, 0, eventBlock:IsShown() and -10 or 0)
+    local prev = bountyHeader
+    local n = table.getn(bountyData)
+    bountyHeader:SetText(n > 0 and "Bounties" or "")
+    for i = 1, 3 do
+        local row = bountyRow(i)
+        local b = bountyData[i]
+        if b then
+            row.bounty = b
+            row.title:SetText(b.title)
+            row.progress:SetText(b.have .. " / " .. b.need)
+            row:ClearAllPoints()
+            row:SetPoint("TOPRIGHT", prev, "BOTTOMRIGHT", 0, -3)
+            row:Show()
+            prev = row
+        else
+            row.bounty = nil
+            row:Hide()
+        end
+    end
+end
+
+function ArpgEvent_Update(ev)
+    if not ev then
+        eventBlock:Hide()
+        trackerLayout()
+        return
+    end
+    local kind = EVENT_KIND[ev.kind] or "Event"
+    eventBlock.title:SetText(ev.title)
+    local need = ev.need > 0 and ev.need or 1
+    if ev.state == 2 then
+        eventBlock.title:SetTextColor(0.2, 1, 0.2)
+        eventBlock.objective:SetText(kind .. " complete!")
+        eventBlock.where:SetText("")
+        eventBlock.bar:SetValue(1)
+    elseif ev.state == 3 then
+        eventBlock.title:SetTextColor(1, 0.25, 0.25)
+        eventBlock.objective:SetText(kind .. " failed.")
+        eventBlock.where:SetText("")
+        eventBlock.bar:SetValue(ev.have / need)
+    else
+        eventBlock.title:SetTextColor(1, 0.5, 0.05)
+        eventBlock.objective:SetText(ev.objective .. ": " .. ev.have .. " / " .. ev.need)
+        local m = math.floor(ev.secs / 60)
+        local s = ev.secs - m * 60
+        local clock = string.format("%d:%02d", m, s)
+        if ev.dir == "here" then
+            eventBlock.where:SetText(clock .. "  |cff40ff40you are there|r")
+        elseif ev.dir ~= "" then
+            eventBlock.where:SetText(clock .. "  " .. ev.dist .. " yd " .. ev.dir)
+        else
+            eventBlock.where:SetText(clock)
+        end
+        eventBlock.bar:SetValue(ev.have / need)
+    end
+    eventBlock:Show()
+    trackerLayout()
+end
+
+function ArpgBounties_Update(rows)
+    bountyData = rows or {}
+    trackerLayout()
+end
+
+-- ---------------------------------------------------------------------------------------------
+-- The Forge (cmangos Arpg/ArpgCraft.h): put an item in (drag it onto the slot, or Alt-click it in
+-- the bags or on the character while the Forge is open), then use an orb, a shard, or salvage it.
+-- The purse comes as ArpgPurse_Update({orbs = {...}, shards = {...}}); a craft goes out through
+-- the session-only setting arpgCraft, "op:bag:slot:affix:nonce" (bag 255 the character's slots).
+
+BINDING_NAME_ARPGFORGE = "Forge"
+local purse = { orbs = {}, shards = {} }
+local forge, forgeItem = nil, nil
+local craftNonce = 0
+local lastPickup = nil
+local SHARD_ROWS = 8
+local shardPage = 1
+
+local function craftAsk(op, affix)
+    if not forgeItem then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffff4040Put an item in the Forge first.|r")
+        return
+    end
+    craftNonce = craftNonce + 1
+    if craftNonce >= 1000 then craftNonce = 1 end
+    SetCVar("arpgCraft", op .. ":" .. forgeItem.bag .. ":" .. forgeItem.slot .. ":" .. (affix or 0) .. ":" .. craftNonce)
+end
+
+local function forgeItemTexture()
+    if not forgeItem then return nil end
+    if forgeItem.bag == 255 then
+        return GetInventoryItemTexture("player", forgeItem.slot)
+    end
+    local texture = GetContainerItemInfo(forgeItem.bag, forgeItem.slot)
+    return texture
+end
+
+local function forgeItemLink()
+    if not forgeItem then return nil end
+    if forgeItem.bag == 255 then
+        return GetInventoryItemLink("player", forgeItem.slot)
+    end
+    return GetContainerItemLink(forgeItem.bag, forgeItem.slot)
+end
+
+local function forgePaint()
+    if not forge then return end
+    local texture = forgeItemTexture()
+    if forgeItem and not texture then
+        forgeItem = nil -- moved, sold or salvaged
+    end
+    if forgeItem then
+        forge.icon:SetTexture(texture)
+        forge.itemName:SetText(forgeItemLink() or "")
+    else
+        forge.icon:SetTexture("Interface\\PaperDoll\\UI-Backpack-EmptySlot")
+        forge.itemName:SetText("|cff808080Drag an item here, or Alt-click one.|r")
+    end
+    for i = 1, 7 do
+        local b = forge.orbs[i]
+        local orb = purse.orbs[i]
+        if orb then
+            b.orb = orb
+            b.count:SetText(orb.held)
+            if orb.held > 0 then
+                b.icon:SetVertexColor(1, 1, 1)
+            else
+                b.icon:SetVertexColor(0.35, 0.35, 0.35)
+            end
+            b:Show()
+        else
+            b:Hide()
+        end
+    end
+    local n = table.getn(purse.shards)
+    local pages = math.max(1, math.ceil(n / SHARD_ROWS))
+    if shardPage > pages then shardPage = pages end
+    for i = 1, SHARD_ROWS do
+        local row = forge.shards[i]
+        local s = purse.shards[(shardPage - 1) * SHARD_ROWS + i]
+        if s then
+            row.shard = s
+            row.text:SetText(s.name .. " |cffffffffx" .. s.held .. "|r")
+            row:Show()
+        else
+            row.shard = nil
+            row:Hide()
+        end
+    end
+    forge.page:SetText(n > 0 and (shardPage .. " / " .. pages) or "No shards yet: salvage items for them.")
+    if shardPage > 1 then forge.prev:Enable() else forge.prev:Disable() end
+    if shardPage < pages then forge.next:Enable() else forge.next:Disable() end
+end
+
+local function forgeSelect(bag, slot)
+    forgeItem = { bag = bag, slot = slot }
+    forgePaint()
+end
+
+-- The orb icons: vanilla's gems, as the orbs' items wear.
+local ORB_ICON = {
+    "Interface\\Icons\\INV_Misc_Gem_Pearl_04",
+    "Interface\\Icons\\INV_Misc_Gem_Sapphire_02",
+    "Interface\\Icons\\INV_Misc_Gem_Opal_01",
+    "Interface\\Icons\\INV_Misc_Gem_Emerald_02",
+    "Interface\\Icons\\INV_Misc_Gem_Crystal_01",
+    "Interface\\Icons\\INV_Misc_Gem_Pearl_05",
+    "Interface\\Icons\\INV_Misc_Gem_Diamond_02",
+}
+
+local function forgeBuild()
+    if forge then return forge end
+    local f = CreateFrame("Frame", "ArpgForgeFrame", UIParent)
+    f:SetWidth(360)
+    f:SetHeight(420)
+    f:SetPoint("LEFT", UIParent, "LEFT", 80, 40)
+    f:SetFrameStrata("DIALOG")
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function() this:StartMoving() end)
+    f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+    f:Hide()
+    local bg = f:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints(f)
+    bg:SetTexture(0.03, 0.028, 0.04, 0.96)
+    local edge = f:CreateTexture(nil, "BORDER")
+    edge:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -36)
+    edge:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -36)
+    edge:SetHeight(1)
+    edge:SetTexture(0.9, 0.8, 0.5, 0.35)
+    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", f, "TOP", 0, -10)
+    title:SetText("Forge")
+    local close = CreateFrame("Button", "ArpgForgeFrameClose", f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
+
+    -- The item slot.
+    local slot = CreateFrame("Button", "ArpgForgeSlot", f)
+    slot:SetWidth(40)
+    slot:SetHeight(40)
+    slot:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -50)
+    f.icon = slot:CreateTexture(nil, "ARTWORK")
+    f.icon:SetAllPoints(slot)
+    f.itemName = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    f.itemName:SetPoint("LEFT", slot, "RIGHT", 10, 0)
+    f.itemName:SetWidth(280)
+    f.itemName:SetJustifyH("LEFT")
+    local function takeCursor()
+        if CursorHasItem() and lastPickup then
+            local bag, s = lastPickup.bag, lastPickup.slot
+            ClearCursor()
+            forgeSelect(bag, s)
+        end
+    end
+    slot:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    slot:SetScript("OnReceiveDrag", takeCursor)
+    slot:SetScript("OnClick", function()
+        if CursorHasItem() then
+            takeCursor()
+        elseif arg1 == "RightButton" then
+            forgeItem = nil
+            forgePaint()
+        end
+    end)
+    slot:SetScript("OnEnter", function()
+        if not forgeItem or not GameTooltip then return end
+        GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+        if forgeItem.bag == 255 then
+            GameTooltip:SetInventoryItem("player", forgeItem.slot)
+        else
+            GameTooltip:SetBagItem(forgeItem.bag, forgeItem.slot)
+        end
+        GameTooltip:Show()
+    end)
+    slot:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+
+    -- The orbs.
+    local orbsLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    orbsLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -104)
+    orbsLabel:SetText("Orbs")
+    f.orbs = {}
+    for i = 1, 7 do
+        local b = CreateFrame("Button", "ArpgForgeOrb" .. i, f)
+        b:SetWidth(36)
+        b:SetHeight(36)
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 16 + (i - 1) * 46, -124)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetAllPoints(b)
+        b.icon:SetTexture(ORB_ICON[i])
+        b.count = b:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+        b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -1, 2)
+        b:SetScript("OnClick", function()
+            if this.orb then craftAsk(this.orb.id) end
+        end)
+        b:SetScript("OnEnter", function()
+            local o = this.orb
+            if not o or not GameTooltip then return end
+            GameTooltip:SetOwner(this, "ANCHOR_TOP")
+            GameTooltip:SetText(o.name, 0.9, 0.8, 0.5)
+            GameTooltip:AddLine(o.text, 1, 1, 1, 1)
+            GameTooltip:AddLine("You hold " .. o.held .. ".", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+        f.orbs[i] = b
+    end
+
+    -- The shards.
+    local shardsLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    shardsLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -176)
+    shardsLabel:SetText("Shards")
+    local shardHint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    shardHint:SetPoint("LEFT", shardsLabel, "RIGHT", 8, 0)
+    shardHint:SetText("Click to add the affix, or raise it. Four per item.")
+    f.shards = {}
+    for i = 1, SHARD_ROWS do
+        local row = CreateFrame("Button", "ArpgForgeShard" .. i, f)
+        row:SetWidth(328)
+        row:SetHeight(20)
+        row:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -194 - (i - 1) * 21)
+        local hl = row:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints(row)
+        hl:SetTexture(0.9, 0.8, 0.5, 0.12)
+        row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row.text:SetPoint("LEFT", row, "LEFT", 4, 0)
+        row.text:SetTextColor(0.6, 0.8, 1)
+        row:SetScript("OnClick", function()
+            if this.shard then craftAsk(9, this.shard.affix) end
+        end)
+        f.shards[i] = row
+    end
+    f.prev = CreateFrame("Button", "ArpgForgePrev", f, "UIPanelButtonTemplate")
+    f.prev:SetWidth(24)
+    f.prev:SetHeight(20)
+    f.prev:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -366)
+    f.prev:SetText("<")
+    f.prev:SetScript("OnClick", function() shardPage = shardPage - 1 forgePaint() end)
+    f.next = CreateFrame("Button", "ArpgForgeNext", f, "UIPanelButtonTemplate")
+    f.next:SetWidth(24)
+    f.next:SetHeight(20)
+    f.next:SetPoint("LEFT", f.prev, "RIGHT", 4, 0)
+    f.next:SetText(">")
+    f.next:SetScript("OnClick", function() shardPage = shardPage + 1 forgePaint() end)
+    f.page = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.page:SetPoint("LEFT", f.next, "RIGHT", 8, 0)
+
+    -- Salvage: the item goes, for shards of its affixes and a chance at an orb.
+    local salvage = CreateFrame("Button", "ArpgForgeSalvage", f, "UIPanelButtonTemplate")
+    salvage:SetWidth(100)
+    salvage:SetHeight(22)
+    salvage:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -12, 10)
+    salvage:SetText("Salvage")
+    salvage.armedAt = 0
+    salvage:SetScript("OnClick", function()
+        if not forgeItem then
+            craftAsk(8)
+            return
+        end
+        if forgeItem.bag == 255 then
+            DEFAULT_CHAT_FRAME:AddMessage("|cffff4040Take the item off to salvage it.|r")
+            return
+        end
+        local now = GetTime()
+        if now - this.armedAt < 4 then
+            this.armedAt = 0
+            this:SetText("Salvage")
+            craftAsk(8)
+            forgeItem = nil
+            forgePaint()
+        else
+            this.armedAt = now
+            this:SetText("Sure?")
+        end
+    end)
+    salvage:SetScript("OnHide", function() this.armedAt = 0 this:SetText("Salvage") end)
+    salvage:SetScript("OnEnter", function()
+        if not GameTooltip then return end
+        GameTooltip:SetOwner(this, "ANCHOR_TOP")
+        GameTooltip:SetText("Salvage")
+        GameTooltip:AddLine("Destroys the item for shards of its affixes (two from a blue or better) "
+            .. "and a chance at an orb. Click twice.", 1, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    salvage:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+
+    -- The bags change under the slot: repaint, so a moved item lets go.
+    f:RegisterEvent("BAG_UPDATE")
+    f:RegisterEvent("UNIT_INVENTORY_CHANGED")
+    f:SetScript("OnEvent", function() if this:IsVisible() then forgePaint() end end)
+    forge = f
+    return f
+end
+
+function ArpgPurse_Update(p)
+    purse = p or { orbs = {}, shards = {} }
+    forgePaint()
+end
+
+function ArpgForge_Toggle()
+    local f = forgeBuild()
+    if f:IsVisible() then
+        f:Hide()
+    else
+        f:Show()
+        forgePaint()
+    end
+end
+
+-- What was last picked up, so a drag onto the Forge's slot knows where it came from.
+if PickupContainerItem then
+    local stockPickupContainer = PickupContainerItem
+    PickupContainerItem = function(bag, slot)
+        lastPickup = { bag = bag, slot = slot }
+        return stockPickupContainer(bag, slot)
+    end
+end
+if PickupInventoryItem then
+    local stockPickupInventory = PickupInventoryItem
+    PickupInventoryItem = function(slot)
+        lastPickup = { bag = 255, slot = slot }
+        return stockPickupInventory(slot)
+    end
+end
+-- Alt-click puts an item in the open Forge, from the bags or the character.
+if ContainerFrameItemButton_OnClick then
+    local stockContainerClick = ContainerFrameItemButton_OnClick
+    ContainerFrameItemButton_OnClick = function(button, ignoreShift)
+        if forge and forge:IsVisible() and IsAltKeyDown() and button == "LeftButton" then
+            forgeSelect(this:GetParent():GetID(), this:GetID())
+            return
+        end
+        return stockContainerClick(button, ignoreShift)
+    end
+end
+if PaperDollItemSlotButton_OnClick then
+    local stockPaperDollClick = PaperDollItemSlotButton_OnClick
+    PaperDollItemSlotButton_OnClick = function(button, ignoreModifiers)
+        if forge and forge:IsVisible() and IsAltKeyDown() and button == "LeftButton" then
+            forgeSelect(255, this:GetID())
+            return
+        end
+        return stockPaperDollClick(button, ignoreModifiers)
+    end
+end
+
+-- The Forge's button, beside the town portal's.
+local forgeButton = CreateFrame("Button", "ArpgHudForgeButton", UIParent)
+forgeButton:SetWidth(28)
+forgeButton:SetHeight(28)
+forgeButton:SetPoint("LEFT", portalButton, "RIGHT", 6, 0)
+forgeButton:SetFrameStrata("MEDIUM")
+local forgeIcon = forgeButton:CreateTexture(nil, "ARTWORK")
+forgeIcon:SetAllPoints(forgeButton)
+forgeIcon:SetTexture("Interface\\Icons\\Trade_BlackSmithing")
+forgeButton:SetScript("OnClick", function() ArpgForge_Toggle() end)
+forgeButton:SetScript("OnEnter", function()
+    if GameTooltip then
+        GameTooltip:SetOwner(this, "ANCHOR_TOP")
+        GameTooltip:SetText("Forge")
+        GameTooltip:AddLine("Use orbs and shards on your items, or salvage them.", 1, 1, 1, 1)
+        GameTooltip:Show()
+    end
+end)
+forgeButton:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)

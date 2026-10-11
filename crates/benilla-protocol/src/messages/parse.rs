@@ -533,6 +533,15 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_GLOBE => {
             ServerPacket::ArpgGlobe(super::arpg::read_arpg_globe(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_EVENT => {
+            ServerPacket::ArpgEvent(super::arpg::read_arpg_event(&mut r)?)
+        }
+        super::arpg::SMSG_ARPG_BOUNTIES => {
+            ServerPacket::ArpgBounties(super::arpg::read_arpg_bounties(&mut r)?)
+        }
+        super::arpg::SMSG_ARPG_PURSE => {
+            ServerPacket::ArpgPurse(super::arpg::read_arpg_purse(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_IMPACT => {
             ServerPacket::ArpgImpact(super::arpg::read_arpg_impact(&mut r)?)
         }

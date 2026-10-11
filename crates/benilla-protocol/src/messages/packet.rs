@@ -406,6 +406,12 @@ pub enum ServerPacket {
     ArpgImpact(crate::messages::ArpgImpact),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_SHEET`, the character sheet.
     ArpgSheet(crate::messages::ArpgSheet),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_EVENT`, the zone's event.
+    ArpgEvent(crate::messages::ArpgEvent),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_BOUNTIES`, the character's bounties.
+    ArpgBounties(Vec<crate::messages::ArpgBounty>),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_PURSE`, the crafting purse.
+    ArpgPurse(crate::messages::ArpgPurse),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1388,6 +1394,9 @@ impl ServerPacket {
             ServerPacket::ArpgProc(_) => "SMSG_ARPG_PROC".into(),
             ServerPacket::ArpgImpact(_) => "SMSG_ARPG_IMPACT".into(),
             ServerPacket::ArpgSheet(_) => "SMSG_ARPG_SHEET".into(),
+            ServerPacket::ArpgEvent(_) => "SMSG_ARPG_EVENT".into(),
+            ServerPacket::ArpgBounties(_) => "SMSG_ARPG_BOUNTIES".into(),
+            ServerPacket::ArpgPurse(_) => "SMSG_ARPG_PURSE".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

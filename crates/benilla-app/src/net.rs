@@ -1055,6 +1055,18 @@ pub(crate) enum ClientCommand {
         skill: u8,
         rune: u8,
     },
+    /// Fork-only: an ARPG craft on the item at `bag`/`slot` (op 1-7 an orb, 8 salvage, 9 the
+    /// shard of `affix`).
+    ArpgCraft {
+        op: u8,
+        bag: u8,
+        slot: u8,
+        affix: u16,
+    },
+    /// Fork-only: abandon ARPG bounty `slot` for a new one.
+    ArpgBountyAbandon {
+        slot: u8,
+    },
     /// Fork-only: give back every point in ARPG skill `skill`.
     ArpgSkillRespec {
         skill: u8,

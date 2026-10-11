@@ -45,6 +45,7 @@ mod strikes;
 mod threats;
 mod tree;
 mod uniques;
+mod world;
 
 pub(crate) use tree::CVAR_TREE_ACTION;
 pub(crate) use uniques::ArpgUniques;
@@ -271,6 +272,7 @@ pub(super) fn plugin(app: &mut App) {
     globes::register_net(app);
     sheet::register_net(app);
     strikes::register_net(app);
+    world::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);
@@ -292,6 +294,7 @@ pub(super) fn plugin(app: &mut App) {
     sheet::plugin(app);
     // The added hits' impact kits, and the blood off crits and heavy kills.
     strikes::plugin(app);
+    world::plugin(app);
     // The corpse loot lying on the ground.
     loot::plugin(app);
     // The skill tree window's feed and requests.
@@ -340,8 +343,8 @@ pub(super) fn plugin(app: &mut App) {
 const HUD_TOC: &str = "## Interface: 11200\n## Title: ARPG Hud\n## Notes: The benilla ARPG \
 client's hover health bar, installed by the client.\nArpgHud.lua\n";
 const HUD_LUA: &str = include_str!("arpg_hud.lua");
-/// The addon's key commands: the town portal, which the key bindings window lists under ARPG.
-const HUD_BINDINGS: &str = "<Bindings>\n    <Binding name=\"ARPGTOWNPORTAL\" header=\"ARPG\">ArpgHud_TownPortal()</Binding>\n</Bindings>\n";
+/// The addon's key commands: the town portal and the Forge, which the key bindings window lists under ARPG.
+const HUD_BINDINGS: &str = "<Bindings>\n    <Binding name=\"ARPGTOWNPORTAL\" header=\"ARPG\">ArpgHud_TownPortal()</Binding>\n    <Binding name=\"ARPGFORGE\" header=\"ARPG\">ArpgForge_Toggle()</Binding>\n</Bindings>\n";
 
 /// Where the hover health bar addon lives, `AddOns/ArpgHud` in the config folder.
 fn hud_dir() -> Option<std::path::PathBuf> {
@@ -1170,7 +1173,8 @@ mod tests {
         // in scope; the bare VM has no player, so the orbs read empty.
         let chunk = format!(
             "if not UIParent then CreateFrame(\"Frame\", \"UIParent\") end\n\
-             for _, f in ipairs({{\"GameFontHighlight\", \"GameFontNormalSmall\"}}) do\n\
+             for _, f in ipairs({{\"GameFontHighlight\", \"GameFontNormalSmall\", \"GameFontNormal\",\n\
+             \"GameFontHighlightSmall\"}}) do\n\
              if not _G[f] then CreateFont(f) end end\n\
              CreateFrame(\"Frame\", \"MainMenuBar\", UIParent)\n\
              CreateFrame(\"Frame\", \"MainMenuBarLeftEndCap\", MainMenuBar)\n\
@@ -1191,7 +1195,16 @@ mod tests {
              assert(math.abs(healthOrb.shown - 0.5) < 0.01, healthOrb.shown)\n\
              assert(healthOrb.cols[1].wet ~= nil)\n\
              paintOrb(powerOrb, 2, POWER_COLORS[1], 9)\n\
-             assert(powerOrb.target == 1)\n"
+             assert(powerOrb.target == 1)\n\
+             ArpgEvent_Update({{state=1,kind=3,title=\"Siege\",objective=\"Hold\",have=1,need=3,\n\
+             secs=75,dist=120,dir=\"NE\"}})\n\
+             assert(eventBlock:IsShown() and eventBlock.where:GetText() == \"1:15  120 yd NE\",\n\
+             eventBlock.where:GetText())\n\
+             ArpgBounties_Update({{{{slot=0,kind=2,have=3,need=20,title=\"Westfall\",reward=\"gold\"}}}})\n\
+             assert(bountyRows[1]:IsShown() and not bountyRows[2]:IsShown())\n\
+             ArpgEvent_Update(nil)\n\
+             assert(not eventBlock:IsShown())\n\
+             ArpgPurse_Update({{orbs={{}},shards={{}}}})\n"
         );
         script.run(&chunk).expect("the HUD addon runs");
     }

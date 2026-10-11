@@ -455,6 +455,14 @@ pub enum SessionEvent {
     ArpgImpact { impact: crate::messages::ArpgImpact },
     /// Fork-only, not 1.12.1: the character sheet (`SMSG_ARPG_SHEET`).
     ArpgSheet { sheet: crate::messages::ArpgSheet },
+    /// Fork-only, not 1.12.1: the zone's event (`SMSG_ARPG_EVENT`).
+    ArpgEvent { event: crate::messages::ArpgEvent },
+    /// Fork-only, not 1.12.1: the character's bounties (`SMSG_ARPG_BOUNTIES`).
+    ArpgBounties {
+        bounties: Vec<crate::messages::ArpgBounty>,
+    },
+    /// Fork-only, not 1.12.1: the crafting purse (`SMSG_ARPG_PURSE`).
+    ArpgPurse { purse: crate::messages::ArpgPurse },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

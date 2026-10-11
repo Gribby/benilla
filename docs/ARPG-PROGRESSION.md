@@ -303,8 +303,53 @@ the whole way.
   guide, as in vanilla.
 - **Open-world elite quests** scale with the group, as dungeons do.
 - **Attunement quests** for the raids (above).
-- **Bounties (later):** a board in each capital with a few zone tasks ("kill the rare in Felwood",
-  "clear Scholomance on Hard"), each paying a Cache, so level 60 zones stay worth visiting.
+- **Bounties** (built, below): three at a time, carried rather than taken from a board.
+
+## Zone events and bounties
+
+Jeff's call: the world should feel alive, with no daily quests. Quests stay optional; bounties
+and kills carry levelling.
+
+**Zone events** (`Arpg/ArpgEvents.{h,cpp}` on the server, `player/arpg/world.rs` and the HUD's
+tracker on the client). In the open world (Eastern Kingdoms and Kalimdor), a director starts one
+event per zone, 45-90 seconds after an ARPG player arrives and 3-6 minutes after the last ended.
+Each starts 45-130 yards from a player who is out of combat, not resting and level 5 or more.
+It uses the zone's own creatures: it anchors on a plain hostile creature within 4 levels below to
+3 above the player's level (no script, no quest or vendor ties, not a champion or rare) and
+summons more of its kind.
+- *Purge* (45%): slay 10-14 enemies within 45 yards of the spot in 3 minutes. Half as many again
+  of the anchor's kind fill the camp out.
+- *Hunt* (30%): a named rare of the anchor's kind, with a pack of three, roams the spot. Slay it in
+  5 minutes.
+- *Siege* (25%): three waves (4, 5, then 6 led by a champion) run at whoever holds the spot.
+  Clearing a wave brings the next after 5 seconds; otherwise each comes 30 seconds after the last.
+  4 minutes in all.
+
+The final kill's corpse holds a cache: a green, a blue, a 20% purple, an 8% unique, 2-4 orbs and
+gold. Every ARPG player who fought in the event, or stands within 120 yards, gains 8% (purge),
+10% (hunt) or 12% (siege) of a level (gold at 60) and the event's bounty credit. Out of time, the
+event fails and its summons go. The zone hears each start, wave, finish and failure in chat.
+
+The client shows the event in a tracker under the minimap: the objective and its progress, the
+clock, and the distance and compass way to the spot ("120 yd NE", or "you are there"). A tall
+orange column of light stands over the spot until the event ends.
+`SMSG_ARPG_EVENT` (0x349): `u8` state (1 live, 2 done, 3 failed, 4 none), `u32` id, `u8` kind,
+`f32` x y z, `f32` radius, `u16` have and need, `u32` ms left, cstring title and objective.
+
+**Bounties.** Each character carries three, for zones and dungeons near its level (from 2 levels
+below to 3 above): complete 2 events in a zone (30% of a level), slay 20-30 of a zone's creatures
+(none grey; 20%), slay 2-4 champions or rares there (25%), or defeat a dungeon's final boss (45%).
+They prefer the zone the player is in. A finished bounty pays at once, then a new one takes its
+slot:
+- that share of a level in XP;
+- gold (level² × 20, × 40 for a dungeon);
+- 1-3 orbs;
+- a rolled item: green, blue or purple. When the bags are full it comes by mail.
+
+Group members within 100 yards share kill credit. Right-click a bounty twice in the tracker to
+abandon it for another (`CMSG_ARPG_ACTION` kind 25, `u8` slot). Saved in `character_arpg_bounty`,
+which the server creates. `SMSG_ARPG_BOUNTIES` (0x34A): `u8` count, per bounty `u8` slot, `u8`
+kind, `u16` have and need, cstring title and reward.
 
 ## Build order
 
@@ -318,7 +363,8 @@ the whole way.
 6. Difficulty tiers. (Built.)
 7. Raid attunements and Molten Core's small-group forms; the other raids one at a time. (Molten
    Core's attunement built.)
-8. Bounties, and a paragon track past 60 (`ARPG-CHARACTER.md`'s open question).
+8. Zone events and bounties. (Built.) A paragon track past 60 (`ARPG-CHARACTER.md`'s open
+   question), and a weekly raid objective (Jeff deferred it).
 
 ## Open questions for Jeff
 

@@ -336,7 +336,7 @@ fn coin_text(copper: u32) -> String {
 
 /// The beam: a quad one unit tall (centred) and two wide, in three columns and three rows, its
 /// vertex alpha full at the centre line's foot and nothing at its edges and top.
-fn beam_mesh() -> Mesh {
+pub(super) fn beam_mesh() -> Mesh {
     let mut positions = Vec::new();
     let mut colors = Vec::new();
     let mut uvs = Vec::new();

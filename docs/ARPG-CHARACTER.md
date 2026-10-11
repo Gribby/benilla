@@ -229,6 +229,46 @@ server; the Skills tab on the client.
 - Saved in `character_arpg_codex`, `character_arpg_held` and `character_arpg_socket`, which the
   server creates.
 
+### Cross-skill procs
+
+Jeff's example: "if you crit with a melee weapon then your next Holy Light is instant cast". One
+skill sets another up, so a build plays as a rotation rather than one button. Each proc has an
+internal cooldown, so it paces the rotation rather than replacing it.
+
+**Built:** `Arpg/ArpgProcs.{h,cpp}` on the server.
+
+How a proc works:
+- *Triggers:* a swing's crit, a damage spell's hit or crit, a heal's crit, a spell landing on an
+  enemy (a stun), or a kill.
+- *Effects:* the next cast of the named spells is instant, deals more, is a sure critical strike or
+  costs no mana; or their cooldowns end now.
+- *The readied cast* is a spell modifier on the player, so the client's cast bar shows the instant
+  cast. It is spent by the next cast it fits and taken away when that spell is done. An instant
+  spell, such as a Seal, does not spend an instant-cast proc. It also goes if it waits too long
+  (8-12 seconds), or if its rune is unsocketed or its item taken off.
+- *The combat log* says each one: "**Rune of Grace** readies your next Holy Light or Flash of
+  Light: instant."
+
+| Rune | Fits | Proc (internal cooldown) |
+|---|---|---|
+| Grace | Strike | A critical swing: the next Holy Light or Flash of Light is instant (10 s) |
+| Verdict | Judgement | A Judgement that hits: the next Exorcism or Hammer of Wrath deals 50% more (8 s) |
+| the Anvil | Hammer of Justice | Stunning an enemy ends Judgement's cooldown (10 s) |
+| Fervour | Holy Wrath, Exorcism | A critical hit: the next Judgement is a sure critical strike (8 s) |
+| Zeal | Seals | A critical Seal hit: the next Holy Light or Flash of Light costs no mana (10 s) |
+
+| Unique | Proc (internal cooldown) |
+|---|---|
+| Hand of Edward the Odd | A critical swing: the next spell is instant (20 s) |
+| Ironfoe | A critical swing: the next Judgement deals 60% more (6 s) |
+| Verigan's Fist | A kill ends the cooldowns of Hammer of Wrath and Exorcism (8 s) |
+| Benediction | A critical heal: the next Exorcism, Holy Wrath or Holy Shock deals 50% more (8 s) |
+| Staff of Jordan | A critical Frostbolt: the next Fireball or Pyroblast is instant (8 s) |
+| Meteor Shard | A critical swing: the next Sinister Strike, Eviscerate, Heroic Strike or Mortal Strike costs nothing (8 s) |
+
+The uniques' proc lines reach the tooltip with the mechanic lines (`SMSG_ARPG_ITEM_MECHANICS`).
+The runes drop as the others do.
+
 ### Levels past 20
 
 "+N to <skill>" item affixes are the only route past 20, so the third source of skill power is
@@ -323,6 +363,45 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   tooltip shows them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`,
   0x343, which carries the rolled colour and a unique's border too). The "+N to a skill" affixes
   are not built yet.
+- **Built (crafting):** `Arpg/ArpgCraft.{h,cpp}` and the crafting half of `Arpg/ArpgAffixes.cpp`
+  on the server, the Forge window on the client (the anvil button beside the town portal's, or
+  the Forge key binding). Put an item in by dragging it onto the Forge's slot, or Alt-clicking it
+  in the bags or on the character. Any weapon or armour piece takes crafting, a quest reward
+  included.
+  - **Orbs**, PoE's currency on vanilla's gems, drop on the ground:
+    - champions 20%, rares one plus 25% for a second, dungeon bosses 1-2;
+    - anything near the looter's level 1%;
+    - each dungeon tier adds 5 points to these chances;
+    - zone event caches 2-4, bounties 1-3, and salvage now and then.
+
+    Picked up, they go into the character's purse, not the bags. The common ones drop most:
+    | Orb | Effect |
+    |---|---|
+    | Orb of Awakening | A white item turns green, with 1-2 affixes |
+    | Prism of Refinement | A green turns blue, adding affixes up to 3-4 |
+    | Orb of Ascension | A blue turns purple, adding up to 5-6 |
+    | Fel Orb | Every affix rerolled, as many as before |
+    | Star of Invocation | One more affix, while the rarity has room |
+    | Void Pearl | One affix, at random, gone |
+    | Arcane Lens | Every affix's value rerolled |
+
+    A unique takes every orb but the three that raise a rarity; its room follows its border (a
+    rare's 4, an epic's 6).
+  - **Shards**, Last Epoch's:
+    - *Salvage* destroys an item from the bags. It gives a shard of one of its affixes (two from a
+      blue or better), and a chance at an orb: 20% green, 35% blue, 50% purple, 60% unique (none from an item
+      with no affixes).
+    - *A shard* on an item adds its affix, when the affix fits the item and its rarity has room, or
+      raises the value it already has a third of the way to the item's top.
+    - An item takes four shard crafts in all; its tooltip counts them ("Forged 2/4").
+  - A crafted item keeps its affixes as a list in place of its seed's
+    (`character_arpg_item.affixes`, `forged`). An affix's id is its place in the list; new affixes
+    only ever go on its end. The orbs' `item_template` rows (92001-92007) are written at start, as
+    the Codex's are.
+  - `CMSG_ARPG_ACTION` kind 24: `u8` op (1-7 an orb, 8 salvage, 9 a shard), `u8` bag (255 the
+    equipped slots, 0 the backpack, 1-4 the bags), `u8` slot from 1, `u16` affix.
+    `SMSG_ARPG_PURSE` (0x34B): `u8` orb count, per orb `u8` id, `u16` held, cstring name and
+    text; `u16` shard count, per shard `u16` affix, `u16` held, cstring name.
 - **Uniques get one more hook:** "+2 to Judgement's Chain node", raising one node past its cap.
   That ties a unique to a build rather than a class.
 - **Affix text** reaches the client the way uniques' lines do, as a table sent at the hello, so

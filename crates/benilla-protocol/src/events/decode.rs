@@ -65,6 +65,9 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::ArpgProc(proc_) => vec![SessionEvent::ArpgProc { proc_ }],
         ServerPacket::ArpgImpact(impact) => vec![SessionEvent::ArpgImpact { impact }],
         ServerPacket::ArpgSheet(sheet) => vec![SessionEvent::ArpgSheet { sheet }],
+        ServerPacket::ArpgEvent(event) => vec![SessionEvent::ArpgEvent { event }],
+        ServerPacket::ArpgBounties(bounties) => vec![SessionEvent::ArpgBounties { bounties }],
+        ServerPacket::ArpgPurse(purse) => vec![SessionEvent::ArpgPurse { purse }],
         ServerPacket::Weather {
             weather_type,
             grade,

@@ -35,7 +35,7 @@ pub(super) fn register_net(app: &mut App) {
 
 fn on_item_mechanics(In(ev): In<SessionEvent>, mut uniques: ResMut<ArpgUniques>) {
     if let SessionEvent::ArpgItemMechanics { rows } = ev {
-        let fresh: HashMap<u32, String> = rows.into_iter().collect();
+        let fresh = merged(rows);
         // Every hello resends the table: only a change touches the resource, which re-feeds the
         // tooltips.
         if uniques.0 != fresh {
@@ -45,9 +45,38 @@ fn on_item_mechanics(In(ev): In<SessionEvent>, mut uniques: ResMut<ArpgUniques>)
     }
 }
 
+/// The table by item: an item with a mechanic and a proc (`Arpg/ArpgProcs.h`) has two rows, its
+/// lines joined in the order sent.
+fn merged(rows: Vec<(u32, String)>) -> HashMap<u32, String> {
+    let mut out: HashMap<u32, String> = HashMap::new();
+    for (item, line) in rows {
+        out.entry(item)
+            .and_modify(|text| {
+                text.push('\n');
+                text.push_str(&line);
+            })
+            .or_insert(line);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_item_with_two_rows_keeps_both_lines() {
+        let table = merged(vec![
+            (873, "Frostbolt shatters.".into()),
+            (2243, "Chains.".into()),
+            (873, "A critical Frostbolt readies Fireball.".into()),
+        ]);
+        assert_eq!(
+            table[&873],
+            "Frostbolt shatters.\nA critical Frostbolt readies Fireball."
+        );
+        assert_eq!(table[&2243], "Chains.");
+    }
 
     #[test]
     fn the_table_answers_by_item_id() {
