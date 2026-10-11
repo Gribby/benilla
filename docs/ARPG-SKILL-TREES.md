@@ -30,10 +30,12 @@ So the tree mixes three kinds of node, and the third kind is what makes it an AR
 | **Modifier** | Changes how one skill works | The uniques' kit (chain, arc, spread, pierce, burst, echo…), as a tree source instead of an item |
 | **Keystone** | A capstone that changes the class's whole loop | Small custom server code per keystone, one per branch |
 
-**Modifiers and uniques stack sideways, not up.** The same kit on the same spell from a node and an
-item doesn't double: the stronger one applies (the rule uniques already follow). Different kits
-combine: Judgement that chains (node) and also bursts (Mograine's Might) is the build you're meant
-to find.
+**Modifiers and uniques stack.** The same kit on the same spell from a node, a rune and an item
+combines (counts add, shares add to at most a whole hit, three quarters for chains, shards,
+projectiles and echoes; the widest reach), so a unique always adds to the tree that built toward
+it: Sweeping Seal 3/3 and Smite's Mighty Hammer strike every other enemy in front for 100%.
+Different kits combine too: Judgement that chains (node) and also bursts (Mograine's Might) is the
+build you're meant to find.
 
 ## Points and pacing
 
@@ -125,7 +127,7 @@ The ranged paladin: holy damage at range, sustain from healing spells.
   - Passive: teaches the talent's rank N spell (dropping lower ranks).
   - Skill: teaches the talent's spell.
   - Modifier: a uniques-kit row the uniques' lookup also reads (`WornMechanic` is now "worn or
-    learned", the larger count winning).
+    learned", stacking every source).
   - Keystone: a flag its hook checks. Avenger is in the Judgement script (`Paladin.cpp`), Martyr's
     Ward pulses from the ARPG swing update, Dawnbringer runs from the heal path, and Purifying
     Light from the creature-type checks in `Spell.cpp`.

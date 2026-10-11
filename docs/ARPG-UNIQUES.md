@@ -37,7 +37,17 @@ If a gold accent turns out too quiet in play, the beam carries more: thicker or 
   vanilla best-in-slot lists mostly stand.
 - **Secondary hits are weaker.** Anything a mechanic adds (an extra projectile, a fragment, a
   chain jump) deals a fixed share of the original hit's damage, shown in the tooltip. No added hit
-  can crit on its own or proc on-hit effects, so mechanics never stack into each other.
+  can crit on its own or set off anything further. An extra projectile or an echo is a whole
+  (weaker) cast, though: it sets off the on-hit kits (a shatter, a chain, a burst) as the first
+  cast does, but never launches more projectiles or echoes, so nothing multiplies without end.
+- **The same kit from several sources stacks.** A unique, a skill node and a rune giving one kit
+  to one spell combine into one: counts add (chain jumps at most 6, shards 10, projectiles 8,
+  spread 6), shares add (to at most 100% of the hit, 75% for what multiplies hits: chains, shards,
+  projectiles, echoes), reach takes the widest, an echo comes as often as its most frequent
+  source. Smite's Mighty Hammer (an arc at 50%) with Sweeping Seal 3/3 (50%) makes Seal of
+  Righteousness strike every other enemy in front for 100%. The Skills tab's Bonuses list shows
+  each stack with its combined numbers. Melee area (Strength, gear) widens arcs, cleaves and
+  shockwaves; spell area (Intellect, gear) widens bursts and shatters.
 - **ARPG players only.** The same item on a stock-client player or a playerbot does nothing new.
 
 ## The mechanic kit
@@ -239,5 +249,4 @@ make testing a unique quicker than the GM command; it's a small addition.
 
 - Should a few **new** uniques exist alongside these: items that don't exist in vanilla,
   as world drops from champion packs?
-- Should two uniques stack if they touch the same spell (two Fireball items)? For now only the
-  best applies.
+- Two uniques on one spell (two Fireball items) stack as above.
