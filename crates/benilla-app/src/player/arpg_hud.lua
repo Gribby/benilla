@@ -526,7 +526,9 @@ ARPG_TOOLTIP_CUT_RADIUS = "Indoors and in caves, how far from your character the
 ARPG_TOOLTIP_LOOT_FILTER = "Which items on the ground get a name label. Hidden ones still "
     .. "glow and can be picked up, and holding Alt shows every label. Gold always shows."
 ARPG_TOOLTIP_DEV_LOOT = "For testing: Drop Test Loot asks the server for a corpse at your feet "
-    .. "holding this many items of this quality around this item level. Form Test Pack makes the "
+    .. "holding this many items of this quality around this item level (past 60, the raids'). "
+    .. "Quality is the rolled rarity: Purple is an ordinary base item rolled with 5-6 affixes, "
+    .. "Unique a named item. The Dungeon Tier sets how strong the affixes roll. Form Test Pack makes the "
     .. "nearest mob lead a pack of five; Champion Pack and Rare Pack bring champions or a rare. "
     .. "All need Arpg.DevTools = 1 in the server's mangosd.conf."
 ARPG_TOOLTIP_DUNGEON_TIER = "The difficulty of the next dungeon you enter first: tougher, harder-"
@@ -558,10 +560,16 @@ local ARPG_OPTION_ROWS = {
         0, 7, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Unique", "Codex" } },
     { "RowDevLootCount", "arpgDevLootCount", "Test Loot Count", "ARPG_TOOLTIP_DEV_LOOT",
         1, 16, 1, "%d" },
-    { "RowDevLootLevel", "arpgDevLootLevel", "Test Loot Level", "ARPG_TOOLTIP_DEV_LOOT",
-        0, 60, 1, function(v)
+    -- An item level, not a character's: past 60 it reaches the raids' gear (Molten Core from 66,
+    -- Blackwing Lair about 75, Naxxramas up to 92), whose affixes roll larger.
+    { "RowDevLootLevel", "arpgDevLootLevel", "Test Loot Item Level", "ARPG_TOOLTIP_DEV_LOOT",
+        0, 92, 1, function(v)
             if v < 0.5 then return "Mine" end
-            return string.format("%d", math.floor(v + 0.5))
+            local n = math.floor(v + 0.5)
+            if n >= 83 then return string.format("%d (Naxxramas)", n) end
+            if n >= 71 then return string.format("%d (BWL, AQ)", n) end
+            if n >= 66 then return string.format("%d (Molten Core)", n) end
+            return string.format("%d", n)
         end },
 }
 
