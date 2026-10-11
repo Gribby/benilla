@@ -269,6 +269,34 @@ How a proc works:
 The uniques' proc lines reach the tooltip with the mechanic lines (`SMSG_ARPG_ITEM_MECHANICS`).
 The runes drop as the others do.
 
+**Every unique has a power.** A named blue or purple without an authored mechanic or proc (the
+tables above and `ARPG-UNIQUES.md`) carries one from a pool. Which one is fixed by the item's entry,
+so the same item always has the same power. Weapons draw from the weapon and general powers, armour
+from the armour and general ones, and jewellery from the general ones. The tooltip shows the power
+in gold under the "Unique" line.
+
+| Power | Fits | Effect |
+|---|---|---|
+| Edge of Ruin | Weapon | A critical swing: next spell +40% (6 s) |
+| Reaper's Haste | Any | A kill: next spell instant (15 s) |
+| Font of Power | Any | A critical spell: next spell free (8 s) |
+| Bloodthirst | Weapon | Each kill heals 6% of maximum health |
+| Soul Siphon | Any | Each kill restores 4% of maximum mana |
+| Pyre | Any | Slain enemies explode for 15% of their maximum health as Fire within 8 yd (at most 60% of your health) |
+| Thunder Edge | Weapon | A critical swing arcs lightning to 3 enemies for 35% of the hit |
+| Storm Conduit | Any | A critical spell arcs lightning to 3 enemies for 30% of the hit |
+| Second Wind | Armour | A blow of a fifth of your health heals 15% (30 s) |
+| Mender's Grace | Any | A critical heal: next spell instant (10 s) |
+| Executioner | Weapon | A kill: next spell a sure critical strike (8 s) |
+| Wellspring | Weapon | A critical swing restores 3% of maximum mana |
+| Bastion | Armour | A heavy blow: 50% of it back as holy fire to every enemy within 8 yd (8 s) |
+| Wrathstorm | Any | A critical spell: 25% of the hit as holy fire to every enemy within 8 yd (3 s) |
+| Vampiric Edge | Weapon | A critical swing heals 3% of maximum health |
+| Ironskin | Armour | A heavy blow restores 10% of maximum mana (15 s) |
+
+A readied "+damage" or "sure crit" waits for a spell that deals damage or heals, so a Seal or a
+blessing in between does not waste it.
+
 ### Levels past 20
 
 "+N to <skill>" item affixes are the only route past 20, so the third source of skill power is
