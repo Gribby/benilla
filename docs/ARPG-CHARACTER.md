@@ -270,8 +270,8 @@ The uniques' proc lines reach the tooltip with the mechanic lines (`SMSG_ARPG_IT
 The runes drop as the others do.
 
 **Every unique has a power.** A named blue or purple without an authored mechanic or proc (the
-tables above and `ARPG-UNIQUES.md`) carries one from a pool. Which one is fixed by the item's entry,
-so the same item always has the same power. Weapons draw from the weapon and general powers, armour
+tables above and `ARPG-UNIQUES.md`) carries one from a pool. Which one is fixed by the item, so
+every copy of it has the same power, as it has the same affixes. Weapons draw from the weapon and general powers, armour
 from the armour and general ones, and jewellery from the general ones. The tooltip shows the power
 in gold under the "Unique" line.
 
@@ -358,8 +358,9 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     Warden or boss 0/25/45/30) and lean up with the dungeon tier. The name shows the rolled
     colour, in the tooltip, the chat link and on the ground.
   - **Uniques** are vanilla's named blues and purples (and every mechanic item, `ARPG-UNIQUES.md`):
-    gold, their authored stats their implicits, and affixes as a rare (a vanilla blue, 3-4) or an
-    epic (a vanilla purple, 5-6). The ground label's border and the beam's core, and a "Unique
+    gold, their authored stats their implicits, a power of their own, and affixes of their own.
+    Which affixes, and how many (a vanilla blue 4, a vanilla purple 6), are fixed by the item, so
+    every copy of a unique has the same ones; only their values roll within their ranges. The ground label's border and the beam's core, and a "Unique
     (Rare: 3 affixes)" line in the tooltip, show which.
   - A raid drop (item level 66+) or a Torment drop rolls the top of its rarity's range.
   - Wardens drop two blues, a 30% purple and a 35% unique; a final boss's Cache, per player, a
@@ -413,8 +414,8 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     | Void Pearl | One affix, at random, gone |
     | Arcane Lens | Every affix's value rerolled |
 
-    A unique takes every orb but the three that raise a rarity; its room follows its border (a
-    rare's 4, an epic's 6).
+    A unique's affixes are its own: it takes the Arcane Lens (new values) and shards that raise an
+    affix it already has, but no orb or shard that changes which affixes it has.
   - **Shards**, Last Epoch's:
     - *Salvage* destroys an item from the bags. It gives a shard of one of its affixes (two from a
       blue or better), and a chance at an orb: 20% green, 35% blue, 50% purple, 60% unique (none from an item
