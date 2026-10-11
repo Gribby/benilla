@@ -23,9 +23,12 @@ pub struct ArpgLootItem {
     pub item_id: u32,
     /// `item_template.display_id`.
     pub display_id: u32,
-    /// 0 poor (grey) to 5 legendary.
+    /// The colour it shows: 0 poor (grey) to 4 epic, the rolled rarity on an ARPG server, and 6
+    /// (the Artifact colour) for a unique.
     pub quality: u8,
     pub count: u8,
+    /// A unique's border: its affixes' rarity (2 to 4); 0 for the rest.
+    pub border: u8,
 }
 
 /// The uniques' tooltip lines (cmangos `Arpg/ArpgUniques.h`), sent after every hello: `u8` count,
@@ -337,12 +340,30 @@ pub const SMSG_ARPG_CHAMPIONS: u16 = 0x0341;
 /// when an affixed item is stored.
 pub const SMSG_ARPG_ITEM_AFFIXES: u16 = 0x0343;
 
-/// `SMSG_ARPG_ITEM_AFFIXES`: `u16` count, per item `u64` guid and a C string of lines, `\n` between.
-pub fn read_arpg_item_affixes(r: &mut impl io::Read) -> io::Result<Vec<(u64, String)>> {
+/// One item's rolled look and affixes.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgItemAffix {
+    pub guid: u64,
+    /// The colour its name shows: 1 white to 4 purple, 6 a unique (the Artifact gold).
+    pub quality: u8,
+    /// A unique's border: its affixes' rarity (2 to 4); 0 for the rest.
+    pub border: u8,
+    /// Its tooltip lines, `\n` between.
+    pub lines: String,
+}
+
+/// `SMSG_ARPG_ITEM_AFFIXES`: `u16` count, per item `u64` guid, `u8` quality, `u8` border and a C
+/// string of lines, `\n` between.
+pub fn read_arpg_item_affixes(r: &mut impl io::Read) -> io::Result<Vec<ArpgItemAffix>> {
     let n = read_u16_le(r)?;
     let mut out = Vec::with_capacity(usize::from(n).min(256));
     for _ in 0..n {
-        out.push((read_u64_le(r)?, read_cstring(r)?));
+        out.push(ArpgItemAffix {
+            guid: read_u64_le(r)?,
+            quality: read_u8(r)?,
+            border: read_u8(r)?,
+            lines: read_cstring(r)?,
+        });
     }
     Ok(out)
 }
@@ -584,6 +605,7 @@ pub fn read_arpg_loot(r: &mut impl io::Read) -> io::Result<(u64, u32, Vec<ArpgLo
             display_id: read_u32_le(r)?,
             quality: read_u8(r)?,
             count: read_u8(r)?,
+            border: read_u8(r)?,
         });
     }
     Ok((corpse, gold, items))
@@ -761,16 +783,20 @@ mod tests {
     }
 
     #[test]
-    fn item_affixes_read_as_guid_and_lines_pairs() {
+    fn item_affixes_read_as_guid_look_and_lines() {
         let mut body = 1u16.to_le_bytes().to_vec();
         body.extend_from_slice(&0x4000_0000_0000_0123u64.to_le_bytes());
+        body.push(6);
+        body.push(3);
         body.extend_from_slice(b"+8 Strength\n+5% Holy damage\0");
         assert_eq!(
             read_arpg_item_affixes(&mut body.as_slice()).unwrap(),
-            vec![(
-                0x4000_0000_0000_0123,
-                "+8 Strength\n+5% Holy damage".to_string()
-            )]
+            vec![ArpgItemAffix {
+                guid: 0x4000_0000_0000_0123,
+                quality: 6,
+                border: 3,
+                lines: "+8 Strength\n+5% Holy damage".to_string(),
+            }]
         );
     }
 
@@ -931,6 +957,7 @@ mod tests {
             body.extend_from_slice(&display.to_le_bytes());
             body.push(quality);
             body.push(count);
+            body.push(if quality == 2 { 0 } else { 3 });
         }
         let (corpse, gold, items) = read_arpg_loot(&mut body.as_slice()).unwrap();
         assert_eq!(corpse, 0xF130_0000_0000_0042);
@@ -943,8 +970,10 @@ mod tests {
                 item_id: 1411,
                 display_id: 8473,
                 quality: 2,
-                count: 1
+                count: 1,
+                border: 0,
             }
         );
+        assert_eq!(items[0].border, 3);
     }
 }

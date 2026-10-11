@@ -545,12 +545,14 @@ fn slot_view(
     let (name, quality, display, link, equip_slots, kind, bar_placeable) = match t {
         Some(t) => {
             let name = rolls.name(&t.name, roll);
+            // Fork-only: an ARPG server's rolled rarity colours the item over its template's.
+            let shown = crate::items::arpg_affixes::quality(guid).unwrap_or(t.quality);
             (
                 Some(name.clone()),
-                t.quality as i32,
+                shown as i32,
                 t.display_info_id,
                 Some(crate::ui_items::item_link_full(
-                    entry, 0, roll, 0, &name, t.quality,
+                    entry, 0, roll, 0, &name, shown,
                 )),
                 find_equip_slot(t.inventory_type, has_relic_slot),
                 (t.class, t.subclass),

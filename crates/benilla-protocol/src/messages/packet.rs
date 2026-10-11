@@ -395,7 +395,7 @@ pub enum ServerPacket {
     /// Fork-only, not 1.12.1: `SMSG_ARPG_STATUS`, the flask's charges and the dodge's cooldown.
     ArpgStatus(crate::messages::ArpgStatus),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_ITEM_AFFIXES`, the rolled affixes of the player's items.
-    ArpgItemAffixes(Vec<(u64, String)>),
+    ArpgItemAffixes(Vec<crate::messages::arpg::ArpgItemAffix>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_TELEGRAPH`, a telegraphed attack.
     ArpgTelegraph(crate::messages::ArpgTelegraph),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_GLOBE`, a health globe dropped or taken.

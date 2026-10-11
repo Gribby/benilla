@@ -1058,15 +1058,26 @@ pub(crate) mod arpg_affixes {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{LazyLock, RwLock};
 
-    static LINES: LazyLock<RwLock<HashMap<u64, String>>> = LazyLock::new(Default::default);
+    use benilla_protocol::messages::arpg::ArpgItemAffix;
+
+    static LINES: LazyLock<RwLock<HashMap<u64, ArpgItemAffix>>> = LazyLock::new(Default::default);
     static GENERATION: AtomicU64 = AtomicU64::new(0);
 
-    /// Take the server's lines, item by item.
-    pub(crate) fn set(items: impl IntoIterator<Item = (u64, String)>) {
+    /// Take the server's rolls, item by item.
+    pub(crate) fn set(items: impl IntoIterator<Item = ArpgItemAffix>) {
         if let Ok(mut lines) = LINES.write() {
-            lines.extend(items);
+            lines.extend(items.into_iter().map(|a| (a.guid, a)));
         }
         GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// The colour the item's name shows, its rolled rarity (6 a unique), if the server rolled it.
+    pub(crate) fn quality(guid: u64) -> Option<u32> {
+        let lines = LINES.read().ok()?;
+        lines
+            .get(&guid)
+            .map(|a| u32::from(a.quality))
+            .filter(|q| *q > 0)
     }
 
     /// Bumped by every [`set`], for the feeds' gates.
@@ -1079,8 +1090,9 @@ pub(crate) mod arpg_affixes {
         let Ok(lines) = LINES.read() else {
             return Vec::new();
         };
-        lines.get(&guid).map_or_else(Vec::new, |text| {
-            text.lines()
+        lines.get(&guid).map_or_else(Vec::new, |a| {
+            a.lines
+                .lines()
                 .filter(|l| !l.is_empty())
                 .map(|l| benilla_ui::script::EnchantView {
                     slot: 0,
@@ -1098,11 +1110,15 @@ pub(crate) mod arpg_affixes {
         #[test]
         fn an_items_lines_come_back_as_green_enchant_lines() {
             let before = generation();
-            set([(
-                0x4000_0000_0000_0042,
-                "+8 Strength\n+5% Holy damage".to_string(),
-            )]);
+            set([ArpgItemAffix {
+                guid: 0x4000_0000_0000_0042,
+                quality: 3,
+                border: 0,
+                lines: "+8 Strength\n+5% Holy damage".to_string(),
+            }]);
             assert!(generation() > before);
+            assert_eq!(quality(0x4000_0000_0000_0042), Some(3));
+            assert_eq!(quality(7), None);
             let lines = views(0x4000_0000_0000_0042);
             assert_eq!(lines.len(), 2);
             assert_eq!(lines[1].name, "+5% Holy damage");

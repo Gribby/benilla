@@ -184,10 +184,10 @@ boss, so the character's damage has to keep up with the dungeon tier.
 
 Built (`Arpg/ArpgActions.{h,cpp}` on the server, `player/arpg/actions.rs` on the client).
 
-- **Roll (Space, the Jump binding):** a leap of about seven yards toward the movement keys' walk,
-  or the cursor with none held, every 2.5 seconds. The server sends it as a knockback, which the
-  client flies and the anticheat expects; while airborne (0.45 s) every blow and hostile spell at
-  the player is dodged. Not while rooted, stunned, feared, mounted, swimming or falling. A bar
+- **Roll (Space, the Jump binding):** a dash of 7.5 yards along the ground toward the movement
+  keys' walk, or the cursor with none held, every 2.5 seconds. The server sends it as a charge
+  spline the client rides on the ground under it, so a small rise never cuts it short and it
+  stops at a wall or a drop; for 0.45 s every blow and hostile spell at the player is dodged. Not while rooted, stunned, feared, mounted, swimming or falling. A bar
   right of the skill bar shows the cooldown.
 - **Flask (Q, the Strafe Left binding; A still walks left):** three charges, starting full. A
   charge heals 15% of maximum health at once and 25% more over three seconds. Kills refill it

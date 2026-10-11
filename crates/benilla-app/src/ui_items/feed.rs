@@ -728,6 +728,7 @@ fn resolve_slot(
             ..Default::default()
         });
     };
+    let shown_quality = crate::items::arpg_affixes::quality(guid).unwrap_or(t.quality);
     Some(ContainerSlot {
         // A charter's guild name and master, keyed by the petition id the server puts in
         // enchantment slot 0 (`PetitionsHandler.cpp:126`), where the reference reads it
@@ -746,7 +747,8 @@ fn resolve_slot(
             .and_then(|d| d.icon.clone()),
         count,
         durability,
-        quality: Some(t.quality),
+        // Fork-only: an ARPG server's rolled rarity colours the item over its template's.
+        quality: Some(shown_quality),
         item_id: entry,
         // The link carries the roll in `randomPropertyId` and in the suffixed name (`0x5d8b00`);
         // the tooltip reads its name back off it.
@@ -756,7 +758,7 @@ fn resolve_slot(
             roll,
             0,
             &rolls.name(&t.name, roll),
-            t.quality,
+            shown_quality,
         )),
         locked: false,
         readable,

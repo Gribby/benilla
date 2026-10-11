@@ -564,7 +564,7 @@ local ARPG_OPTION_ROWS = {
         0, 5, 1, nil, { "Normal", "Hard", "Brutal", "Torment I", "Torment II", "Torment III" } },
     -- Developer: test loot, which a server with Arpg.DevTools = 1 drops at your feet.
     { "RowDevLootQuality", "arpgDevLootQuality", "Test Loot Quality", "ARPG_TOOLTIP_DEV_LOOT",
-        0, 7, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Orange", "Codex" } },
+        0, 7, 1, nil, { "Mixed", "Grey", "White", "Green", "Blue", "Purple", "Unique", "Codex" } },
     { "RowDevLootCount", "arpgDevLootCount", "Test Loot Count", "ARPG_TOOLTIP_DEV_LOOT",
         1, 16, 1, "%d" },
     { "RowDevLootLevel", "arpgDevLootLevel", "Test Loot Level", "ARPG_TOOLTIP_DEV_LOOT",

@@ -281,22 +281,48 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   - **ARPG stat:** +6% movement speed, +8% cooldown recovery, +12 life on kill, +3 mana on hit.
   - **Skill:** +1 to Judgement, +1 to all Holy skills. These are rare and valuable, and they go
     in the item's fourth enchantment slot.
-- **Built (affixes):** `Arpg/ArpgAffixes.{h,cpp}` on the server. Every green, blue and purple
-  weapon or armour piece dropped for an ARPG player (not a named unique) rolls 1, 2 or 3 affixes
-  (one more on a raid purple, one more from Torment I) from: +Strength, Agility, Stamina,
-  Intellect, Spirit (8-30), +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow damage (6-20),
-  +% Area (8-24), Projectile (6-18), Melee and Spell damage (5-16), +% healing (5-18), +% armour
-  (5-25, at most 60), +% block chance (shields, 2-6, at most 15), +% movement speed (boots, 3-8,
-  at most 15), +% cooldown recovery (3-10, at most 20), +life on kill (5-40), +mana on hit
-  (2-10). Those are item level 60 values on Normal: they grow by half again every nine item
-  levels or so (a level 20 drop rolls about a seventh of them, Molten Core a third more,
-  Blackwing Lair about twice, Naxxramas three to four times) and by the dungeon tier the item
-  dropped at (x1.15 Hard up to x2 Torment III, named over the affixes in the tooltip). The roll is one seed per item, kept
-  in `character_arpg_item`; worn affixes add into the same totals as the web. The tooltip shows
-  them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`, 0x343). The
-  "+N to a skill" affixes are not built yet.
-- **Counts by quality:** green 1 affix, blue 2, purple 3. Named dungeon and raid items keep their
-  authored stats and get their unique mechanic instead (`ARPG-UNIQUES.md`).
+- **Built (rarities and affixes):** `Arpg/ArpgAffixes.{h,cpp}` on the server. Loot is Diablo's
+  on vanilla's items: every weapon and armour piece dropped for an ARPG player is a base and rolls
+  its rarity at the drop.
+  - **Ordinary items** (vanilla's whites and greens; a green's "of the Bear" suffix stays as its
+    implicit) roll **white** (no affixes), **green** (1-2), **blue** (3-4) or **purple** (5-6).
+    The odds follow who dropped it (trash 50/33/13/4, a champion or open-world elite 15/40/33/12, a rare,
+    Warden or boss 0/25/45/30) and lean up with the dungeon tier. The name shows the rolled
+    colour, in the tooltip, the chat link and on the ground.
+  - **Uniques** are vanilla's named blues and purples (and every mechanic item, `ARPG-UNIQUES.md`):
+    gold, their authored stats their implicits, and affixes as a rare (a vanilla blue, 3-4) or an
+    epic (a vanilla purple, 5-6). The ground label's border and the beam's core, and a "Unique
+    (Rare: 3 affixes)" line in the tooltip, show which.
+  - A raid drop (item level 66+) or a Torment drop rolls the top of its rarity's range.
+  - Wardens drop two blues, a 30% purple and a 35% unique; a final boss's Cache, per player, a
+    blue, a green, a 25% purple and a 50% unique. Test loot's quality is the rarity asked for.
+- **The affixes** (item level 60 values on Normal; they grow by half again every nine item levels
+  or so, a level 20 drop about a seventh, Molten Core a third more, Blackwing Lair about twice,
+  Naxxramas three to four times, and by the dungeon tier, x1.15 Hard up to x2 Torment III):
+  - **Attributes:** +Strength, Agility, Stamina, Intellect, Spirit (8-30); +all attributes
+    (jewellery, 4-14).
+  - **Damage:** +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow (6-20), Area (8-24),
+    Projectile (6-18), Melee and Spell (5-16), damage over time and channelled (6-20), Seal
+    (weapons, 6-20); +% to elites and bosses (5-15); +% to Undead, Demons, Beasts, Humanoids,
+    Dragonkin, Elementals (weapons, 8-25).
+  - **Offence:** +attack power (10-40), +spell damage (6-24), +% attack speed (weapons, 3-8, at
+    most 20), +% cast speed (3-8, at most 20), +% critical strike chance and spell critical
+    strike chance (1-3, at most 8), +% spell critical damage (jewellery, 8-25), +% melee and
+    spell area (3-10), +% cooldown recovery (3-10), less mana cost (3-8%).
+  - **Sustain:** life leech (weapons, 0.5-2% of damage dealt) and mana leech (jewellery,
+    0.3-1.2%), +life on kill (5-40), +mana on hit (2-10), +health a second (armour, 2-10), +mana a
+    second (jewellery, 1-5), +% healing (5-18), +% globe and flask healing (armour, 5-20).
+  - **Defence:** +% maximum health (armour, 3-8) and mana (3-8), +% armour (armour, 5-25), +%
+    block (shields, 2-6), less damage taken (armour, 2-6%, 40% in all at most), thorns (armour,
+    6-30 Nature damage back at each attacker in reach), +Fire, Nature, Frost, Shadow or Arcane
+    resistance (5-20), +all resistances (jewellery, 3-10).
+  - **Utility:** +% movement speed (boots, 3-8), +% gold found (5-25), +% experience (jewellery,
+    2-6).
+  The roll is one seed per item, kept in `character_arpg_item` with its tier and rarity; worn
+  affixes add into the same totals as the web, and the character sheet's Totals list them. The
+  tooltip shows them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`,
+  0x343, which carries the rolled colour and a unique's border too). The "+N to a skill" affixes
+  are not built yet.
 - **Uniques get one more hook:** "+2 to Judgement's Chain node", raising one node past its cap.
   That ties a unique to a build rather than a class.
 - **Affix text** reaches the client the way uniques' lines do, as a table sent at the hello, so

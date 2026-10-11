@@ -1,7 +1,8 @@
 //! Fork-only, not 1.12.1: the ARPG view's dodge roll and health flask (cmangos
 //! `Arpg/ArpgActions.h`). The Jump binding (Space) rolls instead of jumping: toward the walk the
-//! movement keys ask for, else toward the cursor's aim. The server answers with a knockback, which
-//! the client flies as it does any other, and while airborne the character dodges every blow. The
+//! movement keys ask for, else toward the cursor's aim. The server answers with a short ground
+//! spline (7.5 yards, as a Charge's), which the client rides standing on the ground under it, so a
+//! small rise never cuts it short; while it runs the character dodges every blow. The
 //! Strafe Left binding (Q) drinks a flask charge; the A key still walks left. The server sends the
 //! flask's charges and the roll's cooldown (`SMSG_ARPG_STATUS`), which the health orb shows
 //! (`ArpgHud_Status` in `arpg_hud.lua`). The dungeon difficulty tier the ARPG View page sets

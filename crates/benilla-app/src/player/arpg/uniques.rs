@@ -15,9 +15,6 @@ use crate::net::NetHandlerApp;
 
 use super::*;
 
-/// The unique colour, sRGB: the client's Artifact quality colour (quality 6, `e6cc80`).
-pub(crate) const UNIQUE_RGB: [f32; 3] = [0.902, 0.8, 0.502];
-
 /// Item id → the unique's tooltip line, as the server last sent them; empty on a stock server.
 #[derive(Resource, Default, Debug)]
 pub(crate) struct ArpgUniques(pub(crate) HashMap<u32, String>);

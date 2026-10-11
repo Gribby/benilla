@@ -46,6 +46,9 @@ pub(super) struct ItemInstance {
     /// A timed item's remaining lifetime in ms, from `SMSG_ITEM_TIME_UPDATE`, not
     /// `ITEM_FIELD_DURATION`: the client displays from the packet (`Objects/Item.cpp:1093`).
     pub duration_ms: Option<u64>,
+    /// Fork-only, not 1.12.1: the instance's own quality, which colours the name over the
+    /// template's (an ARPG server's rolled rarity); `None` takes the template's.
+    pub quality: Option<u32>,
 }
 
 /// The set block's blank gold line, the reference's literal `0x854b2c`: a space and a newline. An
@@ -129,7 +132,7 @@ pub(super) fn render_view(
     let name_color = if flags.name_only {
         WHITE
     } else {
-        quality_color(v.quality)
+        quality_color(inst.and_then(|i| i.quality).unwrap_or(v.quality))
     };
     add((name, name_color))?;
     // The petition lines, below the name: a charter's `GUILD_CHARTER_*` pair or a petition's

@@ -439,7 +439,9 @@ pub enum SessionEvent {
     ArpgStatus { status: crate::messages::ArpgStatus },
     /// Fork-only, not 1.12.1: the rolled affixes of the player's items (`SMSG_ARPG_ITEM_AFFIXES`):
     /// item guid and its lines.
-    ArpgItemAffixes { items: Vec<(u64, String)> },
+    ArpgItemAffixes {
+        items: Vec<crate::messages::arpg::ArpgItemAffix>,
+    },
     /// Fork-only, not 1.12.1: a telegraphed attack winding up or broken off
     /// (`SMSG_ARPG_TELEGRAPH`).
     ArpgTelegraph {

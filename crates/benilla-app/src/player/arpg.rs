@@ -47,7 +47,7 @@ mod tree;
 mod uniques;
 
 pub(crate) use tree::CVAR_TREE_ACTION;
-pub(crate) use uniques::{ArpgUniques, UNIQUE_RGB};
+pub(crate) use uniques::ArpgUniques;
 
 use super::camera::CAM_PITCH_LIMIT;
 use super::camera_zoom::CAM_DIST_MAX;
@@ -174,7 +174,7 @@ pub(crate) const ARPG_KNOBS: [ArpgKnob; 6] = [
 /// Fork-only: the options page's Drop Test Loot button bumps this setting (never saved), and each
 /// bump asks the server for test loot as the dev settings below say.
 pub(crate) const CVAR_DEV_LOOT_DROP: &str = "arpgDevLootDrop";
-/// The test loot's quality: 0 a random mix, else the item quality plus one (1 grey … 6 orange).
+/// The test loot's quality: 0 a random mix, else the rarity plus one (1 grey … 5 purple, 6 a unique).
 const CVAR_DEV_LOOT_QUALITY: &str = "arpgDevLootQuality";
 /// How many items to drop.
 const CVAR_DEV_LOOT_COUNT: &str = "arpgDevLootCount";

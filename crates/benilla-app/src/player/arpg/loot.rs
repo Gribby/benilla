@@ -8,8 +8,10 @@
 //! out around the corpse, always in the same place for the same loot slot. A left click on a
 //! label or a glow walks to it and picks it up (`ClientCommand::ArpgLoot`); walking onto the gold
 //! picks it up. Labels show within [`LABEL_RANGE`] of the player, and all of them with Alt held.
-//! A unique (`super::uniques`) also wears the unique colour: a thin gold core inside a taller
-//! beam, and a gold border round its label.
+//! A drop's colour is the server's rolled rarity (white, green, blue, purple), not the item's
+//! vanilla one. A unique (quality 6, or one of `super::uniques`) is gold: a gold label and beam,
+//! with a thin core inside a taller beam and a border round its label in its affixes' rarity's
+//! colour (blue for 3-4 affixes, purple for 5-6).
 //! The loot filter (`arpgLootFilter`, the options window's ARPG View page) hides the labels of
 //! the low qualities ([`label_shown`]); their glows stay, and Alt still shows them.
 //! A corpse that despawns or streams out takes its drops with it.
@@ -533,7 +535,7 @@ fn apply_lists(
                     commands
                         .spawn((
                             Mesh3d(beam_mesh.clone()),
-                            MeshMaterial3d(beam_mats[UNIQUE_ART].clone()),
+                            MeshMaterial3d(beam_mats[unique_border(&kind)].clone()),
                             Transform::from_translation(pos + Vec3::Y * (core * 0.5))
                                 .with_scale(Vec3::new(BEAM_RADIUS * UNIQUE_CORE_RADIUS, core, 1.0)),
                             LootBeam {
@@ -577,11 +579,23 @@ fn apply_lists(
     }
 }
 
-/// Whether `kind` is a unique, by the server's table.
+/// Whether `kind` is a unique: gold (the server's rolled rarity for one), or in its table.
 fn is_unique(kind: &DropKind, uniques: Option<&super::ArpgUniques>) -> bool {
     match kind {
-        DropKind::Item(item) => uniques.is_some_and(|u| u.line(item.item_id).is_some()),
+        DropKind::Item(item) => {
+            usize::from(item.quality) == UNIQUE_ART
+                || uniques.is_some_and(|u| u.line(item.item_id).is_some())
+        }
         DropKind::Gold(_) => false,
+    }
+}
+
+/// The art index of a unique's border and beam core: its affixes' rarity (blue for 3-4, purple
+/// for 5-6), else the unique gold.
+fn unique_border(kind: &DropKind) -> usize {
+    match kind {
+        DropKind::Item(item) if (2..=4).contains(&item.border) => usize::from(item.border),
+        _ => UNIQUE_ART,
     }
 }
 
@@ -927,9 +941,9 @@ fn draw_labels(
             q.rect.max += shift;
         }
         let hovered = rig.arpg.over_loot == Some(key);
-        // A unique's gold border, under the box.
+        // A unique's border, under the box, in its affixes' rarity's colour.
         if is_unique(&ground_drop.kind, uniques.as_deref()) {
-            let g = super::UNIQUE_RGB;
+            let g = QUALITY_RGB[unique_border(&ground_drop.kind)];
             quads.overlays.push(UiQuad {
                 rect: Rect {
                     min: boxed.min - Vec2::splat(UNIQUE_BORDER),
@@ -975,6 +989,7 @@ mod tests {
             display_id: 0,
             quality,
             count: 1,
+            border: 0,
         }
     }
 
@@ -1133,6 +1148,7 @@ mod tests {
             display_id: 0,
             quality: 1,
             count: 3,
+            border: 0,
         };
         assert_eq!(
             label_text(&DropKind::Item(item), Some("Wolf Meat")),
@@ -1151,6 +1167,7 @@ mod tests {
                 display_id: 0,
                 quality: 3,
                 count: 1,
+                border: 0,
             })
         };
         let mut uniques = super::super::ArpgUniques::default();
@@ -1174,6 +1191,7 @@ mod tests {
                 display_id: 0,
                 quality,
                 count: 1,
+                border: 0,
             })
         };
         // Off: everything.
