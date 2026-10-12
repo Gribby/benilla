@@ -470,9 +470,13 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   - A raid drop (item level 66+) or a Torment drop rolls the top of its rarity's range.
   - Wardens drop two blues, a 30% purple and a 35% unique; a final boss's Cache, per player, a
     blue, a green, a 25% purple and a 50% unique. Test loot's quality is the rarity asked for.
-- **The affixes** (item level 60 values on Normal; they grow by half again every nine item levels
-  or so, a level 20 drop about a seventh, Molten Core a third more, Blackwing Lair about twice,
-  Naxxramas three to four times, and by the dungeon tier, x1.15 Hard up to x2 Torment III):
+- **The affixes** (item level 60 values on Normal, and by the dungeon tier, x1.15 Hard up to x2
+  Torment III). Flat ones (attributes, attack power, spell damage, added damage, resistances,
+  life on kill, regeneration, thorns) grow as vanilla's own stats do: by half again every nine
+  item levels or so, a level 20 drop about a seventh of a level 60 one. Percentages grow gently
+  to 60, from 40% of the level 60 value at level 1 (two thirds at 20, 70% at 30), so a low-level
+  "+% Holy damage" is worth having: 4-12% at level 20 where it was 1-3%. Past 60 both grow
+  alike, Molten Core a third more, Blackwing Lair about twice, Naxxramas three to four times.
   - **Attributes:** +Strength, Agility, Stamina, Intellect, Spirit (8-30); +all attributes
     (jewellery, 4-14).
   - **Damage:** +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow (6-20), Area (8-24),
