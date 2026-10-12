@@ -893,6 +893,11 @@ the level their talent row needs.
   and Fury stay the paladin's.
 - Only the paladin's swing counts as a skill (Crusader). A mage's wand or staff swing is no
   skill's.
+- A skill tree's spell modifiers reach its spells by id (every rank and triggered part with the
+  name), not by vanilla's family flags: classic shares those bits between unrelated spells (every
+  mage bolt carries one, so "Flamestrike is instant" would have made Fireball instant too) and
+  some spells have none (Exorcism, Holy Wrath, whose modifiers did nothing before). The client
+  is told only of the bits no other spell carries, for its tooltips.
 - The generated unique powers already suit every class. The authored uniques' kits are by spell,
   and six are the mage's already (Fireball, Frostbolt, Arcane Missiles, Polymorph).
 
