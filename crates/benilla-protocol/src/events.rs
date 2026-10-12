@@ -468,6 +468,10 @@ pub enum SessionEvent {
     ArpgCompare {
         items: Vec<crate::messages::arpg::ArpgItemCompare>,
     },
+    /// Fork-only, not 1.12.1: the class screen's showcase characters (`SMSG_ARPG_SHOWCASE`).
+    ArpgShowcase {
+        chars: Vec<crate::messages::arpg::ArpgShowcaseChar>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

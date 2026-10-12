@@ -696,6 +696,52 @@ pub fn read_arpg_compare(r: &mut impl io::Read) -> io::Result<Vec<ArpgItemCompar
     Ok(out)
 }
 
+/// The class screen's showcase characters (cmangos `Arpg/ArpgShowcase.cpp`), asked for before
+/// login with an empty `CMSG_ARPG_SHOWCASE_QUERY`.
+pub const CMSG_ARPG_SHOWCASE_QUERY: u16 = 0x034D;
+pub const SMSG_ARPG_SHOWCASE: u16 = 0x034E;
+
+/// One showcase character: a class, the look standing for it, and its gear by equipment slot, as
+/// a char-select roster entry carries them.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgShowcaseChar {
+    pub class: u8,
+    pub race: u8,
+    pub sex: u8,
+    pub skin: u8,
+    pub face: u8,
+    pub hair_style: u8,
+    pub hair_color: u8,
+    pub facial_hair: u8,
+    pub equipment: [crate::messages::CharEnumItem; 19],
+}
+
+/// `SMSG_ARPG_SHOWCASE`: `u8` count, per character eight `u8`s (class, race, sex, skin, face,
+/// hair style, hair colour, facial hair) and 19 slots of `u32` display id and `u8` inventory type.
+pub fn read_arpg_showcase(r: &mut impl io::Read) -> io::Result<Vec<ArpgShowcaseChar>> {
+    let n = read_u8(r)?;
+    let mut out = Vec::with_capacity(usize::from(n).min(16));
+    for _ in 0..n {
+        let mut c = ArpgShowcaseChar {
+            class: read_u8(r)?,
+            race: read_u8(r)?,
+            sex: read_u8(r)?,
+            skin: read_u8(r)?,
+            face: read_u8(r)?,
+            hair_style: read_u8(r)?,
+            hair_color: read_u8(r)?,
+            facial_hair: read_u8(r)?,
+            ..Default::default()
+        };
+        for slot in c.equipment.iter_mut() {
+            slot.display_id = read_u32_le(r)?;
+            slot.inventory_type = read_u8(r)?;
+        }
+        out.push(c);
+    }
+    Ok(out)
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
