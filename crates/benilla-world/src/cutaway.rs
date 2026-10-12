@@ -11,7 +11,8 @@
 //!
 //! Indoors the rooms drawn are the ones the player can see ([`crate::wmo_portal`]'s sight rooms):
 //! its own and those through a doorway in its line of sight, two doorways deep, not every room the
-//! cut cylinder meets, so nothing shows through a wall.
+//! cut cylinder meets, so nothing shows through a wall; and from a sealed interior the outside
+//! world does not draw at all ([`SeedFromViewer`]).
 //!
 //! Outdoors the ARPG client sets a smaller [`Cutaway::dither`] cut instead, between the player and
 //! the camera: the WMO walls, roofs and static doodads (a tree crown, an awning) there draw every
@@ -45,8 +46,10 @@ pub const WALL_AHEAD: f32 = 1.0;
 /// rather than the camera. The ARPG camera hangs high over the player, so it is often inside a
 /// building the player stands beside, or over a roof the player stands under; seeded from it, the
 /// flood would hide the world round the player. Off by default; the ARPG client turns it on.
-/// While it is on and the indoor cut is open, the exterior (terrain, other buildings) is never
-/// limited to the doorways the camera sees: the cut roof shows it.
+/// While it is on and the indoor cut is open, the exterior (terrain, water, other buildings) is
+/// not limited to the doorways the camera sees: it draws whole when a room the player sees is an
+/// outdoor group (a doorway onto a courtyard), and not at all from a sealed interior, so the cut
+/// walls never show the world beyond them.
 #[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct SeedFromViewer(pub bool);
 

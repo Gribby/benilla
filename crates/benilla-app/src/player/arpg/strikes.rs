@@ -139,7 +139,7 @@ fn spray_gore(
             && spawn.category == CATEGORY_CRIT
             && super::fx::is_damage_number(&spawn.text)
         {
-            spray(spawn.anchor, false);
+            spray(spawn.anchor, true);
         }
     }
     for kill in kills.read() {

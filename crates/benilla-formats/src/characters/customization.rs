@@ -160,6 +160,36 @@ impl CharCreateCatalog {
     }
 
     /// The worn level-1 gear the create preview dresses a (race, class, sex) in.
+    /// Fork-only, not 1.12.1: let every playable race be every playable class (the ARPG server
+    /// builds the pairings its database lacks). A pairing the client data lacks borrows its
+    /// starting outfit from another race of the class, the same sex.
+    pub fn open_all_combos(&mut self) {
+        let races: Vec<u8> = self.displays.keys().copied().collect();
+        let classes: HashSet<u8> = self.combos.iter().map(|&(_, c)| c).collect();
+        for &race in &races {
+            for &class in &classes {
+                if !self.combos.insert((race, class)) {
+                    continue;
+                }
+                for sex in 0..2u8 {
+                    if self.start_outfits.contains_key(&(race, class, sex)) {
+                        continue;
+                    }
+                    let mut donors: Vec<u8> = races
+                        .iter()
+                        .copied()
+                        .filter(|&r| self.start_outfits.contains_key(&(r, class, sex)))
+                        .collect();
+                    donors.sort_unstable();
+                    if let Some(&donor) = donors.first() {
+                        let outfit = self.start_outfits[&(donor, class, sex)].clone();
+                        self.start_outfits.insert((race, class, sex), outfit);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn start_outfit(&self, race: u8, class: u8, sex: u8) -> &[StartOutfitItem] {
         self.start_outfits
             .get(&(race, class, sex))

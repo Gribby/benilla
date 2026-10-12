@@ -38,7 +38,8 @@ const CHAMPION_RGB: [f32; 3] = [0.35, 0.6, 1.0];
 const RARE_RGB: [f32; 3] = [1.0, 0.85, 0.25];
 
 /// The camera kick, as trauma (0 to 1): what a crit, a kill and a champion's kill add.
-const SHAKE_CRIT: f32 = 0.4;
+const SHAKE_HIT: f32 = 0.22;
+const SHAKE_CRIT: f32 = 0.55;
 const SHAKE_KILL: f32 = 0.5;
 const SHAKE_CHAMPION: f32 = 0.9;
 /// Trauma lost per second, and the camera's offset at full trauma, in yards. The offset goes as
@@ -146,9 +147,11 @@ fn note_hits(
         {
             continue;
         }
-        if spawn.category == CATEGORY_CRIT {
-            shake.kick(SHAKE_CRIT);
-        }
+        shake.kick(if spawn.category == CATEGORY_CRIT {
+            SHAKE_CRIT
+        } else {
+            SHAKE_HIT
+        });
         struck.live.retain(|(unit, ..)| *unit != spawn.anchor);
         struck.live.push((
             spawn.anchor,
@@ -338,7 +341,12 @@ mod tests {
         for i in 0..500 {
             let t = i as f32 * 0.013;
             assert!(shake_offset(1.0, t).length() <= SHAKE_MAX_YARDS * 1.8);
-            assert!(shake_offset(SHAKE_CRIT, t).length() <= SHAKE_MAX_YARDS * 0.3);
+            // The offset goes as trauma squared: a crit's stays well under the full kick.
+            assert!(
+                shake_offset(SHAKE_CRIT, t).length()
+                    <= SHAKE_MAX_YARDS * SHAKE_CRIT * SHAKE_CRIT * 1.8
+            );
+            assert!(shake_offset(SHAKE_HIT, t).length() <= SHAKE_MAX_YARDS * 0.1);
         }
         assert_eq!(shake_offset(0.0, 1.0), Vec3::ZERO);
     }

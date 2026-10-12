@@ -5,8 +5,9 @@
 //! - A proc the server names with a target (`SMSG_ARPG_PROC`'s tail: an ailment's burst, a
 //!   freeze, Pyroclasm, Detonate...) floats its name and damage over that enemy in its damage
 //!   type's colour, plays its type's impact kit there (whose sound comes with it) and swells a
-//!   ring of light; one without a target floats its name over the player. Each name floats at
-//!   most once in [`LABEL_GAP_SECS`], so a stream of them stays readable.
+//!   ring of light; one without a target floats nothing (its line is in the combat log). Each
+//!   name floats at most once in [`LABEL_GAP_SECS`] and any at most once in
+//!   [`LABEL_ANY_GAP_SECS`], so a pack fight stays readable.
 //! - A heavy kill (a crit, or a big share of the health) bursts in the killing blow's damage type:
 //!   its type's impact kit on the corpse (fire, ice, holy light...), beside `strikes`' gore.
 //! - Kills in a row count up on the HUD (`ArpgHud_Streak`), with a flourish at 10, 25, 50, 100.
@@ -37,7 +38,9 @@ pub(crate) struct ArpgProcShown(pub(crate) ArpgProc);
 /// The combat text category of a crit, which pops.
 const CATEGORY_CRIT: u8 = 2;
 /// A proc's name floats at most once in this many seconds.
-const LABEL_GAP_SECS: f64 = 0.8;
+const LABEL_GAP_SECS: f64 = 1.5;
+/// Any label floats at most once in this many seconds.
+const LABEL_ANY_GAP_SECS: f64 = 0.6;
 /// How long the killing blow's type is remembered for a unit, in seconds.
 const BLOW_MEMORY_SECS: f64 = 4.0;
 /// Kills further apart than this end the streak, in seconds (the HUD's `STREAK_SECS`).
@@ -166,7 +169,6 @@ fn burst_kit(spells: &crate::ui_action::Spells, visuals: &SpellVisuals, school: 
 fn show_procs(
     mut procs: MessageReader<ArpgProcShown>,
     index: Res<GuidIndex>,
-    me: Query<Entity, With<SelfPlayer>>,
     places: Query<&Transform>,
     time: Res<Time>,
     spells: Option<Res<crate::ui_action::Spells>>,
@@ -176,9 +178,9 @@ fn show_procs(
     mut rings: MessageWriter<ArpgRing>,
     mut text: MessageWriter<CombatTextSpawn>,
     mut last: Local<HashMap<String, f64>>,
+    mut last_any: Local<f64>,
 ) {
     let now = time.elapsed_secs_f64();
-    let me = me.single().ok();
     for ArpgProcShown(p) in procs.read() {
         if p.name.is_empty() || !(p.kind == PROC_DAMAGE || p.kind == PROC_EFFECT) {
             continue; // heals and mana float their amounts already (`super::sheet`)
@@ -206,17 +208,21 @@ fn show_procs(
                 }
             }
         }
-        // The label, once in a while per name.
+        // The label: only over the enemy it struck, once in a while per name, and one at a time
+        // at most every LABEL_ANY_GAP_SECS. A proc with no enemy (a champion's affix, a kit's
+        // every hit) floats nothing: its line is in the combat log.
+        let Some(anchor) = target else {
+            continue;
+        };
         if last
             .get(&p.name)
             .is_some_and(|at| now - at < LABEL_GAP_SECS)
+            || now - *last_any < LABEL_ANY_GAP_SECS
         {
             continue;
         }
-        let Some(anchor) = target.or(me) else {
-            continue;
-        };
         last.insert(p.name.clone(), now);
+        *last_any = now;
         text.write(CombatTextSpawn {
             anchor,
             text: p.name.clone(),
@@ -226,7 +232,7 @@ fn show_procs(
                 ArpgText::Label {
                     school: school.unwrap_or(u8::MAX),
                 },
-                if target.is_some() { p.amount } else { 0 },
+                p.amount,
             )),
         });
     }

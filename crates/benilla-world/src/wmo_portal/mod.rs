@@ -337,6 +337,9 @@ fn compute_wmo_pvs(
     let mut claim: Option<InteriorClaim> = None;
     // `None` is the driver's outside leg: no containing map object, one full-screen walk.
     let mut windows: Option<Vec<Rect>> = None;
+    // Fork-only: whether the player, indoors under the ARPG cut, sees an outdoor group (a doorway
+    // onto a courtyard); `None` while no sight rooms were drawn.
+    let mut sees_out: Option<bool> = None;
     for (entity, mut inst) in &mut instances {
         let Some(model) = wmos.get(&inst.handle) else {
             continue;
@@ -405,6 +408,12 @@ fn compute_wmo_pvs(
                     .is_some_and(|n| n.flags & EXTERIOR == 0)
             }) {
                 fresh.visible = sight::sight_rooms(model, home, seed.0);
+                let out = fresh
+                    .visible
+                    .iter()
+                    .zip(&model.group_nav)
+                    .any(|(v, n)| *v && n.flags & EXTERIOR != 0);
+                sees_out = Some(sees_out.unwrap_or(false) || out);
             }
         }
         if inst.bypass_change_detection().visible != fresh.visible {
@@ -497,6 +506,10 @@ fn compute_wmo_pvs(
         camera_claim.0 = claim;
     }
     let want_windows = match windows {
+        // Fork-only: indoors under the ARPG cut, the outside draws whole when a room the player
+        // sees is outdoors, and not at all from a sealed interior, so the cut walls never show
+        // the world beyond them.
+        Some(_) if arpg_open && sees_out == Some(false) => ExteriorWindows::Windows(Vec::new()),
         Some(_) if arpg_open => ExteriorWindows::Unrestricted,
         Some(rects) => ExteriorWindows::Windows(rects),
         None => ExteriorWindows::Unrestricted,

@@ -30,15 +30,15 @@ const CATEGORY_CRIT: u8 = 2;
 /// A blow this share of the victim's maximum health or more is heavy.
 const HEAVY_SHARE: f32 = 1.0 / 6.0;
 /// Hit-stop: how long the models hold, in seconds, for a crit and for another heavy blow.
-const STOP_CRIT: f64 = 0.075;
-const STOP_HEAVY: f64 = 0.05;
+const STOP_CRIT: f64 = 0.11;
+const STOP_HEAVY: f64 = 0.07;
 /// A champion's or a rare's kill holds every model within [`ELITE_STOP_REACH`] yards this long:
 /// the fight's beat of slow motion, without slowing the clock the movement runs on.
 const ELITE_STOP: f64 = 0.22;
 const ELITE_STOP_REACH: f32 = 18.0;
 /// Stagger: the push in yards (a crit's, an ordinary hit's), and how long it takes to settle.
-const PUSH_CRIT: f32 = 0.45;
-const PUSH_HIT: f32 = 0.2;
+const PUSH_CRIT: f32 = 0.7;
+const PUSH_HIT: f32 = 0.32;
 const PUSH_SECS: f32 = 0.16;
 /// The fling: how far, how high its arc, and how long it flies.
 const FLING_REACH: f32 = 2.4;
@@ -92,6 +92,15 @@ struct Splat {
 #[derive(Resource, Default)]
 struct Splats(VecDeque<Splat>);
 
+/// A critical hit's blood, waiting for [`feel_kills`] to lay it: the unit, where, its size against
+/// a kill's, and its turn's seed.
+#[derive(Resource, Default)]
+struct CritSplats(Vec<(Entity, Vec3, f32, u64)>);
+
+/// A critical hit's splat, against a kill's, and how far past the unit along the blow it lands.
+const CRIT_SPLAT_SCALE: f32 = 0.6;
+const CRIT_SPLAT_REACH: f32 = 0.9;
+
 /// The entity the splat draws name as their owner.
 #[derive(Resource)]
 struct SplatLane(Entity);
@@ -104,6 +113,7 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<HitStops>()
         .init_resource::<Recoils>()
         .init_resource::<Splats>()
+        .init_resource::<CritSplats>()
         .init_resource::<SplatTextures>()
         .add_systems(Startup, spawn_lane)
         .add_systems(
@@ -143,6 +153,7 @@ fn feel_hits(
     time: Res<Time>,
     mut stops: ResMut<HitStops>,
     mut recoils: ResMut<Recoils>,
+    mut crit_splats: ResMut<CritSplats>,
 ) {
     let now = time.elapsed_secs_f64();
     let Ok((me, my_tf)) = me.single() else {
@@ -158,6 +169,16 @@ fn feel_hits(
         };
         let crit = spawn.category == CATEGORY_CRIT;
         let damage = text_damage(&spawn.text);
+        // A crit splashes blood on the ground past the unit, along the blow.
+        if crit && crit_splats.0.len() < 32 {
+            let dir = flat_dir(my_tf.translation, tf.translation);
+            crit_splats.0.push((
+                spawn.anchor,
+                tf.translation + dir * CRIT_SPLAT_REACH,
+                CRIT_SPLAT_SCALE,
+                spawn.anchor.to_bits() ^ (now * 1000.0) as u64,
+            ));
+        }
         let max = store.0.unit_max_health().unwrap_or(0);
         if let Some(hold) = hit_stop_for(damage, max, crit) {
             for unit in [spawn.anchor, me] {
@@ -207,9 +228,12 @@ fn feel_kills(
     decals: WorldDecal,
     mut stops: ResMut<HitStops>,
     rigs: Query<(Entity, &Transform), With<AnimationPlayer>>,
+    mut crit_splats: ResMut<CritSplats>,
 ) {
     let now = time.elapsed_secs_f64();
     let my_pos = me.single().ok().map(|t| t.translation);
+    // The splats to lay: each kill's, then each crit's.
+    let mut lays: Vec<(Entity, Vec3, f32, u64)> = Vec::new();
     for kill in kills.read() {
         if kill.tier > 0 {
             for (entity, tf) in &rigs {
@@ -236,11 +260,21 @@ fn feel_kills(
                 },
             );
         }
+        let centre = kill.at
+            + if kill.overkill {
+                dir * FLING_REACH * 0.6
+            } else {
+                Vec3::ZERO
+            };
+        lays.push((kill.unit, centre, 1.0, kill.unit.to_bits()));
+    }
+    lays.append(&mut crit_splats.0);
+    for (unit, centre, size, seed) in lays {
         // The blood: the creature's own splat texture, turned at random, under where it fell.
         let (Some(blood), Some(creatures)) = (blood.as_deref(), creatures.as_deref()) else {
             continue;
         };
-        let Some(net) = nets.get(kill.unit).ok() else {
+        let Some(net) = nets.get(unit).ok() else {
             continue;
         };
         let Some(display) = net.display_id else {
@@ -250,21 +284,14 @@ fn feel_kills(
         if paths.is_empty() {
             continue;
         }
-        let seed = kill.unit.to_bits();
         let path = &paths[(seed as usize) % paths.len()];
         let texture = textures
             .0
             .entry(path.clone())
             .or_insert_with(|| asset_server.load::<Image>(splat_url(path)))
             .id();
-        let centre = kill.at
-            + if kill.overkill {
-                dir * FLING_REACH * 0.6
-            } else {
-                Vec3::ZERO
-            };
         let yaw = (seed % 6283) as f32 / 1000.0;
-        let half = SPLAT_SIZE * 0.5 * net.scale.clamp(0.5, 3.0);
+        let half = SPLAT_SIZE * 0.5 * net.scale.clamp(0.5, 3.0) * size;
         let frame = DecalFrame {
             center: centre,
             sin: yaw.sin(),
