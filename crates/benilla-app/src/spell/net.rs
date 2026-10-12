@@ -1064,6 +1064,7 @@ fn spell_go(
                         text: word.to_string(),
                         category,
                         color,
+                        arpg: None,
                     });
                 }
             }

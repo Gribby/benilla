@@ -188,6 +188,16 @@ impl GlueFfx {
     }
 }
 
+/// Fork-only, not 1.12.1: a bloom on the world view, over the zone glow: the blur's light above
+/// `threshold` (0 to 1) adds back squared, `strength` times, so spells, fire and loot beams bleed
+/// light while the scene's mid-tones stay as the reference draws them. Zero strength (the
+/// default) is the reference's combine. The ARPG view sets it.
+#[derive(Resource, Clone, Copy, Default, PartialEq, Debug, ExtractResource)]
+pub struct FfxBloom {
+    pub strength: f32,
+    pub threshold: f32,
+}
+
 /// The haze mix `z`, the combine's cross-fade toward the blur, packed per frame from the player
 /// (`0x6cb134`/`0x6cb599`): `max(min(drunkByte, 100)/100, submerged ? 84/255 : 0)`, submerged
 /// being the camera eye in any liquid (`0x672470` not `0xf`).
@@ -959,7 +969,7 @@ impl ViewNode for FfxGlowNode {
 /// Whether a combine reads the blur: only through `w` (`x`) and the haze (`z`), so with both zero
 /// the three filter passes (Box4, Gauss4 H and V) do not run.
 fn blur_read(uniform: &[f32; 8]) -> bool {
-    uniform[0] != 0.0 || uniform[2] != 0.0
+    uniform[0] != 0.0 || uniform[2] != 0.0 || uniform[6] != 0.0
 }
 
 /// One view's combine uniform and whether its underwater entry is armed, for both combine nodes.
@@ -971,13 +981,20 @@ fn live_combine(world: &World, glow: &FfxGlow) -> ([f32; 8], bool) {
         world.resource::<FfxHazeMix>().0,
     )
     .switched(switches);
-    let uniform = combine_uniform(
+    let mut uniform = combine_uniform(
         world.resource::<FfxGlowGain>().0,
         player,
         FfxPassState::glue(world.resource::<GlueFfx>().death()).switched(switches),
         glow,
         wave,
     );
+    // The fork's bloom, on the living world view only, with the glow pass on.
+    let bloom = *world.resource::<FfxBloom>();
+    if glow.state == FfxState::Player && player.runs && player.death == 0.0 && bloom.strength > 0.0
+    {
+        uniform[6] = bloom.strength;
+        uniform[7] = bloom.threshold.clamp(0.0, 0.95);
+    }
     (uniform, wave_armed(glow.state, wave, player))
 }
 
@@ -1158,6 +1175,7 @@ pub struct FfxGlowPlugin;
 impl Plugin for FfxGlowPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(FfxGlowGain(0.647)) // overwritten by sync_gain from zone data
+            .init_resource::<FfxBloom>()
             .init_resource::<FfxDeathFade>()
             .init_resource::<GlueFfx>()
             .init_resource::<FfxHazeMix>()
@@ -1167,6 +1185,7 @@ impl Plugin for FfxGlowPlugin {
                 ExtractComponentPlugin::<FfxGlow>::default(),
                 ExtractComponentPlugin::<FfxBackdrop>::default(),
                 ExtractResourcePlugin::<FfxGlowGain>::default(),
+                ExtractResourcePlugin::<FfxBloom>::default(),
                 ExtractResourcePlugin::<FfxDeathFade>::default(),
                 ExtractResourcePlugin::<GlueFfx>::default(),
                 ExtractResourcePlugin::<FfxHazeMix>::default(),

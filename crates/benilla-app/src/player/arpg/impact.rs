@@ -32,6 +32,10 @@ const HEAVY_SHARE: f32 = 1.0 / 6.0;
 /// Hit-stop: how long the models hold, in seconds, for a crit and for another heavy blow.
 const STOP_CRIT: f64 = 0.075;
 const STOP_HEAVY: f64 = 0.05;
+/// A champion's or a rare's kill holds every model within [`ELITE_STOP_REACH`] yards this long:
+/// the fight's beat of slow motion, without slowing the clock the movement runs on.
+const ELITE_STOP: f64 = 0.22;
+const ELITE_STOP_REACH: f32 = 18.0;
 /// Stagger: the push in yards (a crit's, an ordinary hit's), and how long it takes to settle.
 const PUSH_CRIT: f32 = 0.45;
 const PUSH_HIT: f32 = 0.2;
@@ -201,10 +205,20 @@ fn feel_kills(
     creatures: Option<Res<crate::entities::Creatures>>,
     asset_server: Res<AssetServer>,
     decals: WorldDecal,
+    mut stops: ResMut<HitStops>,
+    rigs: Query<(Entity, &Transform), With<AnimationPlayer>>,
 ) {
     let now = time.elapsed_secs_f64();
     let my_pos = me.single().ok().map(|t| t.translation);
     for kill in kills.read() {
+        if kill.tier > 0 {
+            for (entity, tf) in &rigs {
+                if tf.translation.distance(kill.at) <= ELITE_STOP_REACH {
+                    let until = stops.0.entry(entity).or_insert(0.0);
+                    *until = until.max(now + ELITE_STOP);
+                }
+            }
+        }
         let dir = my_pos.map_or(Vec3::NEG_Z, |p| flat_dir(p, kill.at));
         if kill.overkill {
             let bones = recoils

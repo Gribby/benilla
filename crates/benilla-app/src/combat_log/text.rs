@@ -269,11 +269,24 @@ pub(super) fn spell_damage_log(
         gated_anchor(s.target, index, self_guid),
         spell_text(s.damage, s.absorb, s.resist, s.hit_info & 0x2 != 0),
     ) {
+        // A number takes the ARPG look: the hit's school, a periodic one as a tick.
+        let arpg = body.parse::<u32>().ok().map(|value| {
+            let kind = if s.periodic {
+                crate::combat_text::ArpgText::Tick { school: s.school }
+            } else {
+                crate::combat_text::ArpgText::Hit {
+                    school: s.school,
+                    crit: s.hit_info & 0x2 != 0,
+                }
+            };
+            (kind, value)
+        });
         text.write(CombatTextSpawn {
             anchor,
             text: body,
             category,
             color,
+            arpg,
         });
     }
 }
@@ -391,19 +404,28 @@ pub(super) fn periodic_aura_log(
     for tick in &s.ticks {
         let PeriodicTick::Damage {
             amount,
+            school,
             absorb,
             resist,
-            ..
         } = *tick
         else {
             continue;
         };
         if let Some((category, body)) = spell_text(amount, absorb, resist, false) {
+            let arpg = body.parse::<u32>().ok().map(|value| {
+                (
+                    crate::combat_text::ArpgText::Tick {
+                        school: u8::try_from(school).unwrap_or(0),
+                    },
+                    value,
+                )
+            });
             text.write(CombatTextSpawn {
                 anchor,
                 text: body,
                 category,
                 color,
+                arpg,
             });
         }
     }
@@ -446,6 +468,13 @@ pub(super) fn damage_shield(
             text: s.damage.to_string(),
             category: 0,
             color,
+            arpg: Some((
+                crate::combat_text::ArpgText::Hit {
+                    school: u8::try_from(s.school).unwrap_or(0),
+                    crit: false,
+                },
+                s.damage,
+            )),
         });
     }
 }
@@ -595,6 +624,7 @@ pub(super) fn spell_log_miss(
                 text: word.to_string(),
                 category,
                 color,
+                arpg: None,
             });
         }
     }
@@ -615,6 +645,7 @@ pub(super) fn xp_gain(
             text: format!("XP: {}", x.total),
             category: 4,
             color: None, // row 4's own purple: XP skips the damage colour law
+            arpg: None,
         });
     }
     chat_log.push_xp_gain(&x);

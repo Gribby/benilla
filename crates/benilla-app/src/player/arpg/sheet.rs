@@ -84,6 +84,7 @@ fn log_procs(
     self_guid: Res<SelfGuid>,
     index: Res<GuidIndex>,
     mut text: MessageWriter<crate::combat_text::CombatTextSpawn>,
+    mut shown: MessageWriter<super::feel::ArpgProcShown>,
 ) {
     if state.procs.is_empty() {
         return;
@@ -98,12 +99,14 @@ fn log_procs(
                 p.line.clone(),
             ));
         }
+        shown.write(super::feel::ArpgProcShown(p.clone()));
         if let (Some(anchor), Some((body, color))) = (me, proc_float(&p)) {
             text.write(crate::combat_text::CombatTextSpawn {
                 anchor,
                 text: body,
                 category: 0,
                 color: Some(color),
+                arpg: None,
             });
         }
     }
@@ -159,18 +162,21 @@ mod tests {
             kind: PROC_HEAL,
             amount: 42,
             line: String::new(),
+            ..Default::default()
         };
         assert_eq!(proc_float(&heal), Some(("+42".into(), HEAL_ARGB)));
         let mana = ArpgProc {
             kind: PROC_MANA,
             amount: 30,
             line: String::new(),
+            ..Default::default()
         };
         assert_eq!(proc_float(&mana), Some(("+30 mana".into(), MANA_ARGB)));
         let hit = ArpgProc {
             kind: benilla_protocol::messages::arpg::PROC_DAMAGE,
             amount: 0,
             line: String::new(),
+            ..Default::default()
         };
         assert_eq!(proc_float(&hit), None);
     }

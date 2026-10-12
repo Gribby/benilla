@@ -35,6 +35,7 @@
 
 mod actions;
 mod champions;
+mod feel;
 mod fx;
 mod globes;
 mod impact;
@@ -292,6 +293,8 @@ pub(super) fn plugin(app: &mut App) {
     globes::plugin(app);
     // Procs in the combat log, and the character sheet for the HUD.
     sheet::plugin(app);
+    // Proc labels, typed kill bursts, the kill streak, the bloom, the wounds over the player.
+    feel::plugin(app);
     // The added hits' impact kits, and the blood off crits and heavy kills.
     strikes::plugin(app);
     world::plugin(app);
@@ -318,6 +321,8 @@ pub(super) fn plugin(app: &mut App) {
     app.init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
         .insert_resource(ArpgMode)
+        // The numbers' ARPG look: damage types' colours, big crits, merged ticks (`combat_text`).
+        .insert_resource(crate::combat_text::ArpgNumbers)
         .add_systems(
             Update,
             pin_view

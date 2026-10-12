@@ -90,6 +90,17 @@ pub(crate) struct ArpgKill {
     pub(crate) unit: Entity,
     pub(crate) at: Vec3,
     pub(crate) overkill: bool,
+    /// The unit's champion tier: 0 none, 1 a champion, 2 a rare.
+    pub(crate) tier: u8,
+}
+
+/// A ring of light to swell out at `at`, as a kill's burst does: its colour and size against a
+/// kill's (a proc's burst, `super::feel`).
+#[derive(Message, Clone, Copy, Debug)]
+pub(crate) struct ArpgRing {
+    pub(crate) at: Vec3,
+    pub(crate) rgb: [f32; 3],
+    pub(crate) scale: f32,
 }
 
 /// The damage a combat text names: its leading number.
@@ -104,6 +115,7 @@ pub(super) fn text_damage(text: &str) -> u32 {
 
 pub(super) fn plugin(app: &mut App) {
     app.add_message::<ArpgKill>()
+        .add_message::<ArpgRing>()
         .init_resource::<StruckUnits>()
         .init_resource::<CameraShake>()
         .add_systems(Update, (note_hits, spot_kills, grow_bursts).chain())
@@ -172,6 +184,7 @@ fn spot_kills(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut mesh: Local<Option<Handle<Mesh>>>,
     mut kills: MessageWriter<ArpgKill>,
+    mut rings: MessageReader<ArpgRing>,
 ) {
     let now = time.elapsed_secs_f64();
     let mut killed = Vec::new();
@@ -186,6 +199,7 @@ fn spot_kills(
                     unit: *unit,
                     at: at.translation,
                     overkill,
+                    tier,
                 });
                 killed.push((*unit, at.translation, tier));
                 false
@@ -199,10 +213,15 @@ fn spot_kills(
             .get(*unit)
             .is_ok_and(|(_, store, _)| store.0.unit_health() == Some(0))
     });
+    let mut swell: Vec<(Vec3, [f32; 3], f32)> =
+        rings.read().map(|r| (r.at, r.rgb, r.scale)).collect();
     for (unit, at, tier) in killed {
         struck.burst.insert(unit);
         let (rgb, scale, kick) = burst_look(tier);
         shake.kick(kick);
+        swell.push((at, rgb, scale));
+    }
+    for (at, rgb, scale) in swell {
         let mesh = mesh
             .get_or_insert_with(|| meshes.add(Annulus::new(1.0 - BURST_WIDTH, 1.0)))
             .clone();

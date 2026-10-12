@@ -40,7 +40,10 @@
 //! The combat-log and spell handlers feed the spawns; the quads append to [`UiQuads`] after the
 //! script extract ([`crate::ui_pass::UiQuadAppend`]).
 
+mod arpg;
 mod law;
+
+pub(crate) use arpg::{ArpgNumbers, ArpgText};
 
 /// Re-exported for the emitter arms' tests; live code gets it through [`damage_color`].
 #[cfg(test)]
@@ -72,6 +75,9 @@ pub(crate) struct CombatTextSpawn {
     pub(crate) category: u8,
     /// The emitter override ([`damage_color`]); `None` is the row's default.
     pub(crate) color: Option<u32>,
+    /// Fork-only: what the number is and its value, for the ARPG look ([`ArpgNumbers`]); a
+    /// label's name is `text`. `None` is the stock look.
+    pub(crate) arpg: Option<(ArpgText, u32)>,
 }
 
 /// One live WORLDTEXTSTRING. `pos` is a spawn-time snapshot, so a unit that walks away leaves its
@@ -86,6 +92,8 @@ struct WorldText {
     color: u32,
     /// The unit slot, 0-3, first free (`0x6c73f0`); seats walk slots descending (`0x6c6e00`).
     slot: u8,
+    /// Fork-only: the ARPG look's kind and value (a tick merges into it), when it applies.
+    arpg: Option<(ArpgText, u32)>,
 }
 
 /// The live texts of all units, pooled; the per-anchor slot check stands in for per-unit arrays.
@@ -120,8 +128,8 @@ const Z_WORLD_TEXT: u64 = overlay_z::WORLD_TEXT;
 
 /// The first free of the unit's 4 slots; `None` is a hard drop, no eviction (`0x6c73f0`). The
 /// slot is also the seat-order key.
-fn free_slot(texts: &[WorldText], anchor: Entity) -> Option<u8> {
-    (0..MAX_PER_UNIT as u8).find(|s| !texts.iter().any(|t| t.anchor == anchor && t.slot == *s))
+fn free_slot(texts: &[WorldText], anchor: Entity, cap: usize) -> Option<u8> {
+    (0..cap as u8).find(|s| !texts.iter().any(|t| t.anchor == anchor && t.slot == *s))
 }
 
 /// The per-frame engine: admit spawns, expire the dead and project the living into quads appended
@@ -147,6 +155,8 @@ pub(crate) fn float_combat_text(
     mut bucket: Local<crate::smart_rect::SmartBucket>,
     // Absent in a bare test world, which draws the default face.
     font: Option<Res<DamageTextFont>>,
+    // Fork-only: the ARPG view's look.
+    numbers: Option<Res<ArpgNumbers>>,
 ) {
     let now = time.elapsed_secs_f64();
     // Headless there is no camera: spawns and expiry run, nothing draws.
@@ -155,8 +165,27 @@ pub(crate) fn float_combat_text(
         .ok()
         .map(|(c, pose)| (c, GlobalTransform::from(*pose)));
     let viewport = cam.as_ref().and_then(|(c, _)| c.logical_viewport_size());
+    let cap = if numbers.is_some() {
+        arpg::MAX_PER_UNIT
+    } else {
+        MAX_PER_UNIT
+    };
     for spawn in spawns.read() {
-        let Some(slot) = free_slot(&texts.0, spawn.anchor) else {
+        let arpg_text = spawn.arpg.filter(|_| numbers.is_some());
+        // A tick merges into the same type's tick just before it on the unit.
+        if let Some((kind @ ArpgText::Tick { .. }, value)) = arpg_text {
+            if let Some(t) = texts.0.iter_mut().find(|t| {
+                t.anchor == spawn.anchor
+                    && t.arpg.is_some_and(|(k, _)| k == kind)
+                    && now - t.born < arpg::MERGE_SECS
+            }) {
+                let total = t.arpg.map_or(0, |(_, v)| v).saturating_add(value);
+                t.arpg = Some((kind, total));
+                t.text = arpg::body(kind, None, total);
+                continue;
+            }
+        }
+        let Some(slot) = free_slot(&texts.0, spawn.anchor, cap) else {
             continue; // the 4-slot hard drop
         };
         let Ok(tf) = transforms.get(spawn.anchor) else {
@@ -195,16 +224,27 @@ pub(crate) fn float_combat_text(
             );
         }
         let pos = overhead - Vec3::Y / 3.0;
+        let (text, color) = match arpg_text {
+            Some((kind, value)) => (
+                arpg::body(kind, Some(&spawn.text), value),
+                arpg::look(kind).color,
+            ),
+            None => (
+                spawn.text.clone(),
+                spawn
+                    .color
+                    .unwrap_or(CATEGORIES[spawn.category as usize].color),
+            ),
+        };
         texts.0.push(WorldText {
             anchor: spawn.anchor,
             pos,
             born: now,
-            text: spawn.text.clone(),
+            text,
             category: spawn.category,
-            color: spawn
-                .color
-                .unwrap_or(CATEGORIES[spawn.category as usize].color),
+            color,
             slot,
+            arpg: arpg_text,
         });
     }
     texts
@@ -238,8 +278,13 @@ pub(crate) fn float_combat_text(
             culled.push(i); // behind the camera or off the viewport
             continue;
         };
-        // Constant with distance: the worldtext path has no depth term.
-        let size_value = scale_value(t.category, life);
+        // Constant with distance: the worldtext path has no depth term. An ARPG number scales
+        // the stock size, and a critical one pops as the stock crit does.
+        let look = t.arpg.map(|(kind, _)| arpg::look(kind));
+        let size_value = match look {
+            Some(l) => scale_value(if l.pops { 2 } else { t.category }, life) * l.size,
+            None => scale_value(t.category, life),
+        };
         let target_px = text_px(size_value, viewport);
         // Deviation: the reference stretches a raster of at most 32 px; each whole-pixel size is
         // rasterized here, so the crit pop stays crisp.
@@ -258,7 +303,7 @@ pub(crate) fn float_combat_text(
                 // The bound face, not a hardcoded Friz: an addon's assignment is what draws.
                 path: font.as_ref().and_then(|f| f.0.as_deref()),
                 height: Some(target_px),
-                outline: Outline::None,
+                outline: look.map_or(Outline::None, |l| l.outline),
                 alpha_gradient: None,
             },
             // A world overlay with its own seat; the UI grid does not apply.
@@ -266,10 +311,11 @@ pub(crate) fn float_combat_text(
         );
         drop(e);
         let (alpha_text, alpha_shadow) = fade_alpha(cat, elapsed_ms);
+        let dim = look.map_or(1.0, |l| l.alpha);
         let mut bounds: Option<Rect> = None;
         for q in &mut glyphs {
             // The fade replaces the alpha byte, never multiplies it.
-            q.color[3] = f32::from(alpha_text) / 255.0;
+            q.color[3] = f32::from(alpha_text) / 255.0 * dim;
             bounds = Some(bounds.map_or(q.rect, |b| b.union(q.rect)));
         }
         // The seat (`0x6c7cc0` tail to `0x509520`): clamp the centre inside the viewport, claim
@@ -383,6 +429,7 @@ fn missile_miss_text(
                 text: word.to_string(),
                 category,
                 color,
+                arpg: None,
             });
         }
     }
@@ -415,11 +462,22 @@ fn melee_impact_text(
             continue; // the CombatDamage and PetMeleeDamage gates
         };
         if let Some((category, body)) = melee_text(s.hit_info, s.victim_state, s.damage) {
+            // A number (not a miss word) takes the ARPG look: a physical hit.
+            let arpg = body.parse::<u32>().ok().map(|value| {
+                (
+                    ArpgText::Hit {
+                        school: 0,
+                        crit: category == 2,
+                    },
+                    value,
+                )
+            });
             text.write(CombatTextSpawn {
                 anchor: victim,
                 text: body,
                 category,
                 color,
+                arpg,
             });
         }
     }
@@ -479,6 +537,7 @@ mod tests {
                 text: format!("{i}"),
                 category: 0,
                 color: None,
+                arpg: None,
             });
         }
         app.world_mut().write_message(CombatTextSpawn {
@@ -486,6 +545,7 @@ mod tests {
             text: "7".into(),
             category: 0,
             color: Some(COLOR_SPELL_GOLD),
+            arpg: None,
         });
         app.update();
         let texts = app.world().resource::<WorldTexts>();

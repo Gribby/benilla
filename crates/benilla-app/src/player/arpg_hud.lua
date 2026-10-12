@@ -389,6 +389,177 @@ orbDriver:SetScript("OnUpdate", function()
     end
 end)
 
+-- ── Feel: the screen's edges and the kill streak ──
+-- The edges glow red as health runs low, beating like a heart below a third, flash red when a
+-- big blow lands (a tenth of the health at once), and flash in a champion's or a rare's colour
+-- at its kill (ArpgHud_Flash). The UI draws a texture in one colour, so the fade from the edge is
+-- built of bands, each fainter than the one outside it.
+local EDGE_BANDS, EDGE_DEPTH = 8, 120
+local LOW_HEALTH, LOW_ALPHA = 0.35, 0.5
+local BEAT_SECS = 1.1
+local edges = CreateFrame("Frame", "ArpgHudEdges", UIParent)
+edges:SetAllPoints(UIParent)
+edges:SetFrameStrata("BACKGROUND")
+edges:EnableMouse(false)
+edges.tex = {}
+for i = 1, EDGE_BANDS do
+    local inset = (i - 1) * EDGE_DEPTH / EDGE_BANDS
+    local thick = EDGE_DEPTH / EDGE_BANDS
+    local fade = 1 - (i - 1) / EDGE_BANDS
+    local weight = fade * fade * 0.35
+    local top = edges:CreateTexture(nil, "BACKGROUND")
+    top:SetPoint("TOPLEFT", edges, "TOPLEFT", inset, -inset)
+    top:SetPoint("TOPRIGHT", edges, "TOPRIGHT", -inset, -inset)
+    top:SetHeight(thick)
+    local bottom = edges:CreateTexture(nil, "BACKGROUND")
+    bottom:SetPoint("BOTTOMLEFT", edges, "BOTTOMLEFT", inset, inset)
+    bottom:SetPoint("BOTTOMRIGHT", edges, "BOTTOMRIGHT", -inset, inset)
+    bottom:SetHeight(thick)
+    local left = edges:CreateTexture(nil, "BACKGROUND")
+    left:SetPoint("TOPLEFT", edges, "TOPLEFT", inset, -(inset + thick))
+    left:SetPoint("BOTTOMLEFT", edges, "BOTTOMLEFT", inset, inset + thick)
+    left:SetWidth(thick)
+    local right = edges:CreateTexture(nil, "BACKGROUND")
+    right:SetPoint("TOPRIGHT", edges, "TOPRIGHT", -inset, -(inset + thick))
+    right:SetPoint("BOTTOMRIGHT", edges, "BOTTOMRIGHT", -inset, inset + thick)
+    right:SetWidth(thick)
+    table.insert(edges.tex, { top, weight })
+    table.insert(edges.tex, { bottom, weight })
+    table.insert(edges.tex, { left, weight })
+    table.insert(edges.tex, { right, weight })
+end
+edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0, 1, 0, 0
+edges.shown = -1
+edges.lastHealth = nil
+edges:Hide()
+
+local function edgesPaint(r, g, b, a)
+    if a < 0.01 then
+        if edges:IsShown() then edges:Hide() end
+        edges.shown = 0
+        return
+    end
+    if math.abs(a - edges.shown) < 0.01 and r == edges.pr and g == edges.pg and b == edges.pb then return end
+    edges.shown, edges.pr, edges.pg, edges.pb = a, r, g, b
+    for i = 1, table.getn(edges.tex) do
+        local t = edges.tex[i]
+        t[1]:SetTexture(r, g, b, math.min(1, a * t[2] / 0.35))
+    end
+    if not edges:IsShown() then edges:Show() end
+end
+
+-- A heartbeat: two quick bumps each beat, `t` in seconds.
+local function heartbeat(t)
+    local phase = math.mod(t, BEAT_SECS) / BEAT_SECS
+    local function bump(at, width)
+        local d = (phase - at) / width
+        if d < -1 or d > 1 then return 0 end
+        return 1 - d * d
+    end
+    return math.max(bump(0.1, 0.08), 0.6 * bump(0.28, 0.08))
+end
+
+function ArpgHud_Flash(r, g, b)
+    edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0.9, r, g, b
+end
+
+local edgeClock = 0
+local function refreshEdges(dt)
+    edgeClock = edgeClock + dt
+    local health, most = UnitHealth("player") or 0, UnitHealthMax("player") or 0
+    local dead = UnitIsDeadOrGhost("player")
+    -- A big blow: a tenth of the health gone since the last look.
+    if edges.lastHealth and most > 0 and not dead and edges.lastHealth - health >= most * 0.1 then
+        if edges.flashA < 0.6 then
+            edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0.6, 0.9, 0.05, 0.05
+        end
+    end
+    edges.lastHealth = health
+    edges.flashA = math.max(0, edges.flashA - dt * 2.4)
+    local low = 0
+    if most > 0 and not dead then
+        local f = health / most
+        if f < LOW_HEALTH then
+            low = (LOW_HEALTH - f) / LOW_HEALTH * LOW_ALPHA
+            if f < LOW_HEALTH * 0.6 then
+                low = low * (0.55 + 0.45 * heartbeat(edgeClock))
+            end
+        end
+    end
+    if edges.flashA > low then
+        edgesPaint(edges.flashR, edges.flashG, edges.flashB, edges.flashA)
+    else
+        edgesPaint(0.75, 0.02, 0.02, low)
+    end
+end
+
+-- The kill streak: kills in a row (each within a few seconds of the last), from three up, above
+-- the skill bar. Each kill pops it; it fades a few seconds after the last; 10, 25, 50 and 100
+-- name the streak and sound.
+local streak = CreateFrame("Frame", "ArpgHudStreak", UIParent)
+streak:SetWidth(320)
+streak:SetHeight(70)
+streak:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 120)
+streak:SetFrameStrata("MEDIUM")
+streak:EnableMouse(false)
+streak.count = streak:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+streak.count:SetPoint("CENTER", streak, "CENTER", 0, 10)
+streak.word = streak:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+streak.word:SetPoint("TOP", streak.count, "BOTTOM", 0, -2)
+streak.left, streak.pop, streak.wordLeft = 0, 0, 0
+streak:Hide()
+
+local STREAK_COLORS = {
+    { 3, 1.0, 0.95, 0.8 },
+    { 10, 1.0, 0.6, 0.15 },
+    { 25, 1.0, 0.25, 0.15 },
+    { 50, 0.8, 0.35, 1.0 },
+    { 100, 1.0, 0.82, 0.2 },
+}
+
+function ArpgHud_Streak(n, word)
+    if n < 3 then
+        streak.left = 0
+        return
+    end
+    local r, g, b = 1, 1, 1
+    for i = 1, table.getn(STREAK_COLORS) do
+        local c = STREAK_COLORS[i]
+        if n >= c[1] then r, g, b = c[2], c[3], c[4] end
+    end
+    streak.count:SetText(n .. " Kills")
+    streak.count:SetTextColor(r, g, b)
+    streak.left, streak.pop = 3.5, 1
+    if word then
+        streak.word:SetText(word)
+        streak.word:SetTextColor(r, g, b)
+        streak.wordLeft = 3.0
+        if n >= 50 then PlaySound("LEVELUP") else PlaySound("igQuestListComplete") end
+    end
+    streak:Show()
+end
+
+local function refreshStreak(dt)
+    if not streak:IsShown() then return end
+    streak.left = streak.left - dt
+    streak.wordLeft = streak.wordLeft - dt
+    streak.pop = math.max(0, streak.pop - dt * 6)
+    if streak.left <= 0 then
+        streak:Hide()
+        return
+    end
+    streak:SetScale(1 + 0.35 * streak.pop * streak.pop)
+    streak:SetAlpha(math.min(1, streak.left / 0.8))
+    if streak.wordLeft > 0 then streak.word:Show() else streak.word:Hide() end
+end
+
+local feelDriver = CreateFrame("Frame")
+feelDriver:SetScript("OnUpdate", function()
+    local dt = math.min(arg1 or 0, 0.1)
+    refreshEdges(dt)
+    refreshStreak(dt)
+end)
+
 -- ── The bottom of the screen ──
 -- The stock main bar is a 1024-pixel strip of art, gryphons, paging arrows, micro-menu and bag
 -- buttons, which covers the orbs' neighbours and takes the world's clicks along the bottom. The

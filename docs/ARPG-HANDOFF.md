@@ -172,8 +172,15 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
   - `impact.rs`;
   - `juice.rs`;
   - `fx.rs`;
+  - `feel.rs`: proc labels and their kits, kills bursting in the killing blow's damage type, the
+    kill streak, the bloom, the player's wounds in red;
   - `world.rs`: event tracker and beam, bounties, purse, the `arpgCraft` CVar.
-- `arpg_hud.lua`: everything drawn with the UI.
+- `arpg_hud.lua`: everything drawn with the UI (the kill streak and the screen's red edges at
+  low health and on big blows are `ArpgHud_Streak` / `ArpgHud_Flash` and the edges block).
+- `combat_text/arpg.rs`: the ARPG look of the floating numbers (damage type colours, big
+  outlined crits, small merged ticks, labels, thousands separators), under `ArpgNumbers`.
+- `benilla-world/src/ffx_glow.rs`: `FfxBloom`, a thresholded bloom on the stock full-screen
+  glow, which the ARPG view turns on.
 - Other touched areas: `ui_items/feed.rs` (tooltips and rarity colours), `benilla-ui` tooltip
   render, `net.rs` / `net/io.rs` (`ClientCommand`s), `cvars/table.rs` (ARPG CVars).
 
@@ -303,6 +310,11 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 - The mage (web, six skills, 16 keystone hooks): untested in game. Check that its notables'
   talents are taught (the server log names a missing one), Blizzard's tick hook, Meteor's instant
   Flamestrike, and Permafrost's chills.
+- The feel pass: damage numbers by damage type, crits, merged ticks, wounds in red; proc
+  labels over their targets (the server's `SMSG_ARPG_PROC` now carries the name, the target and
+  the damage tag, `ReportProcOn`); typed kill bursts; the kill streak; the low-health edges; the
+  bloom (`BLOOM_STRENGTH` / `BLOOM_THRESHOLD` in `feel.rs`); an elite kill's beat of hit-stop.
+  Untested in game: tune the bloom and the label rate first.
 - How the new damage feels: kill speed at 20, 40 and 60 against the old pace; whether Judged
   bursts and Bleeds read well; whether creature health growth (0.5) is right.
 

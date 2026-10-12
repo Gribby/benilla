@@ -448,18 +448,36 @@ pub const PROC_EFFECT: u8 = 4;
 pub struct ArpgProc {
     /// [`PROC_HEAL`], [`PROC_MANA`], [`PROC_DAMAGE`] or [`PROC_EFFECT`].
     pub kind: u8,
-    /// The health or mana it gave the player; 0 for the others.
+    /// The health or mana it gave the player, or the damage it dealt each; 0 for the others.
     pub amount: u32,
     pub line: String,
+    /// The mechanic's bare name ("Pyroclasm"); empty from a server that sends none.
+    pub name: String,
+    /// The enemy it struck or changed; 0 for none (it happened to the player).
+    pub target: u64,
+    /// Its damage tag (0 Physical .. 6 Holy, as the server's `Arpg/ArpgTags.h`); 0xFF for none.
+    pub tag: u8,
 }
 
-/// `SMSG_ARPG_PROC`: `u8` kind, `u32` amount, cstring line.
+/// `SMSG_ARPG_PROC`: `u8` kind, `u32` amount, cstring line; then, from a newer server, cstring
+/// name, `u64` target guid and `u8` damage tag.
 pub fn read_arpg_proc(r: &mut impl io::Read) -> io::Result<ArpgProc> {
-    Ok(ArpgProc {
+    let mut p = ArpgProc {
         kind: read_u8(r)?,
         amount: read_u32_le(r)?,
         line: read_cstring(r)?,
-    })
+        tag: 0xFF,
+        ..Default::default()
+    };
+    // The tail is optional: an older server ends at the line.
+    if let Ok(name) = read_cstring(r) {
+        p.name = name;
+        if let (Ok(target), Ok(tag)) = (read_u64_le(r), read_u8(r)) {
+            p.target = target;
+            p.tag = tag;
+        }
+    }
+    Ok(p)
 }
 
 /// The character sheet (cmangos `Arpg/ArpgCharacter.h`): what the attributes do and what adds to
@@ -1079,6 +1097,28 @@ mod tests {
                 kind: PROC_HEAL,
                 amount: 42,
                 line: "Health Globe heals you for 42.".into(),
+                tag: 0xFF,
+                ..Default::default()
+            }
+        );
+    }
+
+    #[test]
+    fn a_proc_reads_its_name_target_and_tag_when_sent() {
+        let mut body = vec![PROC_DAMAGE];
+        body.extend_from_slice(&900u32.to_le_bytes());
+        body.extend_from_slice(b"Pyroclasm explodes.\0Pyroclasm\0");
+        body.extend_from_slice(&0xF130_0000_0000_0042u64.to_le_bytes());
+        body.push(2);
+        assert_eq!(
+            read_arpg_proc(&mut body.as_slice()).unwrap(),
+            ArpgProc {
+                kind: PROC_DAMAGE,
+                amount: 900,
+                line: "Pyroclasm explodes.".into(),
+                name: "Pyroclasm".into(),
+                target: 0xF130_0000_0000_0042,
+                tag: 2,
             }
         );
     }

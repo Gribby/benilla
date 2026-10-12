@@ -15,7 +15,8 @@ struct FfxCombine {
     // x = zone glow weight `w` (both combines), y = FFXDeath gate (1 while a ghost, no ramp),
     // z = haze mix, w = deband dither on.
     lane: vec4<f32>,
-    // xy = the GlowWave phases `(t mod 3174)/3174` and `(t mod 2805)/2805`, t in ms; zw unused.
+    // xy = the GlowWave phases `(t mod 3174)/3174` and `(t mod 2805)/2805`, t in ms; z = the
+    // fork's bloom strength (0 off), w = its threshold.
     wave: vec4<f32>,
 }
 @group(0) @binding(3) var<uniform> ffx: FfxCombine;
@@ -108,7 +109,10 @@ fn combine_body(uv: vec2<f32>, frag_coord: vec2<f32>) -> vec4<f32> {
     // The haze fades toward the blur before the glow add; z is the larger of the drunk fraction
     // and 84/255 while submerged.
     let hazed = mix(sg, min(bg, vec3<f32>(1.0)), ffx.lane.z);
-    let outg = min(hazed + ffx.lane.x * bg * bg, vec3<f32>(1.0));
+    // Fork-only bloom: the blur's light above the threshold, renormalised and squared.
+    let over = max(bg - vec3<f32>(ffx.wave.w), vec3<f32>(0.0)) / max(1.0 - ffx.wave.w, 0.05);
+    let bloom = ffx.wave.z * over * over;
+    let outg = min(hazed + ffx.lane.x * bg * bg + bloom, vec3<f32>(1.0));
     return combine_out(outg, scene.a, frag_coord);
 }
 
