@@ -87,6 +87,13 @@ A tag bonus is a damage or healing multiplier the server applies when a spell ca
 lands: one hook in the spell damage and healing bonus path, summing the player's bonuses for
 the spell's tags.
 
+## No hit
+
+There is no hit stat. An ARPG player's swings, shots and spells, and those of its pets and
+totems, never miss: the melee and ranged miss roll, the spell miss roll and the hit share of the
+magic resist roll are all zero. Dodge, parry, block and resistances still apply. Vanilla's +hit
+items do nothing, and no affix gives hit.
+
 ## Attributes
 
 The five vanilla attributes keep their vanilla effects, so every vanilla item still works as
@@ -435,14 +442,25 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   and greens stop near item level 63, so a rolled item from a raid or a high dungeon tier used to
   be a dungeon item (a weak base, and affixes scaled from its own item level).
   - **The bank:** at start the server writes one base for every armour slot and type, cloak,
-    neck, ring, shield, off-hand and weapon kind, at item levels 64, 68 ... 92 (entries 93000 up).
-    That is about 50 per level, 400 in all. Each:
-    - is white, with no stats of its own;
+    neck, ring, shield, off-hand and weapon kind, at item levels 64, 68 ... 92 (entries 94000 up).
+    Each kind comes in up to three implicit families, so that is about 140 per level, 1,100 in
+    all. Each:
+    - has implicits, vanilla's green suffixes, scaled to its item level and slot: of the Bear
+      (Strength, Stamina), of the Tiger (Strength, Agility), of the Monkey (Agility, Stamina), of
+      the Eagle (Stamina, Intellect), of the Owl (Intellect, Spirit), of Sorcery (Intellect and
+      spell damage), of Healing (Intellect and healing). Spell damage and healing are vanilla's
+      own equip spells. A level 64 chest carries about +14/+15, a Naxxramas one about +20/+20.
+      The families fit the kind: plate is Bear, Tiger or Healing; cloth Sorcery, Healing or Owl;
+      mail Monkey, Eagle or Healing; and so on;
     - has its armour, weapon damage or block fitted from vanilla's own blues and epics of its
       kind at that item level, at 90% of them;
     - wears the look of a vanilla blue or epic of its kind nearby;
-    - takes a name for its content: Emberforged (64), Molten (68), Draconic (72), Chromatic
-      (76), Qiraji (80), Obsidian (84), Necrotic (88), Frostbound (92).
+    - takes a name for its content and its family: Emberforged (64), Molten (68), Draconic (72),
+      Chromatic (76), Qiraji (80), Obsidian (84), Necrotic (88), Frostbound (92), as in "Molten
+      Breastplate of the Bear".
+
+    The first bank's bases (93000 up, no implicits) stay valid for anyone holding one, but no
+    longer drop.
   - **Where they drop:** any rolled drop at item level 64 or more takes its base from the bank, so
     its affixes scale from that level. A dungeon's high tiers reach it too: Brutal and Torment
     caches, Wardens, champions and rares.
