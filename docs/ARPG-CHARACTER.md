@@ -870,6 +870,240 @@ ranks" plans; Consecration comes at 6.
   every heal into a bolt, Judging Light judges what stands near the healed, and Holy Nova bursts
   each critical heal; Overflow chains overheal. Wants Intellect and Spirit, and +Light.
 
+## The mage, in full
+
+### Identity
+
+The second class. A caster with three schools that pull apart: **Fire** (Ignite, explosions, big
+single hits), **Frost** (chill, freeze, shatter) and **Arcane** (Overload, mana). Every skill
+tree and every web keystone leans into one of the ailments, so a build is a school and an
+ailment plan, not just a bigger number. Like the paladin, it gets every trainer spell free at its
+level and its talent-granted spells (Pyroblast, Blast Wave, Presence of Mind, Ice Barrier...) at
+the level their talent row needs.
+
+**How the classes share the systems (built with the mage):**
+- A skill is its class's and its id (1 to 6). A class's nodes take their own numbers within each
+  skill's hundred: the paladin's 1 to 19, the mage's 20 to 39, the druid's 40 to 59, the
+  warlock's 60 to 79, the shaman's 80 to 99. So every capstone has its own Codex page.
+- Codex pages and runes drop only for the classes of the ARPG players there. One of another
+  class's, looted in a mixed group, goes to the bags to trade instead of the Codex.
+- Runes fit each class's skills on their own (`FitsFor` in `ArpgSkills.cpp`); the Skills window
+  lists only the class's runes. The mage takes Chains, Shattering, Expanse, Lingering, Haste,
+  Leech and Sanctity; the paladin's proc runes (Grace, Verdict, Anvil, Fervour, Zeal), Command
+  and Fury stay the paladin's.
+- Only the paladin's swing counts as a skill (Crusader). A mage's wand or staff swing is no
+  skill's.
+- The generated unique powers already suit every class. The authored uniques' kits are by spell,
+  and six are the mage's already (Fireball, Frostbolt, Arcane Missiles, Polymorph).
+
+### Mage skills that can be specialised
+
+Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
+
+| Skill | Covers | Branches | Role |
+|---|---|---|---|
+| **Fireball** | Fireball, Pyroblast | Volley, Inferno, Pyre | The bolt: more of them, Ignite, and the big charge |
+| **Frostbolt** | Frostbolt, Cone of Cold | Shards, Winter, Cone | Shards, chill and freeze, the cone |
+| **Arcane Missiles** | Arcane Missiles | Barrage, Flux, Focus | The channel: seeking missiles, Overload, mana |
+| **Arcane Explosion** | Arcane Explosion | Nova, Fury, Mana | The close nova |
+| **Storms** | Blizzard, Flamestrike | Blizzard, Storm, Flamestrike | Ground storms |
+| **Fire Blast** | Fire Blast, Scorch | Blast, Scorch, Combust | Quick fire up close; sets off Ignites |
+
+#### Fireball
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Volley | Twin Fireball [A] | 3 | 1/1/2 extra fireballs, at 45/60/60% |
+| Volley | Quick Fireball [M] | 3 | -0.15 sec cast time per rank |
+| Volley | Piercing Flame [A] | 3 | Flies through 1/2/4 enemies, at 60% |
+| Volley | **Flame Echo** [A] | 1 | Every 3rd Fireball echoes, at 70% |
+| Inferno | Searing Bolt [M] | 4 | 6% more damage per rank |
+| Inferno | Kindle [Ail] | 3 | 8% per rank to Ignite |
+| Inferno | Lingering Flame [M] | 3 | 15% more burn per rank |
+| Inferno | **Pyroclasm** [H] | 1 | Critical hits explode for 60% within 8 yd |
+| Pyre | Quick Pyre [M] | 3 | -0.5 sec Pyroblast cast time per rank |
+| Pyre | Hot Streak [M] | 3 | +5% Pyroblast critical strike chance per rank |
+| Pyre | Pyre [M] | 3 | Pyroblast's critical strikes 20% more of their bonus per rank |
+| Pyre | **Cataclysm** [A] | 1 | Pyroblast bursts within 10 yd, at 60% |
+
+#### Frostbolt
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Shards | Splintering Bolt [A] | 3 | Shatters into 2/3/4 shards within 10 yd, at 35% |
+| Shards | Bitter Cold [M] | 4 | 6% more Frostbolt damage per rank |
+| Shards | Glacial Chain [A] | 2 | Chains to 1/2 more within 10 yd, at 50% |
+| Shards | **Echoing Frost** [A] | 1 | Every 3rd Frostbolt echoes, at 60% |
+| Winter | Deep Chill [Ail] | 3 | 10% per rank to chill (a critical hit on the chilled freezes) |
+| Winter | Brittle [M] | 3 | +4% critical strike chance per rank |
+| Winter | Razor Ice [M] | 3 | Critical strikes 20% more of their bonus per rank |
+| Winter | **Shatterstorm** [H] | 1 | Frostbolt on a frozen enemy shatters for 80% within 8 yd |
+| Cone | Wide Cone [M] | 3 | +15% Cone of Cold area per rank |
+| Cone | Biting Cone [M] | 3 | 10% more Cone of Cold damage per rank |
+| Cone | Swift Cone [M] | 3 | -1.5 sec Cone of Cold cooldown per rank |
+| Cone | **Deep Freeze** [H] | 1 | Cone of Cold freezes every enemy it hits |
+
+#### Arcane Missiles
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Barrage | Seeking Missiles [A] | 3 | Each missile jumps to 1/1/2 more within 8 yd, at 40/55/55% |
+| Barrage | Empowered Missiles [M] | 4 | 6% more damage per rank |
+| Barrage | Piercing Missiles [A] | 2 | Each missile flies through 1/2, at 50% |
+| Barrage | **Arcane Barrage** [A] | 1 | Each missile bursts within 4 yd, at 30% |
+| Flux | Unstable Missiles [Ail] | 3 | 6% per rank to Overload |
+| Flux | Sharp Mind [M] | 3 | +3% critical strike chance per rank |
+| Flux | Arcane Thrift [M] | 3 | 10% less mana cost per rank |
+| Flux | **Overcharge** [H] | 1 | Your Overload bursts deal 40% more |
+| Focus | Focused Mind [M] | 3 | Critical strikes 15% more of their bonus per rank |
+| Focus | Long Reach [M] | 2 | +10% range per rank |
+| Focus | **Arcane Siphon** [H] | 1 | Each missile that hits restores 0.5% of maximum mana |
+
+#### Arcane Explosion
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Nova | Wide Explosion [M] | 4 | +10% radius per rank |
+| Nova | Arcane Force [M] | 4 | 6% more damage per rank |
+| Nova | Volatile [Ail] | 3 | 10% per rank to Overload |
+| Nova | **Detonation** [Ail] | 1 | Overloads every enemy it hits |
+| Fury | Unstable Power [M] | 3 | +3% critical strike chance per rank |
+| Fury | Arcane Fury [M] | 3 | Critical strikes 20% more of their bonus per rank |
+| Fury | **Arcane Nova** [M] | 1 | 40% larger radius |
+| Mana | Mana Efficiency [M] | 3 | 10% less mana cost per rank |
+| Mana | Resonance [M] | 3 | 5% more damage per rank |
+| Mana | **Mana Burst** [H] | 1 | 1% of maximum mana per enemy hit, 5% at most a cast |
+
+#### Storms
+
+Blizzard's damage is its ticks, so its damage nodes are damage over time ones, and it inflicts no
+ailment of its own; Glacial Storm is the hook on its ticks (`OnPeriodicHit`, called from
+`SpellAuras.cpp`).
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Blizzard | Wide Blizzard [M] | 3 | +12% Blizzard radius per rank |
+| Blizzard | Biting Storm [M] | 4 | 8% more Blizzard damage per rank |
+| Blizzard | Thrifty Storm [M] | 3 | 10% less Blizzard mana cost per rank |
+| Blizzard | **Glacial Storm** [H] | 1 | Blizzard chills; each strike has 15% to freeze the chilled |
+| Storm | Stormcaller [M] | 3 | 10% less mana cost per rank |
+| Storm | Storm Surge [M] | 3 | +8% radius per rank |
+| Storm | Raging Storm [M] | 3 | Blizzard's strikes and Flamestrike's burn 6% more per rank |
+| Storm | **Eye of the Storm** [M] | 1 | 30% wider |
+| Flamestrike | Quick Flamestrike [M] | 3 | -0.3 sec cast time per rank |
+| Flamestrike | Searing Ground [M] | 3 | 15% more burn per rank |
+| Flamestrike | Kindling Strike [Ail] | 3 | 10% per rank to Ignite |
+| Flamestrike | **Meteor** [M] | 1 | Flamestrike is instant |
+
+#### Fire Blast
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Blast | Swift Blast [M] | 3 | -1 sec Fire Blast cooldown per rank |
+| Blast | Explosive Blast [A] | 3 | Bursts within 4/6/8 yd, at 40% |
+| Blast | Incineration [M] | 3 | +5% Fire Blast critical strike chance per rank |
+| Blast | **Chain Blast** [H] | 1 | A kill with Fire Blast readies it again |
+| Scorch | Quick Scorch [M] | 3 | -0.2 sec Scorch cast time per rank |
+| Scorch | Arcing Scorch [A] | 2 | Chains to 1/2 more within 10 yd, at 60% |
+| Scorch | Scorching [Ail] | 3 | 10% per rank to Ignite |
+| Scorch | **Searing Brand** [H] | 1 | Scorch brands with Fire Vulnerability (3% more Fire taken per stack, 5 at most) |
+| Combust | Flashpoint [M] | 3 | Critical strikes 15% more of their bonus per rank |
+| Combust | Blazing [M] | 4 | 6% more damage per rank |
+| Combust | **Detonate** [H] | 1 | Fire Blast sets off your Ignite on its target at once: the burn left strikes it and every enemy within 6 yd |
+
+#### Mage Codex pages
+
+| Capstone | Skill | Home boss |
+|---|---|---|
+| Flame Echo | Fireball | Archmage Arugal, Shadowfang Keep |
+| Pyroclasm | Fireball | Pyroguard Emberseer, Upper Blackrock Spire |
+| Cataclysm | Fireball | Emperor Dagran Thaurissan, Blackrock Depths |
+| Echoing Frost | Frostbolt | Amnennar the Coldbringer, Razorfen Downs |
+| Shatterstorm | Frostbolt | Ras Frostwhisper, Scholomance |
+| Deep Freeze | Frostbolt | Darkmaster Gandling, Scholomance |
+| Arcane Barrage | Arcane Missiles | Arcanist Doan, Scarlet Monastery |
+| Overcharge | Arcane Missiles | Mekgineer Thermaplugg, Gnomeregan |
+| Arcane Siphon | Arcane Missiles | Immol'thar, Dire Maul |
+| Detonation | Arcane Explosion | Archaedas, Uldaman |
+| Arcane Nova | Arcane Explosion | Prince Tortheldrin, Dire Maul |
+| Mana Burst | Arcane Explosion | Balnazzar, Stratholme |
+| Glacial Storm | Storms | Baron Rivendare, Stratholme |
+| Eye of the Storm | Storms | Mutanus the Devourer, Wailing Caverns |
+| Meteor | Storms | Warchief Rend Blackhand, Upper Blackrock Spire |
+| Chain Blast | Fire Blast | Edwin VanCleef, the Deadmines |
+| Searing Brand | Fire Blast | Archivist Galford, Stratholme |
+| Detonate | Fire Blast | Overlord Wyrmthalak, Lower Blackrock Spire |
+
+Frost Nova, Blink, Polymorph, the armours and the wards stay out of the trees: castable from the
+spellbook, fed by the web and gear. Frost Nova's root counts as frozen for Shatter and
+Shatterstorm.
+
+### The mage passive web
+
+The paladin's layout (`Assemble` in `ArpgTree.cpp`), with the mage's own nodes. Notables teach
+the mage's talents at the rank given.
+
+**Fire region (north-west):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Kindling | +4% Fire damage |
+| Notable | Improved Fireball | Talent, rank 5: -0.5 sec Fireball cast time |
+| **Keystone** | **Pyromancer** | 40% more Fire damage; Frost and Arcane damage 30% less |
+| Arm (×5) | Insight | +5 Intellect |
+| Notable | Critical Mass | Talent, rank 3: +6% Fire critical strike chance |
+| Notable | Incinerate | Talent, rank 2: +4% Fire Blast and Scorch critical strike chance |
+| Arm (×5) | Embers | +4% Area damage |
+| Notable | Master of Elements | Talent, rank 3: Fire and Frost critical strikes refund 30% of their mana |
+| **Keystone** | **Wildfire** | An Ignited enemy's death spreads its Ignite to 3 within 8 yd; Ignites 20% less |
+| Side | Expanse, Ardour | +5% spell area; +5 life on kill and +4 mana on hit |
+
+**Arcane region (north-east):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Mind | +5 Intellect |
+| Notable | Arcane Mind | Talent, rank 5: +10% maximum mana |
+| **Keystone** | **Brimming Mind** | Spells: 1% more per 2% of mana over half (25% at most); below half, 15% less |
+| Arm (×5) | Focus | +4% Arcane damage |
+| Notable | Arcane Concentration | Talent, rank 5: 10% chance on a hit of a free next spell |
+| Notable | Arcane Instability | Talent, rank 3: +3% spell damage and critical strike chance |
+| Arm (×5) | Meditation | +4 Spirit and +3 mana on hit |
+| Notable | Arcane Meditation | Talent, rank 3: 15% of mana regeneration while casting |
+| **Keystone** | **Arcane Flux** | Overload bursts 50% more and restore 2% mana each; hits 10% less |
+| Side | Expanse, Tempo | +5% spell area; +4% cooldown recovery |
+
+**Frost region (south):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Rime | +4% Frost damage |
+| Notable | Improved Frostbolt | Talent, rank 5: -0.5 sec Frostbolt cast time |
+| **Keystone** | **Shatter** | 40% more against frozen enemies (frozen, or rooted as by Frost Nova); 15% less against the rest |
+| Arm (×5) | Fortitude | +6 Stamina |
+| Notable | Ice Shards | Talent, rank 5: Frost critical strikes 100% more of their bonus |
+| Notable | Arctic Reach | Talent, rank 2: +20% Frost range and area |
+| Arm (×5) | Ice | +4% armour and +2 Stamina |
+| Notable | Frostbite | Talent, rank 3: 15% for chills to freeze |
+| **Keystone** | **Permafrost** | Enemies that hit you are chilled, or frozen if chilled (each once every 3 sec); Fire damage 25% less |
+| Side | Endurance, Stride | +8 life on kill; +3% movement speed |
+
+**Between the regions:** three "Blink" nodes (+3% movement speed) near the start, and the bridges
+Spellfire (Fire–Arcane: +8% Fire and Arcane damage), Frost Channeling (Arcane–Frost: talent,
+rank 3, Frost spells 15% less mana) and Frostfire (Frost–Fire: +8% Frost and Fire damage).
+
+### Example mage builds at 60
+
+- **Pyromancer (Fireball, Fire Blast, Storms).** Twin Fireball and Pyroclasm clear packs,
+  Detonate turns every Ignite into a burst, Meteor drops Flamestrike instantly. Web: Pyromancer
+  and Wildfire, Critical Mass.
+- **Shatter (Frostbolt, Storms, Arcane Explosion).** Frost Nova or Deep Freeze, then Frostbolt's
+  Shatterstorm; Glacial Storm keeps packs chilled and freezing. Web: Shatter, Ice Shards,
+  Permafrost for a mage who lets them come.
+- **Arcanist (Arcane Missiles, Arcane Explosion, Fire Blast).** Detonation and Unstable Missiles
+  Overload everything; Overcharge and Arcane Flux make the bursts the damage and the mana.
+  Web: Arcane Flux, Arcane Mind, Brimming Mind with a deep pool.
+
 ## How it gets built
 
 ### Server effect primitives
@@ -919,7 +1153,8 @@ for capstones and hooks:
    "Paladin skills that can be specialised"). See "What phase 2 built" below.
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
-5. **Other classes**, one at a time, starting with whichever Jeff plays next.
+5. **Other classes**, one at a time: the mage is built ("The mage, in full"); next the druid,
+   the warlock and the shaman.
 
 ### What phase 2 built
 

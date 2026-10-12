@@ -110,7 +110,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgCombat` | The ARPG switch (`Active`), action kinds, swings, line skillshots, `EnemiesNear`, `ReportProc`/`ProcHeal`/`ProcMana`, `NeverMisses` |
 | `ArpgHandler.cpp` | The action handler (map-thread work goes through `GetMessager().AddMessage`) |
 | `ArpgTree` | The passive web; `WebTotals` (every stat the character has) and `RefreshTotals` |
-| `ArpgSkills` | Skill specialisation slots and trees (paladin only so far), runes and sockets, held "things" (`Held`/`AddHeld`, table `character_arpg_held`) |
+| `ArpgSkills` | Skill specialisation slots and trees (paladin and mage), runes and sockets (per class), held "things" (`Held`/`AddHeld`, table `character_arpg_held`) |
 | `ArpgCharacter` | Attributes and their ARPG effects, rest regen, keystones, the character sheet, leech, thorns, kill hooks, `UpdateCharacter` (called each player update) |
 | `ArpgUniques` | Authored unique mechanics (kits: extra projectiles, fragments, chain, burst, arc, pierce, echo, spread...), how they stack, impacts, `StrikeFoe` |
 | `ArpgProcs` | Cross-skill procs (runes Grace, Verdict, Anvil, Fervour, Zeal; six authored uniques) and **generated unique powers** (trigger, effect, damage type and rider, scaled by item level; every named unique without an authored power gets its own) |
@@ -127,6 +127,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgCodex` | Codex pages and fragments, rune items, Molten Core's key (the Core Sigil) |
 | `ArpgEvents` | Zone events (Purge, Hunt, Siege) and zone-bound bounties (`character_arpg_zone_bounty`) |
 | `ArpgTags` | Spell tags (Holy, Area, Projectile, Seal, Channel...) |
+| `ArpgMage` | The mage's keystone hooks (on hit, periodic tick, kill, blow taken); its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:
 - `Entities/Unit.cpp`: kill flow, loot preparation, damage taken, miss chances;
@@ -299,6 +300,9 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 - Hunt rares' affixes at low level: consider excluding Stone Skin and Vampiric below 30.
 - The paladin's six skills (Crusader, Holy Light, Judgement, Consecration, Hammers, Wrath; five
   rows deep, with ailment nodes): every paladin is respecced once on login (tree revision 2).
+- The mage (web, six skills, 16 keystone hooks): untested in game. Check that its notables'
+  talents are taught (the server log names a missing one), Blizzard's tick hook, Meteor's instant
+  Flamestrike, and Permafrost's chills.
 - How the new damage feels: kill speed at 20, 40 and 60 against the old pace; whether Judged
   bursts and Bleeds read well; whether creature health growth (0.5) is right.
 
@@ -306,8 +310,9 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 - Stop enemies dodging and parrying ARPG players.
 
 **Not built yet:**
-- Skill trees for classes other than paladin (next: mage, then druid, warlock, shaman); the
-  authored uniques are paladin-centric, generated unique powers already suit every class.
+- Druid, warlock and shaman (in that order): a web, six skills and keystone hooks each, as the
+  mage's ("The mage, in full" says how classes share the systems: node numbers 40-59, 60-79 and
+  80-99 within each skill's hundred).
 - Real item models on the ground.
 
 **Roadmap:**
