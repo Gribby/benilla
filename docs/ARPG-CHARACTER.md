@@ -431,6 +431,36 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     equipped slots, 0 the backpack, 1-4 the bags), `u8` slot from 1, `u16` affix.
     `SMSG_ARPG_PURSE` (0x34B): `u8` orb count, per orb `u8` id, `u16` held, cstring name and
     text; `u16` shard count, per shard `u16` affix, `u16` held, cstring name.
+- **Built (base items for the raids):** `Arpg/ArpgBases.{h,cpp}` on the server. Vanilla's whites
+  and greens stop near item level 63, so a rolled item from a raid or a high dungeon tier used to
+  be a dungeon item (a weak base, and affixes scaled from its own item level).
+  - **The bank:** at start the server writes one base for every armour slot and type, cloak,
+    neck, ring, shield, off-hand and weapon kind, at item levels 64, 68 ... 92 (entries 93000 up).
+    That is about 50 per level, 400 in all. Each:
+    - is white, with no stats of its own;
+    - has its armour, weapon damage or block fitted from vanilla's own blues and epics of its
+      kind at that item level, at 90% of them;
+    - wears the look of a vanilla blue or epic of its kind nearby;
+    - takes a name for its content: Emberforged (64), Molten (68), Draconic (72), Chromatic
+      (76), Qiraji (80), Obsidian (84), Necrotic (88), Frostbound (92).
+  - **Where they drop:** any rolled drop at item level 64 or more takes its base from the bank, so
+    its affixes scale from that level. A dungeon's high tiers reach it too: Brutal and Torment
+    caches, Wardens, champions and rares.
+  - **In a raid**, a white or green the corpse drops becomes the bank's base of its kind at the
+    raid's item level, plus 2 per tier:
+    | Raid | Item level |
+    |---|---|
+    | Zul'Gurub | 64 |
+    | Molten Core, Ruins of Ahn'Qiraj | 66 |
+    | Onyxia | 68 |
+    | Blackwing Lair | 74 |
+    | Temple of Ahn'Qiraj | 80 |
+    | Naxxramas | 88 |
+
+    A raid foe drops a rolled base 12% of the time (green 50%, blue 35%, purple 15%), a boss 2 (one
+    more per two tiers), blue or purple.
+  - **Never uniques:** rolled drops, champions' and rares' included, are bases. Uniques are
+    vanilla's named blues and purples, from their own loot tables.
 - **Uniques get one more hook:** "+2 to Judgement's Chain node", raising one node past its cap.
   That ties a unique to a build rather than a class.
 - **Affix text** reaches the client the way uniques' lines do, as a table sent at the hello, so
