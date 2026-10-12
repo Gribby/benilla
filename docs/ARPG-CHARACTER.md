@@ -473,23 +473,24 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
 - **The affixes** (item level 60 values on Normal, and by the dungeon tier, x1.15 Hard up to x2
   Torment III). Flat ones (attributes, attack power, spell damage, added damage, resistances,
   life on kill, regeneration, thorns) grow as vanilla's own stats do: by half again every nine
-  item levels or so, a level 20 drop about a seventh of a level 60 one. Percentages grow gently
-  to 60, from 40% of the level 60 value at level 1 (two thirds at 20, 70% at 30), so a low-level
-  "+% Holy damage" is worth having: 4-12% at level 20 where it was 1-3%. Past 60 both grow
-  alike, Molten Core a third more, Blackwing Lair about twice, Naxxramas three to four times.
+  item levels or so, a level 20 drop about a seventh of a level 60 one. Percentages grow in step
+  with the item level to 60 (a level 30 item rolls half the level 60 value, a level 40 two
+  thirds, a tenth at least), so ten levels always show: "+% Holy damage" is 3-10% at 20, 5-15% at
+  30, 7-20% at 40, 10-30% at 60. Past 60 both grow alike, Molten Core a third more, Blackwing Lair
+  about twice, Naxxramas three to four times (Holy damage 38-114% there).
   - **Attributes:** +Strength, Agility, Stamina, Intellect, Spirit (8-30); +all attributes
     (jewellery, 4-14).
-  - **Damage:** +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow (6-20), Area (8-24),
-    Projectile (6-18), Melee and Spell (5-16), damage over time and channelled (6-20), Seal
-    (weapons, 6-20); +% to elites and bosses (5-15); +% to Undead, Demons, Beasts, Humanoids,
-    Dragonkin, Elementals (weapons, 8-25).
+  - **Damage:** +% Holy, Physical, Fire, Frost, Arcane, Nature, Shadow (10-30), Area (12-36),
+    Projectile (10-27), Melee and Spell (8-24), damage over time and channelled (10-30), Seal
+    (weapons, 10-30); +% to elites and bosses (8-22); +% to Undead, Demons, Beasts, Humanoids,
+    Dragonkin, Elementals (weapons, 12-36).
   - **Offence:** +attack power (10-40), +spell damage (6-24), +% attack speed (weapons, 3-8, at
     most 20), +% cast speed (3-8, at most 20), +% critical strike chance and spell critical
-    strike chance (1-3, at most 8), +% spell critical strike damage (jewellery, 8-25, added to a spell's critical strike multiplier), +% melee and
+    strike chance (1-3, at most 8), +% spell critical strike damage (jewellery, 12-36, added to a spell's critical strike multiplier), +% melee and
     spell area (3-10), +% cooldown recovery (3-10), less mana cost (3-8%).
   - **Sustain:** life leech (weapons, 0.5-2% of damage dealt) and mana leech (jewellery,
     0.3-1.2%), +life on kill (5-40), +mana on hit (2-10), +health a second (armour, 2-10), +mana a
-    second (jewellery, 1-5), +% healing (5-18), +% globe and flask healing (armour, 5-20).
+    second (jewellery, 1-5), +% healing (8-26), +% globe and flask healing (armour, 5-20).
   - **Defence:** +% maximum health (armour, 3-8) and mana (3-8), +% armour (armour, 5-25), +%
     block (shields, 2-6), less damage taken (armour, 2-6%, 40% in all at most), thorns (armour,
     6-30 Nature damage back at each attacker in reach), +Fire, Nature, Frost, Shadow or Arcane
@@ -499,9 +500,9 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
   - **Damage** (see Damage above; weapons, gloves and jewellery unless said): adds Physical, Holy,
     Fire, Frost, Nature or Shadow damage to attacks (an average of 10-24 at vanilla's size, shown
     at the ARPG's: "Adds 70 to 164" at item level 60), adds Holy, Fire, Frost, Arcane, Nature or
-    Shadow damage to spells (12-28), +% critical strike multiplier (6-20, at most 60), % chance to
-    cause Bleeding, Judge, Ignite, Chill, Overload, Poison or Wither (any slot, 4-12, at most 40),
-    +% increased damage with ailments (any slot, 6-20).
+    Shadow damage to spells (12-28), +% critical strike multiplier (10-30, at most 60), % chance to
+    cause Bleeding, Judge, Ignite, Chill, Overload, Poison or Wither (any slot, 5-15, at most 40),
+    +% increased damage with ailments (any slot, 10-30).
     An item stored before these existed rolls from the old list (`character_arpg_item.pool` 0), so
     its affixes never change; new drops roll from the whole list. A unique's fixed affixes always
     come from the old list, so every copy of it, old or new, has the same ones.
