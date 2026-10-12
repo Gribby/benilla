@@ -34,7 +34,16 @@ pub(crate) struct ArpgActionState {
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgActionState>()
         .net_handler(SessionEventKind::ArpgStatus, on_status)
-        .net_handler(SessionEventKind::ArpgItemAffixes, on_affixes);
+        .net_handler(SessionEventKind::ArpgItemAffixes, on_affixes)
+        .net_handler(SessionEventKind::ArpgCompare, on_compare);
+}
+
+/// What carried items would do to the skills' damage if worn (cmangos `Arpg/ArpgCompare.h`), the
+/// whole set, after their affixes in the tooltips.
+fn on_compare(In(ev): In<SessionEvent>) {
+    if let SessionEvent::ArpgCompare { items } = ev {
+        crate::items::arpg_affixes::set_compare(items);
+    }
 }
 
 /// The server's rolled item affixes (cmangos `Arpg/ArpgAffixes.h`), for the tooltips.

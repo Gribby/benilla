@@ -412,6 +412,8 @@ pub enum ServerPacket {
     ArpgBounties(Vec<crate::messages::ArpgBounty>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_PURSE`, the crafting purse.
     ArpgPurse(crate::messages::ArpgPurse),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_COMPARE`, what carried items would do if worn.
+    ArpgCompare(Vec<crate::messages::arpg::ArpgItemCompare>),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1397,6 +1399,7 @@ impl ServerPacket {
             ServerPacket::ArpgEvent(_) => "SMSG_ARPG_EVENT".into(),
             ServerPacket::ArpgBounties(_) => "SMSG_ARPG_BOUNTIES".into(),
             ServerPacket::ArpgPurse(_) => "SMSG_ARPG_PURSE".into(),
+            ServerPacket::ArpgCompare(_) => "SMSG_ARPG_COMPARE".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

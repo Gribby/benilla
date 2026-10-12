@@ -94,6 +94,89 @@ totems, never miss: the melee and ranged miss roll, the spell miss roll and the 
 magic resist roll are all zero. Dodge, parry, block and resistances still apply. Vanilla's +hit
 items do nothing, and no affix gives hit.
 
+## Damage
+
+**Built:** `Arpg/ArpgDamage.{h,cpp}` and `DamagePartsFor` in `Arpg/ArpgCharacter.cpp` on the server.
+The first damage model added every bonus into one percentage, so each upgrade was the same small
+bump, worth less the more you had. A hit is now built in layers, as Path of Exile and Last Epoch
+build theirs, and the numbers are ARPG-sized.
+
+| Layer | What it is | Where it comes from |
+|---|---|---|
+| **Base** | Vanilla's: the weapon's swing or the spell's points, with attack power or spell damage by vanilla's coefficients | Gear's vanilla stats |
+| **× Size** | The power scale: 1 + 0.1 per level past the first (×6.9 at 60). Every creature's health grows to match, so the size of the numbers changes, not the fight | `Arpg.Power.PerLevel` |
+| **× Increased** | One sum of every "increased" bonus that fits the hit's tags | The web's small nodes, item affixes, Strength, Intellect, Spirit, Holy Weapons |
+| **× More** | Each "more" bonus multiplies on its own | Notables, keystones, skill tree nodes, the uniques' readied procs |
+| **× Critical** | Vanilla's multiplier (2 for attacks, 1.5 for spells) plus Agility's and gear's | Agility, "+% critical strike multiplier", "+% spell critical strike damage" |
+
+So "+12% Holy damage" on a ring joins a pool that may already hold 150%, while Radiance's "8% more
+Judgement damage" per rank multiplies everything else. Specialising a skill (its tree's more
+nodes) is a build's big multiplier; gear's increased bonuses are its breadth.
+
+The size applies only against creatures: a duel stays vanilla's. Everything that turns a flat
+number into damage grows with it (thorns, Martyr, Martyr's Ward, Holy Hammer's and Blessed
+Hammer's attack-power hits, the Lightforged and Dawnbringer bolts made from a heal, damage shields
+such as Retribution Aura, spells immune to caster modifiers), and everything that turns damage
+into health or mana shrinks back (leech, Rune of Leech, Light of the Crusader, a thorned
+champion's recoil).
+
+**Creature health:** vanilla's × the size at the creature's level × (1 + 0.5 × level ÷ 60), about
+×10 at 60; the extra half is for the bonuses a character builds up. A raid's creatures grow again
+with the gear the raid drops: × (1 + (raid item level − 60) ÷ 20), so Molten Core ×1.3, Blackwing
+Lair ×1.7, Temple of Ahn'Qiraj ×2, Naxxramas ×2.4, on top of the solo scaling and the tier. Both
+are `mangosd.conf` settings (`Arpg.Power.PerLevel`, `Arpg.Power.HealthGrowth`). The ARPG world
+hosts ARPG players only: a stock client there would face the health without the damage.
+
+### Added damage
+
+"Adds 70 to 164 Fire damage to attacks" (weapons, gloves and jewellery). Each damage type the
+gear adds lands as **its own hit** beside the main one. It hits in its own school with its own
+look (Fireball's impact for Fire, Smite's for Holy...), and takes its own type's increased
+bonuses with the main hit's delivery (Melee, Spell, Area) and the skill's more bonuses. It is
+critical when the main hit was, and it can inflict its own ailment. Swings take the attack
+affixes, spells the spell ones; a Seal's proc takes none, as the swing it rides on has them
+already; at most the two biggest types land beside one hit. The
+affix shows and deals its numbers at the ARPG's size for the item's level. This is what makes an
+off-type affix worth having: a Holy paladin with Fire added to attacks ignites.
+
+### Ailments
+
+Each damage type has one. **A critical strike always inflicts its type's ailment**, and "% chance
+to Ignite" (and the others) adds a chance on any hit. Ailment damage grows with "increased damage
+with ailments", "damage over time" and Spirit, on top of the hit it came from.
+
+| Type | Ailment | Effect |
+|---|---|---|
+| Physical | **Bleed** | 60% of the hit over 5 sec, doubled while the target moves; the strongest counts; armour reduces its ticks |
+| Fire | **Ignite** | 80% of the hit over 4 sec; the strongest counts |
+| Nature | **Poison** | 30% of the hit over 3 sec; stacks (20 at once), their ticks landing as one hit |
+| Frost | **Chill** | Slowed (Improved Blizzard's chill); a critical hit on a chilled target **freezes** it (Frostbite) |
+| Shadow | **Wither** | It takes 4% more damage from you per stack, 10 at most, for 4 sec after the last |
+| Arcane | **Overload** | Half the hit is stored; 3 sec after the first, it bursts on the target and those within 6 yd |
+| Holy | **Judged** | A quarter of the hit is stored per stack; at 5 stacks a Holy blast (Holy Wrath's) strikes the target and those within 6 yd for all of it |
+
+Judged is the paladin's: every critical Seal, Judgement, Exorcism or Holy Wrath judges, and a
+pack that takes five goes up in light. Burst radii grow with spell area.
+
+### Showing it
+
+The Skills tab's Bonuses button lists, per skill: the size, the increased sum, the more product,
+each bonus that applies now and where it comes from, the critical multiplier, the added damage,
+and the ailments with their chance and bonus. The estimate and the last minute's hits follow.
+
+**Comparisons** (`Arpg/ArpgCompare.{h,cpp}`, `SMSG_ARPG_COMPARE` 0x34C): every wearable item in
+the bags says, under its affixes, what it would do to each slotted skill's damage if worn in
+place of what is there ("Worn in place of Band of Flesh: Judgement +12% damage, Strike −3%
+damage"). Each skill gets a score, its expected damage a use (Strike: a second), from the same
+pieces as a hit: attack power and the weapon or the spell's points and spell damage, the
+increased sum, the more product, critical strike chance and multiplier, added damage, and the
+ailments it should inflict. The score is worked out with the gear worn and with the item swapped
+in. The item's vanilla stats count (its own, its equip spells' and its "of the Bear" suffix's),
+and so do its affixes. It is an estimate: Agility's and Intellect's vanilla critical strike chance,
+set bonuses and the target's armour are left out. The server sends the whole set once a second
+when the gear, the bags or the character's numbers changed; the client shows the lines after the
+item's affixes.
+
 ## Attributes
 
 The five vanilla attributes keep their vanilla effects, so every vanilla item still works as
@@ -102,11 +185,11 @@ making the stat mandatory:
 
 | Attribute | Vanilla (unchanged) | ARPG effect | Rate (proposed) | Cap |
 |---|---|---|---|---|
-| **Strength** | Attack power, block | Melee area: bigger arcs, cleaves and shockwaves | +1% size per 10 Str | +40% |
-| **Agility** | Crit, armour, dodge, ranged AP | Movement speed (over a base +10%) | +1% per 20 Agi | +30% with the base |
+| **Strength** | Attack power, block | Melee area: bigger arcs, cleaves and shockwaves; increased Melee and Physical damage | +1% size per 10 Str; +1% damage per 5 | +40% size |
+| **Agility** | Crit, armour, dodge, ranged AP | Movement speed (over a base +10%); critical strike multiplier | +1% per 20 Agi; +1% multiplier per 5 | +30% speed with the base |
 | **Stamina** | Health | Life on kill | Stamina ÷ 4 per kill | none |
-| **Intellect** | Mana, spell crit | Spell area: bigger Consecration, Holy Wrath, Blizzard | +1% radius per 10 Int | +40% |
-| **Spirit** | Regeneration | Cooldown recovery | +1% per 10 Spirit | +30% |
+| **Intellect** | Mana, spell crit | Spell area: bigger Consecration, Holy Wrath, Blizzard; increased Spell damage | +1% radius per 10 Int; +1% damage per 5 | +40% radius |
+| **Spirit** | Regeneration | Cooldown recovery; increased damage over time and with ailments | +1% per 10 Spirit; +1% damage per 5 | +30% cooldown |
 
 Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting, slowly enough that spells
 and drains show (0.5% of the maximum per swing that lands, 0.5% for a skill hit at most once a
@@ -155,7 +238,7 @@ makes the attack skills hit harder, so five attack skills is the weaker build. P
 - **Auras:** Sanctity Aura gives +10% Holy damage; Wide Aura spreads it to the whole pack you're
   fighting.
 - **Divine:** when Divine Shield ends, your next three Judgements are critical strikes.
-- **Hammer of Justice:** stunned enemies take +15% damage from you (Sentence Passed).
+- **Hammer of Justice:** your damage is 15% more on stunned enemies (Sentence Passed).
 - **Seals:** they are the swing's damage. A Strike build without Seals is half a build.
 
 ### What a skill tree looks like
@@ -309,6 +392,21 @@ blessing in between does not waste it.
 "+N to <skill>" item affixes are the only route past 20, so the third source of skill power is
 plain gear. Tomes (a third drop type) aren't needed.
 
+**Built:** four affixes, on weapons and amulets only, so they stay rare: "+1 to all Melee skills",
+"+1 to all Spell skills", "+1 to all Holy skills", and "+1 to all Fire, Frost, Nature, Arcane and
+Shadow skills". From about item level 69 they roll +2. They work by the skill's tags (its spells'),
+so they suit every class without a table per skill: for a paladin, Holy reaches Seals, Judgement,
+Consecration, Exorcism, Holy Wrath and Hammer of Wrath, and Melee reaches Strike and Seals.
+- Each level the gear gives a skill raises its cap by one (20 + levels) and gives a point that
+  only that skill can spend; those are spent first. The Skills tab's total counts them for the
+  slotted skills (`ArpgSkills.cpp`, `GearSkillLevels`).
+- Taking the gear off gives the points back from the deepest ranked nodes first, one at a time,
+  so the rest of the tree stays; the same trim handles points rebalanced by a level change
+  (it used to empty every tree). It waits until the excess has lasted 10 seconds out of combat
+  with the character's gear known, so a login (the gear's affixes load after the skills) or a
+  weapon swap never costs ranks. The client is sent the skills again whenever gear's levels
+  change.
+
 ## Spells without ranks
 
 - **A skill is one spell with no "Rank N".** The spellbook shows one Judgement; trainers no
@@ -383,7 +481,7 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     Dragonkin, Elementals (weapons, 8-25).
   - **Offence:** +attack power (10-40), +spell damage (6-24), +% attack speed (weapons, 3-8, at
     most 20), +% cast speed (3-8, at most 20), +% critical strike chance and spell critical
-    strike chance (1-3, at most 8), +% spell critical damage (jewellery, 8-25), +% melee and
+    strike chance (1-3, at most 8), +% spell critical strike damage (jewellery, 8-25, added to a spell's critical strike multiplier), +% melee and
     spell area (3-10), +% cooldown recovery (3-10), less mana cost (3-8%).
   - **Sustain:** life leech (weapons, 0.5-2% of damage dealt) and mana leech (jewellery,
     0.3-1.2%), +life on kill (5-40), +mana on hit (2-10), +health a second (armour, 2-10), +mana a
@@ -394,11 +492,22 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     resistance (5-20), +all resistances (jewellery, 3-10).
   - **Utility:** +% movement speed (boots, 3-8), +% gold found (5-25), +% experience (jewellery,
     2-6).
+  - **Damage** (see Damage above; weapons, gloves and jewellery unless said): adds Physical, Holy,
+    Fire, Frost, Nature or Shadow damage to attacks (an average of 10-24 at vanilla's size, shown
+    at the ARPG's: "Adds 70 to 164" at item level 60), adds Holy, Fire, Frost, Arcane, Nature or
+    Shadow damage to spells (12-28), +% critical strike multiplier (6-20, at most 60), % chance to
+    cause Bleeding, Judge, Ignite, Chill, Overload, Poison or Wither (any slot, 4-12, at most 40),
+    +% increased damage with ailments (any slot, 6-20).
+    An item stored before these existed rolls from the old list (`character_arpg_item.pool` 0), so
+    its affixes never change; new drops roll from the whole list. A unique's fixed affixes always
+    come from the old list, so every copy of it, old or new, has the same ones.
+  - **Skill levels** (weapons and amulets, 1, 2 from about item level 69): +to all Melee, Spell,
+    Holy, or Fire/Frost/Nature/Arcane/Shadow skills (see "Levels past 20").
   The roll is one seed per item, kept in `character_arpg_item` with its tier and rarity; worn
   affixes add into the same totals as the web, and the character sheet's Totals list them. The
   tooltip shows them as green lines after the item's own enchants (`SMSG_ARPG_ITEM_AFFIXES`,
   0x343, which carries the rolled colour and a unique's border too). The "+N to a skill" affixes
-  are not built yet.
+  are built (see "Levels past 20").
 - **Built (crafting):** `Arpg/ArpgCraft.{h,cpp}` and the crafting half of `Arpg/ArpgAffixes.cpp`
   on the server, the Forge window on the client (the anvil button beside the town portal's, or
   the Forge key binding). Put an item in by dragging it onto the Forge's slot, or Alt-clicking it
@@ -530,9 +639,9 @@ socket at 10 points.
 | Reach | Long Arm **[M]** | 2 | +1/2 yd melee reach. |
 | Reach | Whirling Strikes **[H]** | 1 | Every 4th swing hits all around you. *(capstone)* |
 | Rhythm | Quickened **[M]** | 4 | +4% attack speed per rank. |
-| Rhythm | Momentum **[H]** | 3 | Each consecutive hit on the same pack: +3% damage, stacking 5 times. |
+| Rhythm | Momentum **[H]** | 3 | Each consecutive hit on the same pack: 1/2/3% more damage, stacking 5 times. |
 | Rhythm | Crusader's Pace **[H]** | 1 | Kills give 30% movement speed for 3 sec. *(capstone)* |
-| Weight | Heavy Hand **[M]** | 4 | +5% physical damage per rank with two-handers. |
+| Weight | Heavy Hand **[M]** | 4 | 5% more physical damage per rank with two-handers. |
 | Weight | Stagger **[H]** | 2 | 10/20% chance to daze an enemy for 1 sec. |
 | Weight | Shockwave **[A]** | 1 | Crits send a 10 yd shockwave for 40%. *(capstone)* |
 
@@ -542,7 +651,7 @@ socket at 10 points.
 |---|---|---|---|
 | Root | Seals | – | Your Seals, as one skill. |
 | Righteous | Sweeping Seal **[A]** | 3 | Seal of Righteousness hits every enemy in front of you, at 20/35/50%. |
-| Righteous | Holy Edge **[M]** | 4 | +6% Seal damage per rank. |
+| Righteous | Holy Edge **[M]** | 4 | 6% more Seal damage per rank. |
 | Righteous | Twin Seals **[H]** | 1 | Two Seals can be active at once. *(capstone)* |
 | Command | Commanding Seal **[H]** | 1 | Seal of Command becomes baseline. |
 | Command | Command Arc **[A]** | 2 | Seal of Command procs hit every enemy in front of you at 40/60%. |
@@ -560,8 +669,8 @@ socket at 10 points.
 | Chain | Echoing Verdict **[M]** | 3 | Chain jumps lose 10% less damage per rank. |
 | Chain | Final Verdict **[H]** | 1 | A Judgement kill refreshes its cooldown. *(capstone)* |
 | Burst | Hammer of Light **[A]** | 3 | Judgement bursts onto enemies within 4/6/8 yd at 40%. |
-| Burst | Radiance **[M]** | 4 | +8% Judgement damage per rank. |
-| Burst | Sentence **[H]** | 1 | Judgement deals double damage to stunned enemies. *(capstone)* |
+| Burst | Radiance **[M]** | 4 | 8% more Judgement damage per rank. |
+| Burst | Sentence **[H]** | 1 | Judgement deals 100% more damage to stunned enemies. *(capstone)* |
 | Seal | Avenger **[H]** | 1 | Judgement no longer consumes your Seal; its cooldown is doubled. |
 | Seal | Swift Judgement **[M]** | 3 | −1 sec cooldown per rank. |
 | Seal | Righteous Mind **[H]** | 2 | Judgement restores 5/10% of max mana. |
@@ -574,8 +683,8 @@ socket at 10 points.
 | Ground | Wide Blessing **[M]** | 4 | +10% radius per rank (scales with Intellect too). |
 | Ground | Lasting Ground **[M]** | 3 | +2 sec duration per rank. |
 | Ground | Walking Consecration **[H]** | 1 | Consecration follows you. *(capstone)* |
-| Smite | Burning Ground **[M]** | 4 | +8% Consecration damage per rank. |
-| Smite | Searing Light **[H]** | 2 | Enemies standing in it take +5/10% Holy damage from you. |
+| Smite | Burning Ground **[M]** | 4 | 8% more Consecration damage per rank. |
+| Smite | Searing Light **[H]** | 2 | Your Holy damage is 5/10% more on enemies standing in it. |
 | Smite | Sanctified **[H]** | 1 | Your Judgements on consecrated enemies burst at 50% (stacks with Hammer of Light). *(synergy)* |
 | Refuge | Hallowed Ground **[H]** | 3 | You regenerate 1/2/3% health per second inside it. |
 | Refuge | Steadfast **[H]** | 1 | Inside it you can't be stunned. |
@@ -593,7 +702,7 @@ socket at 10 points.
 | Control | Long Stun **[M]** | 3 | +0.5 sec stun per rank. |
 | Control | Quick Hammer **[M]** | 3 | −10 sec cooldown per rank. |
 | Holy | Holy Hammer **[H]** | 3 | The hammer deals Holy damage (weapon-based), more per rank. |
-| Holy | Sentence Passed **[H]** | 1 | Stunned enemies take +15% damage from you. *(capstone)* |
+| Holy | Sentence Passed **[H]** | 1 | Your damage is 15% more on stunned enemies. *(capstone)* |
 
 #### Auras
 
@@ -617,15 +726,15 @@ checked the target's health; the client keeps its button lit in the ARPG view).
 
 | Skill | Branch | Nodes | Capstone (Codex page home) |
 |---|---|---|---|
-| Exorcism | Burning | Holy Fire **[A]** (burst 4/6/8 yd, 35%), Searing Word **[M]** (+10%/rank) | Purging Light **[A]**: every enemy within 10 yd behind the target takes the full hit (Ras Frostwhisper, Scholomance) |
+| Exorcism | Burning | Holy Fire **[A]** (burst 4/6/8 yd, 35%), Searing Word **[M]** (10% more/rank) | Purging Light **[A]**: every enemy within 10 yd behind the target takes the full hit (Ras Frostwhisper, Scholomance) |
 | Exorcism | Chain | Chain Exorcism **[A]** (1/2/3 jumps, 60%), Swift Exorcism **[M]** (−2 s), Echoing Word **[A]** (every 4th/3rd repeats at 50%) | |
 | Exorcism | Purge | Exorcist **[M]** (+5% crit), Zealous Word **[M]** (−15% cost) | Twin Exorcism **[A]**: a second bolt at 70% (Magistrate Barthilas, Stratholme) |
-| Holy Wrath | Radius | Wide Wrath **[M]** (+12% radius), Searing Wrath **[M]** (+10%) | Wrathful **[H]**: fires on its own with 4+ enemies within 10 yd, every 12 s (Archivist Galford, Stratholme) |
+| Holy Wrath | Radius | Wide Wrath **[M]** (+12% radius), Searing Wrath **[M]** (10% more) | Wrathful **[H]**: fires on its own with 4+ enemies within 10 yd, every 12 s (Archivist Galford, Stratholme) |
 | Holy Wrath | Fury | Swift Wrath **[M]** (−8 s), Quick Wrath **[M]** (−0.4 s cast), Shattering Wrath **[A]** (each struck enemy bursts, 20/30%) | |
-| Holy Wrath | Zeal | Zealous Wrath **[M]** (−15% cost), Righteous Wrath **[M]** (+5% crit), Radiant Wrath **[M]** (+10%) | |
-| Hammer of Wrath | Volley | Hammer Volley **[A]** (1/2 more hammers, 60%), Weighted Hammer **[M]** (+8%) | Storm of Hammers **[A]**: every 2nd throw repeats at 60% (Warchief Rend Blackhand, Upper Blackrock Spire) |
+| Holy Wrath | Zeal | Zealous Wrath **[M]** (−15% cost), Righteous Wrath **[M]** (+5% crit), Radiant Wrath **[M]** (10% more) | |
+| Hammer of Wrath | Volley | Hammer Volley **[A]** (1/2 more hammers, 60%), Weighted Hammer **[M]** (8% more) | Storm of Hammers **[A]**: every 2nd throw repeats at 60% (Warchief Rend Blackhand, Upper Blackrock Spire) |
 | Hammer of Wrath | Pierce | Piercing Hammer **[A]** (through 1/2/all, 60%), Long Throw **[M]** (+5 yd), Swift Hammer **[M]** (−1 s) | |
-| Hammer of Wrath | Execute | Righteous Hammer **[M]** (+5% crit), Zealous Hammer **[M]** (−15% cost) | Executioner **[H]**: double damage below 20% health (Pyroguard Emberseer, Upper Blackrock Spire) |
+| Hammer of Wrath | Execute | Righteous Hammer **[M]** (+5% crit), Zealous Hammer **[M]** (−15% cost) | Executioner **[H]**: 100% more damage below 20% health (Pyroguard Emberseer, Upper Blackrock Spire) |
 
 Runes: Chains, Shattering and Leech also fit Exorcism; Expanse fits Holy Wrath; Haste and Sanctity
 fit both. Hammer of Wrath takes no rune yet (a rune's skill mask is a byte, skills 1 to 7).
@@ -683,12 +792,12 @@ regions near the start, and three bridges join them farther out.
 | Arm (×5) | Fervour | +4% Seal damage |
 | Side | Reach | +5% melee area |
 | Side | Bloodthirst | +5 life on kill |
-| Notable | Two-Handed Mastery | +12% Melee damage with a two-handed weapon |
+| Notable | Two-Handed Mastery | 12% more Melee damage with a two-handed weapon |
 | Notable | Conviction | Vanilla's Conviction at rank 5: +5% melee crit |
 | Notable | Vengeance | Vanilla's Vengeance at rank 5: +15% Physical and Holy damage for 8 sec after a crit |
 | Notable | Righteous Fervour | +15% Seal damage, and vanilla's Benediction at rank 5 (Seals and Judgement cost 15% less) |
 | **Keystone** | **Zealot** | +25% attack speed; while a Seal is on you, it drains 1% of your mana a second |
-| **Keystone** | **Crusade** | Each kill in the last 5 sec gives +4% damage (10 kills at most); out of combat you're 20% slower |
+| **Keystone** | **Crusade** | Each kill in the last 5 sec gives 4% more damage (10 kills at most); out of combat you're 20% slower |
 
 **Lightbringer region (north-east):** Intellect, Spirit, Holy, healing.
 
@@ -705,7 +814,7 @@ regions near the start, and three bridges join them farther out.
 | Notable | Divine Favour | Every 20 sec, your next Holy spell is a critical strike |
 | Notable | Healing Light | Vanilla's Healing Light at rank 3 (+12% Holy Light and Flash of Light), and +10% all healing |
 | Notable | Blessed Recovery | Healing yourself gives +10% cooldown recovery for 4 sec |
-| **Keystone** | **Lightforged** | Your heals also fly as a Holy bolt at the nearest enemy for their full amount, and no longer heal you; +30% Holy damage |
+| **Keystone** | **Lightforged** | Your heals also fly as a Holy bolt at the nearest enemy for their full amount, and no longer heal you; 30% more Holy damage |
 
 **Templar region (south):** Stamina, armour, blocking, area.
 
@@ -720,14 +829,14 @@ regions near the start, and three bridges join them farther out.
 | Notable | Shield Wall | +10% block chance; blocks heal you for 1% of your health |
 | Notable | Redoubt | Vanilla's Redoubt at rank 5 |
 | Notable | Reckoning | Vanilla's Reckoning at rank 2: a 20% chance after being hit of an extra swing |
-| Notable | Righteous Fury | +20% Holy damage while three or more enemies are within 8 yd |
+| Notable | Righteous Fury | 20% more Holy damage while three or more enemies are within 8 yd |
 | **Keystone** | **Martyr** | 25% of the damage you take strikes every enemy within 10 yd as Holy damage; healing you take is halved |
 | **Keystone** | **Unyielding** | You can't be stunned or slowed; you move 20% slower |
 
 **Between the regions:** "Swiftness" (+3% movement speed) near the start; bridges of two
 "+3 to all attributes" nodes round a notable: Holy Weapons (Crusader–Lightbringer, +3% Holy
 damage per 10 Strength), Aegis (Lightbringer–Templar, +8 Stamina, Intellect and Spirit), Shield
-and Hammer (Templar–Crusader, +10% Melee damage with a one-hander and a shield).
+and Hammer (Templar–Crusader, 10% more Melee damage with a one-hander and a shield).
 
 **What's not in the web:** the first tree's skill modifiers (Sweeping Seal, Chain of Judgement…)
 and its capstones (Avenger, Martyr's Ward, Dawnbringer, Purifying Light) move to the skill trees

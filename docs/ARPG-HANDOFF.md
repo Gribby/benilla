@@ -73,7 +73,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
   - The client writer is `crates/benilla-protocol/src/world/writer/arpg.rs`.
   - Recent kinds: 24 craft (`u8` op, `u8` bag (255 equipped, 0 backpack, 1–4 bags), `u8` slot
     from 1, `u16` affix) and 25 abandon a bounty (`u8` slot).
-- **Server to client:** opcodes 0x33D–0x34B. Readers live in
+- **Server to client:** opcodes 0x33D–0x34C. Readers live in
   `crates/benilla-protocol/src/messages/arpg.rs`, wired through `parse.rs`, `packet.rs`,
   `events.rs` and `events/decode.rs`.
 
@@ -86,9 +86,9 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
   | 0x341 | CHAMPIONS | 0x349 | EVENT |
   | 0x342 | STATUS | 0x34A | BOUNTIES |
   | 0x343 | ITEM_AFFIXES | 0x34B | PURSE |
-  | 0x344 | TELEGRAPH | | |
+  | 0x344 | TELEGRAPH | 0x34C | COMPARE |
 
-  `NUM_MSG_TYPES` is 0x34C. A new opcode means three changes: bump it in
+  `NUM_MSG_TYPES` is 0x34D. A new opcode means three changes: bump it in
   `src/game/Server/Opcodes.h`, add a row to `Opcodes.cpp`, and add the client reader.
 - **The client's UI** is a Lua 5.0 addon the client installs: `crates/benilla-app/src/player/arpg_hud.lua`.
   - The HUD, the passive web and Skills window, the tracker and the Forge all live there.
@@ -116,6 +116,8 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgProcs` | Cross-skill procs (runes Grace, Verdict, Anvil, Fervour, Zeal; six authored uniques) and the **unique power pool** (16 powers; each named unique without an authored power gets one, fixed by its entry) |
 | `ArpgAffixes` | Rarity rolls, about 60 affixes scaling with item level and tier, seeds, crafted affix lists (`character_arpg_item`), crafting operations, salvage, `GiveRolledItem` |
 | `ArpgCraft` | Orbs (items 92001–92007, kept in a purse), the Forge's operations, `SMSG_ARPG_PURSE` |
+| `ArpgDamage` | The power scale (ARPG-sized damage, creature health to match), the critical multiplier bonus, added damage hits, the seven ailments |
+| `ArpgCompare` | What carried items would do to the slotted skills' damage, `SMSG_ARPG_COMPARE` |
 | `ArpgBases` | The **base bank**: about 1,100 generated bases at item levels 64–92 (entries 94000 up), with fitted armour/damage and vanilla-green implicits; raid drop swaps and extra raid drops |
 | `ArpgLoot` | Ground loot, test loot (`DropDevLoot`), `PickRandomItem` |
 | `ArpgPacks` | Packs, champions and rares with affixes, camp-density limits, `MakeLesser` |
@@ -279,6 +281,11 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 
 ### Untested in game
 
+- **The damage rework** (`ARPG-CHARACTER.md`, "Damage"): ARPG-sized numbers and creature health,
+  increased and more, critical multiplier, added damage, ailments, the new affixes, gear skill
+  levels, item comparisons, the 20-yard pack pull. Tuning knobs: `Arpg.Power.PerLevel` (0.1) and
+  `Arpg.Power.HealthGrowth` (0.5); the ailment shares and the raid growth are constants in
+  `ArpgDamage.cpp` and `ArpgDungeons.cpp`.
 - The latest server changes: implicits, no hit, Hunt tuning, camp density.
 - The base bank's equip-spell lookup (spell damage and healing on Sorcery/Healing bases), which
   depends on Jeff's spell data. The server log should say about 1,100 bases written.
@@ -290,15 +297,16 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 **Watch list:**
 - Proc balance: Grace, Hand of Edward the Odd, Pyre, Thunder Edge.
 - Hunt rares' affixes at low level: consider excluding Stone Skin and Vampiric below 30.
-- A pack's shared aggro reaches 40 yards.
+- How the new damage feels: kill speed at 20, 40 and 60 against the old pace; whether Judged
+  bursts and Bleeds read well; whether creature health growth (0.5) is right.
 
 **Offered, waiting on Jeff:**
 - Stop enemies dodging and parrying ARPG players.
-- Tighten pack aggro.
 
 **Not built yet:**
 - Skill trees for classes other than paladin; the authored uniques are paladin-centric.
-- "+N to a skill" affixes.
+- Skill tree nodes that build on the ailments (the client's trees are three rows deep; a fourth
+  row needs a layout change).
 - Real item models on the ground.
 
 **Roadmap:**

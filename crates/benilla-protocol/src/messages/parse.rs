@@ -542,6 +542,9 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_PURSE => {
             ServerPacket::ArpgPurse(super::arpg::read_arpg_purse(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_COMPARE => {
+            ServerPacket::ArpgCompare(super::arpg::read_arpg_compare(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_IMPACT => {
             ServerPacket::ArpgImpact(super::arpg::read_arpg_impact(&mut r)?)
         }

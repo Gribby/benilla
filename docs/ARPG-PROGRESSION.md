@@ -44,7 +44,8 @@ gold and gear chances are reduced.
 
 **How they spawn:** at runtime, not in the database. When an eligible creature spawns, it may
 lead a pack: its followers are temporary summons that follow its path, share its aggro, despawn
-with its corpse and come back when it respawns. Eligible: hostile, normal rank, no NPC flags, not
+with its corpse and come back when it respawns. Pulling one pulls the rest of its pack within 20
+yards that can see it (a whole camp across 40 yards used to come at once). Eligible: hostile, normal rank, no NPC flags, not
 a pet, summon, rare or boss. Settings: `Arpg.Packs.Enable`, sizes, champion and rare chances.
 
 **Champions and rares:**
@@ -134,7 +135,10 @@ five players.
 Health: dungeons `Arpg.Dungeons.SoloHealth` (0.35) plus `Arpg.Dungeons.PlayerHealth` (0.16) per
 extra player; raids 0.35 × 9 / the raid's size solo (about 8% for Molten Core), each extra player
 adding three quarters of that; open-world elites `Arpg.Dungeons.EliteSoloHealth` (0.5) plus 0.16
-per group member within 100 yards; world bosses as a 40-player raid. A creature is scaled a moment
+per group member within 100 yards; world bosses as a 40-player raid. All of it is on top of the
+power scale (`ARPG-CHARACTER.md`, "Damage"): every creature's health is vanilla's × the ARPG's
+damage size at its level × (1 + 0.5 × level ÷ 60), and a raid's again × (1 + (its item level − 60)
+÷ 20), Molten Core ×1.3 to Naxxramas ×2.4. A creature is scaled a moment
 after it spawns and again when a fight starts with a different player count or tier, keeping its
 share of health. Caps, melee / spell (DoT ticks as melee): trash 6% / 12%, champions, rares and
 open-world elites 9% / 15%, dungeon bosses 12% / 30%, raid and world bosses 15% / 35%; ordinary

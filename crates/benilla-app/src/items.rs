@@ -1058,15 +1058,25 @@ pub(crate) mod arpg_affixes {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::{LazyLock, RwLock};
 
-    use benilla_protocol::messages::arpg::ArpgItemAffix;
+    use benilla_protocol::messages::arpg::{ArpgItemAffix, ArpgItemCompare};
 
     static LINES: LazyLock<RwLock<HashMap<u64, ArpgItemAffix>>> = LazyLock::new(Default::default);
+    /// What each carried item would do to the skills' damage if worn, by guid.
+    static COMPARE: LazyLock<RwLock<HashMap<u64, String>>> = LazyLock::new(Default::default);
     static GENERATION: AtomicU64 = AtomicU64::new(0);
 
     /// Take the server's rolls, item by item.
     pub(crate) fn set(items: impl IntoIterator<Item = ArpgItemAffix>) {
         if let Ok(mut lines) = LINES.write() {
             lines.extend(items.into_iter().map(|a| (a.guid, a)));
+        }
+        GENERATION.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Take the server's comparisons: the whole set, so an item left out has none.
+    pub(crate) fn set_compare(items: impl IntoIterator<Item = ArpgItemCompare>) {
+        if let Ok(mut compare) = COMPARE.write() {
+            *compare = items.into_iter().map(|c| (c.guid, c.lines)).collect();
         }
         GENERATION.fetch_add(1, Ordering::Relaxed);
     }
@@ -1085,14 +1095,11 @@ pub(crate) mod arpg_affixes {
         GENERATION.load(Ordering::Relaxed)
     }
 
-    /// The item's affixes as enchant lines: slot 0, so they paint green as an enchant does.
+    /// The item's affixes as enchant lines: slot 0, so they paint green as an enchant does; then
+    /// what it would do if worn.
     pub(crate) fn views(guid: u64) -> Vec<benilla_ui::script::EnchantView> {
-        let Ok(lines) = LINES.read() else {
-            return Vec::new();
-        };
-        lines.get(&guid).map_or_else(Vec::new, |a| {
-            a.lines
-                .lines()
+        let as_views = |text: &str| -> Vec<benilla_ui::script::EnchantView> {
+            text.lines()
                 .filter(|l| !l.is_empty())
                 .map(|l| benilla_ui::script::EnchantView {
                     slot: 0,
@@ -1100,7 +1107,16 @@ pub(crate) mod arpg_affixes {
                     ..Default::default()
                 })
                 .collect()
-        })
+        };
+        let mut out = LINES
+            .read()
+            .ok()
+            .and_then(|lines| lines.get(&guid).map(|a| as_views(&a.lines)))
+            .unwrap_or_default();
+        if let Some(text) = COMPARE.read().ok().and_then(|c| c.get(&guid).cloned()) {
+            out.extend(as_views(&text));
+        }
+        out
     }
 
     #[cfg(test)]
@@ -1124,6 +1140,31 @@ pub(crate) mod arpg_affixes {
             assert_eq!(lines[1].name, "+5% Holy damage");
             assert_eq!(lines[0].slot, 0);
             assert!(views(7).is_empty());
+        }
+
+        #[test]
+        fn comparisons_follow_the_affixes_and_a_new_set_replaces_the_old() {
+            let guid = 0x4000_0000_0000_0077;
+            set([ArpgItemAffix {
+                guid,
+                quality: 2,
+                border: 0,
+                lines: "+8 Strength".to_string(),
+            }]);
+            let before = generation();
+            set_compare([ArpgItemCompare {
+                guid,
+                lines: "Worn:\nJudgement +12% damage".to_string(),
+            }]);
+            assert!(generation() > before);
+            let names: Vec<String> = views(guid).into_iter().map(|v| v.name).collect();
+            assert_eq!(names, ["+8 Strength", "Worn:", "Judgement +12% damage"]);
+            set_compare([]);
+            assert_eq!(
+                views(guid).len(),
+                1,
+                "a set without the item takes its lines away"
+            );
         }
     }
 }

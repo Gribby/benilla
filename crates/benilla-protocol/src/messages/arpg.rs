@@ -651,6 +651,32 @@ pub fn read_arpg_purse(r: &mut impl io::Read) -> io::Result<ArpgPurse> {
     Ok(ArpgPurse { orbs, shards })
 }
 
+/// What carried items would do to the damage of the skills in the player's slots if worn (cmangos
+/// `Arpg/ArpgCompare.h`): the whole set each time, sent when the gear, the bags or the character's
+/// numbers change.
+pub const SMSG_ARPG_COMPARE: u16 = 0x034C;
+
+/// One carried item's comparison lines.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgItemCompare {
+    pub guid: u64,
+    /// Its tooltip lines, `\n` between, coloured by the server.
+    pub lines: String,
+}
+
+/// `SMSG_ARPG_COMPARE`: `u16` count, per item `u64` guid and a C string of lines, `\n` between.
+pub fn read_arpg_compare(r: &mut impl io::Read) -> io::Result<Vec<ArpgItemCompare>> {
+    let n = read_u16_le(r)?;
+    let mut out = Vec::with_capacity(usize::from(n).min(256));
+    for _ in 0..n {
+        out.push(ArpgItemCompare {
+            guid: read_u64_le(r)?,
+            lines: read_cstring(r)?,
+        });
+    }
+    Ok(out)
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -928,6 +954,20 @@ mod tests {
                 lines: "+8 Strength\n+5% Holy damage".to_string(),
             }]
         );
+    }
+
+    #[test]
+    fn a_comparison_reads_as_guid_and_lines() {
+        let mut body = 2u16.to_le_bytes().to_vec();
+        body.extend_from_slice(&0x4000_0000_0000_0123u64.to_le_bytes());
+        body.extend_from_slice(b"Worn:\nJudgement +12% damage\0");
+        body.extend_from_slice(&0x4000_0000_0000_0124u64.to_le_bytes());
+        body.extend_from_slice(b"\0");
+        let items = read_arpg_compare(&mut body.as_slice()).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].guid, 0x4000_0000_0000_0123);
+        assert_eq!(items[0].lines, "Worn:\nJudgement +12% damage");
+        assert_eq!(items[1].lines, "");
     }
 
     #[test]

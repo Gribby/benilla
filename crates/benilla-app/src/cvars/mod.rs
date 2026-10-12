@@ -1990,7 +1990,13 @@ mod tests {
         strings.sort_unstable(); // the list is the claim, not where the rows sit in the table
         assert_eq!(
             strings,
-            vec!["arpgCraft", "gxApi", "gxResolution", "realmList", "realmName"]
+            vec![
+                "arpgCraft",
+                "gxApi",
+                "gxResolution",
+                "realmList",
+                "realmName"
+            ]
         );
         let default_of = |name: &str| {
             REGISTERED

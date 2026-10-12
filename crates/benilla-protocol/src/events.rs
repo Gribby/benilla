@@ -463,6 +463,11 @@ pub enum SessionEvent {
     },
     /// Fork-only, not 1.12.1: the crafting purse (`SMSG_ARPG_PURSE`).
     ArpgPurse { purse: crate::messages::ArpgPurse },
+    /// Fork-only, not 1.12.1: what carried items would do to the skills' damage if worn
+    /// (`SMSG_ARPG_COMPARE`), the whole set.
+    ArpgCompare {
+        items: Vec<crate::messages::arpg::ArpgItemCompare>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
