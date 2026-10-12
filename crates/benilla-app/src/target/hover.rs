@@ -61,7 +61,7 @@ pub(super) fn update_pick_occlusion(
     // ray goes on through it to what is drawn (the floor under a cut ceiling). Stock casts once.
     let cut = cutaway.as_deref().copied().unwrap_or_default();
     let through = pick_through.as_deref().copied().unwrap_or_default();
-    let passes = if through.0.is_some() {
+    let passes = if through.feet.is_some() {
         THROUGH_PASSES
     } else {
         CUT_PASSES
@@ -85,11 +85,12 @@ pub(super) fn update_pick_occlusion(
         let point = ray.origin + *ray.direction * distance;
         // An outdoor dither still draws half its pixels, and terrain under it draws whole, so the
         // ray stops at it as at anything drawn.
-        // A floor the cut spares (a ramp or ledge above the player, off the sightline) is drawn,
-        // so the ray stops at it.
-        let cut_away =
-            !cut.dither && cut.cuts(point) && !cut.spares(point, hit.normal.y, ray.origin);
-        // The ARPG cursor sees through a wall or a roof (never terrain) to what is behind it.
+        // A floor or a far wall the cut spares (a ramp or ledge above the player, the room's far
+        // side) is drawn, so the ray stops at it.
+        let cut_away = !cut.dither
+            && cut.cuts(point)
+            && !cut.spares(point, hit.normal.normalize_or_zero(), ray.origin);
+        // The ARPG cursor sees through a near wall or a roof (never terrain) to what is behind it.
         let seen_through = !terrain.contains(hit.entity) && through.passes(point, hit.normal.y);
         if cut_away || seen_through {
             travelled = distance + CUT_STEP;

@@ -25,15 +25,15 @@ Client (`crates/`):
 | No selection; magnet hover on enemies | `benilla-app/src/target/arpg_soft.rs` |
 | Casts at the cursor (`CMSG_ARPG_ACTION` kind 3) | `benilla-app/src/spell/cast_send.rs`, `cast_target.rs`, `targeting/world.rs` |
 | Wire format | `benilla-protocol/src/world/writer/arpg.rs` |
-| Indoor roof/cave cutaway; outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
+| Indoor dollhouse cutaway (ceilings, storeys above and anything on the camera's side of the player cut; the walls beyond and beside the player stand to a room's height, so the camera never looks over them into the next room); outdoor see-through dither | `benilla-world/src/cutaway.rs`, lanes in `lighting/global_light.rs`, discards in `static_gx.wgsl`, `wow_model.wgsl`, `terrain.wgsl` |
 | Hit flash on struck units | `benilla-app/src/player/arpg/fx.rs`, `benilla-world/src/instance_tint.rs::with_flash`, `wow_model.wgsl` |
 | The bottom of the screen: the stock bar's art, gryphons, paging, micro-menu and bag buttons parked; the twelve action buttons centred between the orbs on a plate with a slim XP line; flask vials (Q) left, roll bar (Space) right; stance, pet and cast bars above; bags open above the orbs | `benilla-app/src/player/arpg_hud.lua` (`ArpgHud_LayoutBar`) |
 | Telegraphed attacks drawn on the ground (`SMSG_ARPG_TELEGRAPH` 0x344), draped over the floor and terrain under them: flat area, growing fill and edge in the attacker's grade colour, with the unit selection ring (`UnitSelectTexture.blp`) at a circle's or cone's rim; landing flash, grey when broken off, a camera kick if you stand in one | `benilla-app/src/player/arpg/threats.rs` |
 | Town portal: T (an addon `Bindings.xml` command, `ARPGTOWNPORTAL`, bound to T on login if T is free) and a button right of the roll, through `arpgTreeAction` kind 12 to `CMSG_ARPG_ACTION` kind 22 | `benilla-app/src/player/arpg_hud.lua`, `player/arpg.rs` (`HUD_BINDINGS`), `player/arpg/tree.rs` |
 | A new rank of a known spell is announced as the spell grown "(stronger)", ranks being hidden | `benilla-app/src/spell/net.rs` (`announce_learn`) |
 | Hostile bolts at the player fly at the point the player stood on and strike the ground there when the player stepped out of the line | `benilla-app/src/entities/missile.rs` (`Aim::Unit::fixed`, `in_bolt_path`) |
-| The cursor sees through walls, roofs and tree crowns (never terrain) to the unit, object or floor behind them | `benilla-world/src/cutaway.rs` (`PickThrough`), `benilla-app/src/target/hover.rs` |
-| Portal culling seeds from the player, not the high camera, so a camera inside or over a building no longer hides the world round the player; with the indoor cut open, the exterior is never limited to the doorways the camera sees | `benilla-world/src/cutaway.rs` (`SeedFromViewer`), `benilla-world/src/wmo_portal/mod.rs` |
+| The cursor sees through what the cutaway leaves out: walls on the camera's side of the player, roofs and tree crowns over them; a wall the cutaway keeps (beyond or beside the player) stops it, as terrain does | `benilla-world/src/cutaway.rs` (`PickThrough`), `benilla-app/src/target/hover.rs` |
+| Portal culling seeds from the player, not the high camera, so a camera inside or over a building no longer hides the world round the player. Indoors under the cut, the rooms drawn are the ones the player sees: its own, every room through its doorways, and those its eye sees through one of them, two doorways deep; rooms behind a wall and the building's shell and roof stay dark, and a unit standing in a dark room is not drawn | `benilla-world/src/cutaway.rs` (`SeedFromViewer`), `benilla-world/src/wmo_portal/sight.rs`, `wmo_portal/mod.rs`, `benilla-app/src/player/arpg.rs` (`hide_unseen_units`) |
 | Hit-stop, stagger, corpse fling (root-bone offsets in `PosePost`), kill blood splats (decals) | `benilla-app/src/player/arpg/impact.rs` |
 | Health globes (`SMSG_ARPG_GLOBE` 0x345), walk-over pickup (`CMSG_ARPG_ACTION` kind 23) | `benilla-app/src/player/arpg/globes.rs` |
 | Procs in the combat log (`SMSG_ARPG_PROC` 0x346, as `COMBAT_MISC_INFO` lines; a heal or mana proc floats its amount) and the character sheet (`SMSG_ARPG_SHEET` 0x347: the paper doll's attribute tooltips, the Skills tab's Bonuses button, the web's Totals button) | `benilla-app/src/player/arpg/sheet.rs`, `arpg_hud.lua` |
@@ -98,11 +98,10 @@ ignore the quality rates, and most world greens and blues sit in grouped referen
 Referenced 3, Money 2.
 
 Next:
-- Camera (banked by Jeff, after gameplay): the height cut fails in multi-storey instances
-  (Naxxramas, Blackrock Spire). Plan: cut by room, hiding whole WMO groups above the player's
-  room (`wmo_portal::PlayerWmoRoom` already tracks it); fade anything left on the camera→player
-  sightline as the outdoor dither does; keep the height cut as the fallback for open caves
-  (Molten Core). Floors more than `FLOOR_RISE` over the plane are already cut.
+- Camera: the dollhouse cut and the rooms in sight are built (untested in game). To watch: a
+  room taller than `WALL_RISE` (8 yd over the plane) loses its far walls' tops; open caves
+  (Molten Core) are one or a few big groups, so the sight rooms change little there and the cut
+  does the work; a WMO with two-sided ceilings shows them where back-face culling would not.
 - Phase 1/2 leftovers: torches/fire and water above the cut plane still draw; the dither skips
   animated M2 doodads drawn by `wow_model.wgsl` (only WMO/interior there are cut).
 - Phase 3: real item models on the ground. Built since: mob packs, champions and rares,

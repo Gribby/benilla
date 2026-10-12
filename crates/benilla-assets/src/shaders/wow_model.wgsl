@@ -417,16 +417,31 @@ fn vertex(vertex: WowVertex) -> WowVsOut {
 }
 
 // Fork-only, not 1.12.1: whether the ARPG indoor cut (`benilla_world::cutaway::Cutaway::spares`)
-// spares a point above its plane: a floor-like surface (facing up) stays, so a ramp or a ledge
-// higher than the player is not holed, unless it lies on the sightline from the camera to the
-// player, where it would hide them. Walls and ceilings above the plane always go.
+// spares a point above its plane, for a surface of unit normal `n` seen from `eye`: a floor-like
+// surface (facing up) no more than ARPG_FLOOR_RISE over the plane stays, so a ramp or a ledge is
+// not holed; a wall facing the camera beyond or beside the player (no more than ARPG_WALL_AHEAD
+// toward the camera), up to ARPG_WALL_RISE over the plane, stays, so the room's far side stands
+// whole. Either only off the sightline from the camera to the player. Ceilings, storeys above and
+// whatever stands on the camera's side go.
 const ARPG_FLOOR_UP: f32 = 0.6;
 const ARPG_SIGHT_RADIUS: f32 = 3.5;
 const ARPG_SIGHT_DROP: f32 = 1.5;
 // A floor this far over the plane is a storey above, not a ramp: it goes too.
 const ARPG_FLOOR_RISE: f32 = 3.0;
-fn arpg_cut_spares(world: vec3<f32>, up: f32, plane: f32, centre: vec2<f32>, eye: vec3<f32>) -> bool {
-    if (up < ARPG_FLOOR_UP || world.y > plane + ARPG_FLOOR_RISE) {
+const ARPG_WALL_RISE: f32 = 8.0;
+const ARPG_WALL_AHEAD: f32 = 1.0;
+fn arpg_cut_spares(world: vec3<f32>, n: vec3<f32>, plane: f32, centre: vec2<f32>, eye: vec3<f32>) -> bool {
+    var kept = false;
+    if (n.y >= ARPG_FLOOR_UP) {
+        kept = world.y <= plane + ARPG_FLOOR_RISE;
+    } else if (abs(n.y) < ARPG_FLOOR_UP) {
+        let to_eye = eye.xz - centre;
+        let toward = to_eye / max(length(to_eye), 0.0001);
+        let ahead = dot(world.xz - centre, toward);
+        let facing = dot(n.xz, eye.xz - world.xz) > 0.0;
+        kept = world.y <= plane + ARPG_WALL_RISE && ahead <= ARPG_WALL_AHEAD && facing;
+    }
+    if (!kept) {
         return false;
     }
     let p = vec3<f32>(centre.x, plane - ARPG_SIGHT_DROP, centre.y);
@@ -469,8 +484,7 @@ fn fragment(in: WowVsOut, @builtin(front_facing) is_front: bool) -> WowFragOut {
         // A negative radius is the outdoor dither: every other pixel, so the player shows through.
         let dither_keep = ((u32(in.position.x) + u32(in.position.y)) & 1u) != 0u;
         let cut_n = in.world_normal;
-        let cut_up = cut_n.y / max(length(cut_n), 0.0001);
-        let cut_spared = cut_r > 0.0 && arpg_cut_spares(in.world_position.xyz, cut_up,
+        let cut_spared = cut_r > 0.0 && arpg_cut_spares(in.world_position.xyz, cut_n / max(length(cut_n), 0.0001),
             wow_light.wmo_fog_params.z, vec2<f32>(wow_light.wmo_fog_params.w, wow_light.fog_params.z),
             view.world_position.xyz);
         if (dot(cut_d, cut_d) < cut_r * cut_r && ((cut_r > 0.0 && !cut_spared) || (cut_r < 0.0 && !dither_keep))) {

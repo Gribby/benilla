@@ -306,11 +306,15 @@ pub(super) fn plugin(app: &mut App) {
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);
-    // The portal flood seeds from the player, not the high camera, and the cursor sees through
-    // walls and roofs to what is behind them.
+    // The portal flood seeds from the player, not the high camera, indoors only the rooms the
+    // player sees are drawn (and the units in them), and the cursor sees through what the cutaway
+    // leaves out, never a wall it keeps.
     app.insert_resource(benilla_world::cutaway::SeedFromViewer(true))
         .init_resource::<benilla_world::cutaway::PickThrough>()
-        .add_systems(Update, publish_pick_through.before(pin_view));
+        .add_systems(
+            Update,
+            (publish_pick_through.before(pin_view), hide_unseen_units),
+        );
     app.init_resource::<crate::spell::ArpgCastAim>()
         .init_resource::<ArpgAttackKey>()
         .insert_resource(ArpgMode)
@@ -878,14 +882,68 @@ fn turn_toward(from: f32, to: f32, dt: f32) -> f32 {
     wrap_pi(from + step.copysign(delta))
 }
 
-/// The cursor's see-through rule follows the player's feet.
+/// The cursor's see-through rule follows the player's feet and the camera's side of them.
 fn publish_pick_through(
     player: Res<Player>,
+    cvars: Option<Res<crate::cvars::Cvars>>,
     mut through: ResMut<benilla_world::cutaway::PickThrough>,
 ) {
-    let fresh = benilla_world::cutaway::PickThrough(Some(player.pos).filter(|p| p.is_finite()));
+    let yaw = ArpgView::read(cvars.as_deref()).pin.yaw;
+    let fresh = benilla_world::cutaway::PickThrough {
+        feet: Some(player.pos).filter(|p| p.is_finite()),
+        // The camera looks along `(−sin, 0, −cos)` of its yaw ([`xray_cut`]): it stands the other way.
+        toward_camera: Vec2::new(yaw.sin(), yaw.cos()),
+    };
     if *through != fresh {
         *through = fresh;
+    }
+}
+
+/// A unit hidden for standing in a room the player cannot see, and the visibility it had.
+#[derive(Component)]
+struct ArpgRoomHidden(Visibility);
+
+/// Indoors, under the cut, a unit in a room the player cannot see (one the portal flood left dark,
+/// `benilla_world::wmo_portal`'s sight rooms) is not drawn: the room around it is not, and it
+/// would stand in the void, seen through a wall. It shows again as it walks into sight, or when
+/// the player steps outdoors. Our own body never hides.
+#[allow(clippy::type_complexity)] // one Bevy system's full input set
+fn hide_unseen_units(
+    cutaway: Res<benilla_world::cutaway::Cutaway>,
+    instances: Query<&benilla_world::wmo_portal::WmoPortalInstance>,
+    mut units: Query<
+        (
+            Entity,
+            &benilla_world::wmo_portal::UnitWmoRoom,
+            &mut Visibility,
+            Option<&ArpgRoomHidden>,
+        ),
+        (
+            With<benilla_world::world_unit::WorldUnit>,
+            Without<benilla_world::world_unit::ViewerUnit>,
+        ),
+    >,
+    mut commands: Commands,
+) {
+    let indoor = cutaway.plane.is_some() && !cutaway.dither;
+    for (entity, room, mut visibility, hidden) in &mut units {
+        let unseen = indoor
+            && room.room().is_some_and(|r| {
+                instances
+                    .get(r.instance)
+                    .is_ok_and(|inst| inst.visible.get(usize::from(r.group)) == Some(&false))
+            });
+        match (unseen, hidden) {
+            (true, None) => {
+                commands.entity(entity).insert(ArpgRoomHidden(*visibility));
+                *visibility = Visibility::Hidden;
+            }
+            (false, Some(was)) => {
+                *visibility = was.0;
+                commands.entity(entity).remove::<ArpgRoomHidden>();
+            }
+            _ => {}
+        }
     }
 }
 

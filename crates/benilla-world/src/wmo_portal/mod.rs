@@ -24,6 +24,7 @@ mod interior;
 mod probe;
 mod room_vis;
 mod seed;
+mod sight;
 
 use fog::select_wmo_fog;
 pub use fog::{CameraWmoFog, WmoFogTarget};
@@ -270,30 +271,6 @@ impl Plugin for WmoPortalPlugin {
 /// is not the room you are in.
 const MAX_FLOOR_DROP: f32 = 1760.0;
 
-/// Recompute each resident WMO's per-group visible set from the camera; a portal-less prop stays
-/// all-visible.
-/// Fork-only, not 1.12.1: a WMO group's world bounds, from its model-space (WoW axes) box, for the
-/// ARPG cutaway's reveal.
-fn group_world_bounds(
-    nav: &benilla_assets::WmoGroupNav,
-    world_from_local: &Affine3A,
-) -> (Vec3, Vec3) {
-    let (lo, hi) = (nav.bbox_min, nav.bbox_max);
-    let mut min = Vec3::splat(f32::INFINITY);
-    let mut max = Vec3::splat(f32::NEG_INFINITY);
-    for i in 0..8 {
-        let corner = [
-            if i & 1 == 0 { lo[0] } else { hi[0] },
-            if i & 2 == 0 { lo[1] } else { hi[1] },
-            if i & 4 == 0 { lo[2] } else { hi[2] },
-        ];
-        let p = world_from_local.transform_point3(benilla_assets::coords::wow_to_bevy(corner));
-        min = min.min(p);
-        max = max.max(p);
-    }
-    (min, max)
-}
-
 /// Fork-only, not 1.12.1: what the ARPG view gives the flood ([`compute_wmo_pvs`]).
 type ArpgPvsInputs<'w> = (
     Option<Res<'w, crate::cutaway::Cutaway>>,
@@ -301,6 +278,8 @@ type ArpgPvsInputs<'w> = (
     Option<Res<'w, crate::view::Viewer>>,
 );
 
+/// Recompute each resident WMO's per-group visible set from the camera; a portal-less prop stays
+/// all-visible.
 fn compute_wmo_pvs(
     wmos: Res<Assets<WmoModel>>,
     cam: Query<(&GlobalTransform, &Projection), With<WorldCamera>>,
@@ -409,16 +388,23 @@ fn compute_wmo_pvs(
             &world_from_local,
             &mut (&mut tap, &mut log),
         );
-        // Fork-only, not 1.12.1: the rooms the cutaway opens show through the cut roof, which no
-        // portal of the camera's flood reaches, so each group inside its cylinder is drawn.
-        if let Some(cut) = cutaway.as_deref().filter(|c| c.plane.is_some()) {
-            for (g, nav) in model.group_nav.iter().enumerate() {
-                if fresh.visible.get(g) == Some(&false) {
-                    let (min, max) = group_world_bounds(nav, &world_from_local);
-                    if cut.reveals(min, max) {
-                        fresh.visible[g] = true;
-                    }
-                }
+        // Fork-only, not 1.12.1: indoors under the ARPG cut, the camera over the cut roof cannot
+        // say which rooms show; the player's eye does (`sight`): its room, the rooms through its
+        // doorways, and those it sees through them. Rooms behind a wall, and the building's own
+        // shell and roof, stay dark. A building the player is not inside keeps the camera's flood.
+        if seed_world.is_some()
+            && cutaway
+                .as_deref()
+                .is_some_and(|c| c.plane.is_some() && !c.dither)
+        {
+            let seeds = down_ray_seeds(model, seed.0, seed.1);
+            if let Some(home) = seeds.in_group.filter(|&g| {
+                model
+                    .group_nav
+                    .get(g)
+                    .is_some_and(|n| n.flags & EXTERIOR == 0)
+            }) {
+                fresh.visible = sight::sight_rooms(model, home, seed.0);
             }
         }
         if inst.bypass_change_detection().visible != fresh.visible {
