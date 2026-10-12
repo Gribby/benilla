@@ -1521,6 +1521,21 @@ mod tests {
         assert_eq!(apply(&mut app, "bogus", "1"), SetOutcome::Unknown);
     }
 
+    /// Fork-only: the Forge's request is text ("op:bag:slot:affix:nonce"), so its row must not be
+    /// numeric: a numeric row refused every craft and salvage.
+    #[test]
+    fn the_forge_setting_takes_its_text_requests() {
+        let mut app = cvar_app();
+        assert_eq!(
+            apply(&mut app, "arpgCraft", "4:0:3:0:1"),
+            SetOutcome::Changed
+        );
+        assert_eq!(
+            apply(&mut app, "arpgCraft", "8:0:3:0:2"),
+            SetOutcome::Changed
+        );
+    }
+
     /// `/console spellEffectLevel 0` prints the handler's own line (`0x689537`-`0x689554`, format
     /// `0x869f94`) with the level it clamped to; a Lua write logs it instead.
     #[test]
@@ -1963,7 +1978,8 @@ mod tests {
     /// The string-valued rows, a closed list, each default checked on its own terms: `realmName`
     /// (the reference's registered `""`, `0x882748`) and `gxApi` are empty until the session writes
     /// them; `gxResolution` and `realmList` pass their observers' parsers
-    /// ([`crate::video::parse_resolution`], [`crate::realmlist::normalize`]).
+    /// ([`crate::video::parse_resolution`], [`crate::realmlist::normalize`]). Fork-only: `arpgCraft`,
+    /// the Forge's text request, is empty until the Forge writes one.
     #[test]
     fn the_string_valued_cvars_are_the_realm_and_the_windowed_size() {
         let mut strings: Vec<&str> = REGISTERED
@@ -1974,7 +1990,7 @@ mod tests {
         strings.sort_unstable(); // the list is the claim, not where the rows sit in the table
         assert_eq!(
             strings,
-            vec!["gxApi", "gxResolution", "realmList", "realmName"]
+            vec!["arpgCraft", "gxApi", "gxResolution", "realmList", "realmName"]
         );
         let default_of = |name: &str| {
             REGISTERED
@@ -1985,6 +2001,7 @@ mod tests {
         };
         assert_eq!(default_of("realmName"), "");
         assert_eq!(default_of("gxApi"), "");
+        assert_eq!(default_of("arpgCraft"), "");
         assert_eq!(
             crate::video::parse_resolution(default_of("gxResolution")),
             Some(crate::video::DEFAULT_WINDOWED)

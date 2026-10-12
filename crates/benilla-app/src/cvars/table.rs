@@ -745,8 +745,10 @@ pub(crate) const REGISTERED: &[Registered] = &[
     // The skill tree window's requests (`player::arpg::tree`), a number: kind × 100000 + node × 100
     // + a nonce. Session-owned, never saved.
     ours("arpgTreeAction", "0", ARPG_WHY),
-    // The Forge's requests (`player::arpg::world`): "op:bag:slot:affix:nonce". Session-owned.
-    ours("arpgCraft", "0", ARPG_WHY),
+    // The Forge's requests (`player::arpg::world`): "op:bag:slot:affix:nonce". Session-owned. Its
+    // default is text, not "0": a numeric default makes the row numeric, which refuses the
+    // request's colons.
+    ours("arpgCraft", "", ARPG_WHY),
     // `lastCharacterIndex` (`0x402d93`, "0" `0x82e570`, category 4, handle `[0x882674]`), help
     // "Last character selected": a 0-based row (the selection cell `[0x83856c]` under `"%d"`), so
     // "0" is the first character. It mirrors [`crate::char_select::Roster::pending_index`].
