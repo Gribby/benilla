@@ -323,13 +323,18 @@ tracker on the client). In the open world (Eastern Kingdoms and Kalimdor), a dir
 event per zone, 45-90 seconds after an ARPG player arrives and 3-6 minutes after the last ended.
 Each starts 45-130 yards from a player who is out of combat, not resting and level 5 or more.
 It uses the zone's own creatures: it anchors on a plain hostile creature within 4 levels below to
-3 above the player's level (no script, no quest or vendor ties, not a champion or rare) and
+1 above the player's level (no script, no quest or vendor ties, not a champion or rare) and
 summons more of its kind.
 - *Purge* (45%): slay 10-14 enemies within 45 yards of the spot in 3 minutes. Half as many again
-  of the anchor's kind fill the camp out.
-- *Hunt* (30%): a named rare of the anchor's kind, with a pack of three, roams the spot. Slay it in
-  5 minutes.
-- *Siege* (25%): three waves (4, 5, then 6 led by a champion) run at whoever holds the spot.
+  of the anchor's kind fill the camp out, as lesser followers.
+- *Hunt* (30%): a named rare of the anchor's kind, with two lesser followers, roams the spot.
+  Slay it in 5 minutes. The rare is no higher than your level and has one affix fewer than a
+  pack's rare (one under level 30, two from 30).
+- *Siege* (25%): three waves (4, 5, then 6 led by a champion) of lesser followers run at whoever
+  holds the spot.
+
+The summons fight as a pack's followers do: a level or two under the event's level, at a pack
+follower's share of health and damage.
   Clearing a wave brings the next after 5 seconds; otherwise each comes 30 seconds after the last.
   4 minutes in all.
 
