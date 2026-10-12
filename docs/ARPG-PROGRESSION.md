@@ -25,8 +25,16 @@ built for.
 |---|---|---|
 | 1–5 | 1–2 | The swing and Seal of Righteousness |
 | 6–11 | 2–3 | Consecration (level 6), one skill slot |
-| 12–19 | 3–4 | First tree nodes (Wide Swing, Sweeping Seal), a second slot |
-| 20+ | 3–5 | Area damage, life on kill, Hallowed Ground |
+| 12–29 | 3–4 | First tree nodes (Wide Swing, Sweeping Seal), a second and third slot |
+| 30+ | 3–5 | Area damage, life on kill, Hallowed Ground |
+
+**A camp is a pack already.** Vanilla's camps (a gnoll camp in Redridge, a murloc shore) are
+spawns standing side by side, and each one leading its own pack turned eight gnolls into thirty.
+So the count follows the spawns already there, within 18 yards:
+- 4 or more of normal rank: the mob leads no followers. A champion pack still comes, with two
+  champions.
+- 2 or 3: it leads at most one follower.
+- Fewer: a lone wanderer still leads a full pack.
 
 **Followers** are the leader's own kind, one or two levels lower, drawn a little smaller, with
 about 55% of its health and damage: a pack of five fights like about three ordinary mobs. Each
