@@ -992,8 +992,8 @@ end
 local function treeBuild()
     if treeFrame then return treeFrame end
     local f = CreateFrame("Frame", "ArpgTreeFrame", UIParent)
-    local width = math.min(980, UIParent:GetWidth() - 60)
-    local height = math.min(700, UIParent:GetHeight() - 120)
+    local width = math.min(1000, UIParent:GetWidth() - 60)
+    local height = math.min(800, UIParent:GetHeight() - 80)
     f:SetWidth(width)
     f:SetHeight(height)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
@@ -1529,10 +1529,16 @@ local function skillsPaint()
     p.socket.icon:SetDesaturated(not open and 1 or nil)
     p.socket:Show()
     -- The tree's size from the window's own (set, not anchored), as its layout may not have run yet.
+    -- The rows share the height below the title, however deep the tree runs.
     local width, height = f:GetWidth() - 286, f:GetHeight() - 86
     local left = (width - 2 * SKILL_COL_W) / 2
+    local deepest = 1
+    for _, n in ipairs(k.nodes) do
+        if n.row > deepest then deepest = n.row end
+    end
+    local rowH = math.min(SKILL_ROW_H, math.floor((height - 92 - 44) / deepest))
     local function at(col, row)
-        return left + col * SKILL_COL_W, 92 + row * SKILL_ROW_H
+        return left + col * SKILL_COL_W, 92 + row * rowH
     end
     local all = { { id = 0, kind = 0, col = 1, row = 0, parent = -1, max = 0, rank = 1, icon = k.icon, name = k.name, text = k.text } }
     for _, n in ipairs(k.nodes) do tinsert(all, n) end

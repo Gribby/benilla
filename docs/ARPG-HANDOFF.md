@@ -297,6 +297,8 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 **Watch list:**
 - Proc balance: Grace, Hand of Edward the Odd, Pyre, Thunder Edge.
 - Hunt rares' affixes at low level: consider excluding Stone Skin and Vampiric below 30.
+- The paladin's six skills (Crusader, Holy Light, Judgement, Consecration, Hammers, Wrath; five
+  rows deep, with ailment nodes): every paladin is respecced once on login (tree revision 2).
 - How the new damage feels: kill speed at 20, 40 and 60 against the old pace; whether Judged
   bursts and Bleeds read well; whether creature health growth (0.5) is right.
 
@@ -304,9 +306,8 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 - Stop enemies dodging and parrying ARPG players.
 
 **Not built yet:**
-- Skill trees for classes other than paladin; the authored uniques are paladin-centric.
-- Skill tree nodes that build on the ailments (the client's trees are three rows deep; a fourth
-  row needs a layout change).
+- Skill trees for classes other than paladin (next: mage, then druid, warlock, shaman); the
+  authored uniques are paladin-centric, generated unique powers already suit every class.
 - Real item models on the ground.
 
 **Roadmap:**

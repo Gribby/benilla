@@ -239,7 +239,8 @@ makes the attack skills hit harder, so five attack skills is the weaker build. P
   fighting.
 - **Divine:** when Divine Shield ends, your next three Judgements are critical strikes.
 - **Hammer of Justice:** your damage is 15% more on stunned enemies (Sentence Passed).
-- **Seals:** they are the swing's damage. A Strike build without Seals is half a build.
+- **Seals:** they are the swing's damage, and one skill with it (Crusader). A swing build without
+  Seals is half a build.
 
 ### What a skill tree looks like
 
@@ -307,10 +308,10 @@ server; the Skills tab on the client.
   still tears into two). Five unseal any capstone of a specialised
   skill: Shift-click it in the Skills tab.
 - *Runes:* the socket (top right of a skill's tree) opens at 10 points; click it to choose. Nine
-  runes, each fitting some skills: Chains (Judgement), Shattering (Judgement, Seals), Expanse
-  (Consecration), Lingering (Consecration, Hammer of Justice), Haste (Judgement, Consecration,
-  Hammer), Leech (Strike, Seals, Judgement), Command (Hammer), Sanctity (Seals, Judgement,
-  Consecration), Fury (Strike). A kit rune on a skill whose tree already has that kit adds to it
+  runes, each fitting some skills: Chains (Judgement, Wrath), Shattering (Judgement, Crusader,
+  Wrath), Expanse (Consecration, Wrath), Lingering (Consecration, Hammers), Haste (Judgement,
+  Consecration, Hammers, Wrath, Holy Light), Leech (Crusader, Judgement, Wrath, Hammers), Command
+  (Hammers), Sanctity (every skill), Fury (Crusader). A kit rune on a skill whose tree already has that kit adds to it
   (Chains: one more jump on Chain of Judgement; Shattering: +15% on Hammer of Light). Runes drop
   from champions 2%, rares 8%, dungeon bosses 12%, Wardens 30%, Caches 40%. Socketing is free and
   the rune stays held; unslotting the skill empties its socket.
@@ -345,7 +346,7 @@ How a proc works:
 | Verdict | Judgement | A Judgement that hits: the next Exorcism or Hammer of Wrath deals 50% more (8 s) |
 | the Anvil | Hammer of Justice | Stunning an enemy ends Judgement's cooldown (10 s) |
 | Fervour | Holy Wrath, Exorcism | A critical hit: the next Judgement is a sure critical strike (8 s) |
-| Zeal | Seals | A critical Seal hit: the next Holy Light or Flash of Light costs no mana (10 s) |
+| Zeal | Crusader | A critical Seal hit: the next Holy Light or Flash of Light costs no mana (10 s) |
 
 | Unique | Proc (internal cooldown) |
 |---|---|
@@ -410,8 +411,8 @@ plain gear. Tomes (a third drop type) aren't needed.
 **Built:** four affixes, on weapons and amulets only, so they stay rare: "+1 to all Melee skills",
 "+1 to all Spell skills", "+1 to all Holy skills", and "+1 to all Fire, Frost, Nature, Arcane and
 Shadow skills". From about item level 69 they roll +2. They work by the skill's tags (its spells'),
-so they suit every class without a table per skill: for a paladin, Holy reaches Seals, Judgement,
-Consecration, Exorcism, Holy Wrath and Hammer of Wrath, and Melee reaches Strike and Seals.
+so they suit every class without a table per skill: for a paladin, Holy reaches Crusader, Holy Light,
+Judgement, Consecration, Hammers and Wrath, and Melee reaches Crusader.
 - Each level the gear gives a skill raises its cap by one (20 + levels) and gives a point that
   only that skill can spend; those are spent first. The Skills tab's total counts them for the
   slotted skills (`ArpgSkills.cpp`, `GearSkillLevels`).
@@ -434,7 +435,7 @@ Consecration, Exorcism, Holy Wrath and Hammer of Wrath, and Melee reaches Strike
 - **On top of the base:** gear (spell power and attack power, through vanilla's coefficients),
   attributes (their ARPG effects), tags (passive and item bonuses), and the skill's own tree.
 - **Downranking goes away** (a cheaper low rank for mana). Mana pacing moves into the trees and
-  the web instead: Mana Strike on Seals, Righteous Mind on Judgement, Spirit, Illumination.
+  the web instead: Mana Strike on Crusader, Righteous Mind on Judgement, Spirit, Illumination.
 - **How it's built:** first, at each level-up the server teaches the vanilla rank for that level
   and removes the lower one, and the client hides "Rank N". The smooth blend between ranks comes
   second, as a damage and cost multiplier.
@@ -630,170 +631,158 @@ hit any creature type** for ARPG players (their undead-and-demon limit is a raid
 
 ### Paladin skills that can be specialised
 
-| Skill | Tags | Vanilla source | Role |
+**Built (revision 2):** six skills for five slots, so one is left out. Each tree has three branches
+(Holy Light two) of four or five tiers, about 40 points of nodes against the 20 a skill takes
+(more with gear's skill levels), so two characters of one skill can play differently. The first
+version had eight thin skills, three tiers deep; a character from it has its skill points back
+once, its runes back unsocketed, its Seals and Exorcism slots emptied, and the Codex pages it
+had read carried to the capstones that took their place (`ArpgSkills.cpp`, `TREE_REVISION`).
+
+| Skill | Covers | Branches | Role |
 |---|---|---|---|
-| Strike | Melee, Physical | The held swing | The left-click |
-| Seals | Seal, Holy, Melee | All Seals, as one skill | Swing empowerment |
-| Judgement | Spell, Holy | Judgement | Burst, chaining |
-| Consecration | Spell, Holy, Area, Ground | Consecration (free at 6) | Ground control |
-| Hammer of Justice | Spell, Control | Hammer of Justice | Stun, or a thrown hammer |
-| Exorcism | Spell, Holy | Exorcism | Single-target nuke |
-| Holy Shock | Spell, Holy, Heal | Holy Shock (baseline at 40) | Damage-or-heal |
-| Light | Spell, Holy, Heal | Holy Light, Flash of Light | Healing as offence |
-| Auras | Aura, Holy | Every aura, as one skill | Passive area |
-| Hammer of Wrath | Spell, Holy, Projectile | Hammer of Wrath | Execute |
-| Holy Wrath | Spell, Holy, Area | Holy Wrath | Nova |
-| Divine | Holy, Movement | Divine Shield, Blessing of Protection | Survival |
+| **Crusader** | The held swing and every Seal | Reach, Righteous, Zeal | Melee: a Seal is the swing's damage |
+| **Holy Light** | Holy Light, Flash of Light | Radiance, Retribution | Healing, and healing as offence |
+| **Judgement** | Judgement | Chain, Burst, Verdict | Burst, chaining |
+| **Consecration** | Consecration | Ground, Smite, Refuge | Ground control |
+| **Hammers** | Hammer of Justice, Hammer of Wrath | Thrown, Stun, Execute | Stun and the thrown execute |
+| **Wrath** | Exorcism, Holy Wrath | Exorcism, Nova, Zeal | Holy fire: a bolt and a nova; specialised, at any foe |
 
-Pick five. Each tree below has 20 points to spend by default (more with items). Points cost one
-per rank. **[A]** marks a node built from the uniques kit, **[M]** a spell modifier, and **[H]** a
-new hook. Every capstone needs its Codex page (table after the trees), and every tree has a rune
-socket at 10 points.
+**[A]** a node from the uniques kit, **[M]** a spell modifier (a "more" when it is damage),
+**[H]** a hook, **[Ail]** an ailment node: the skill's hits have that chance per rank to inflict
+the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled in
+`ArpgDamage.cpp`). A modifier on a two-spell skill can name one spell ("Hammer of Wrath" only).
 
-#### Strike: the held swing
+#### Crusader
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Strike | – | Your held swing. |
-| Reach | Wide Swing **[A]** | 3 | Swings hit every enemy in front of you; the extras take 20/35/50%. |
-| Reach | Long Arm **[M]** | 2 | +1/2 yd melee reach. |
-| Reach | Whirling Strikes **[H]** | 1 | Every 4th swing hits all around you. *(capstone)* |
-| Rhythm | Quickened **[M]** | 4 | +4% attack speed per rank. |
-| Rhythm | Momentum **[H]** | 3 | Each consecutive hit on the same pack: 1/2/3% more damage, stacking 5 times. |
-| Rhythm | Crusader's Pace **[H]** | 1 | Kills give 30% movement speed for 3 sec. *(capstone)* |
-| Weight | Heavy Hand **[M]** | 4 | 5% more physical damage per rank with two-handers. |
-| Weight | Stagger **[H]** | 2 | 10/20% chance to daze an enemy for 1 sec. |
-| Weight | Shockwave **[A]** | 1 | Crits send a 10 yd shockwave for 40%. *(capstone)* |
+| Reach | Wide Swing [H] | 3 | Swings strike every other enemy in front, 20/35/50% |
+| Reach | Long Arm [H] | 2 | +1 yd melee reach per rank |
+| Reach | Heavy Hand [H] | 4 | 5% more Physical damage per rank with a two-hander |
+| Reach | Rending Strikes [Ail] | 3 | 8% per rank to cause Bleeding |
+| Reach | **Whirling Strikes** [H] | 1 | Every 4th swing strikes all around, 75% |
+| Righteous | Sweeping Seal [A] | 3 | Seal of Righteousness strikes every enemy in front, 20/35/50% |
+| Righteous | Holy Edge [H] | 4 | 6% more Seal damage per rank |
+| Righteous | Judging Seals [Ail] | 3 | 8% per rank to Judge |
+| Righteous | Mana Strike [H] | 3 | Seal hits give 1% of maximum mana per rank |
+| Righteous | **Twin Seals** [H] | 1 | Two different Seals at once |
+| Zeal | Quickened [H] | 4 | +4% attack speed per rank |
+| Zeal | Momentum [H] | 3 | 1% more Crusader damage per rank per hit in a row, 5 at most |
+| Zeal | Zeal [H] | 3 | +10% attack speed per rank under Seal of the Crusader |
+| Zeal | Light of the Crusader [H] | 1 | Seal hits heal 10% of their damage |
+| Zeal | **Shockwave** [H] | 1 | Critical swings send a 10 yd shockwave, 40% |
 
-#### Seals
+#### Holy Light
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Seals | – | Your Seals, as one skill. |
-| Righteous | Sweeping Seal **[A]** | 3 | Seal of Righteousness hits every enemy in front of you, at 20/35/50%. |
-| Righteous | Holy Edge **[M]** | 4 | 6% more Seal damage per rank. |
-| Righteous | Twin Seals **[H]** | 1 | Two Seals can be active at once. *(capstone)* |
-| Command | Commanding Seal **[H]** | 1 | Seal of Command becomes baseline. |
-| Command | Command Arc **[A]** | 2 | Seal of Command procs hit every enemy in front of you at 40/60%. |
-| Command | Relentless **[M]** | 3 | +1 Seal of Command proc per minute per rank. |
-| Crusader | Zeal **[M]** | 3 | Seal of the Crusader's speed bonus +10% per rank, without its damage loss. |
-| Crusader | Mana Strike **[H]** | 3 | Seal hits give 1/2/3% of max mana. |
-| Crusader | Light of the Crusader **[H]** | 1 | Seal hits heal you for 5% of the damage. *(capstone)* |
+| Radiance | Healing Light [M] | 4 | 6% more healing per rank |
+| Radiance | Light's Grace [M] | 3 | +4% critical strike chance per rank |
+| Radiance | Swift Light [M] | 3 | -0.2 sec cast time per rank |
+| Radiance | Divine Grace [M] | 3 | 10% less mana cost per rank |
+| Radiance | **Dawnbringer** [H] | 1 | Heals on yourself also send half their amount as a Holy bolt |
+| Retribution | Searing Radiance [H] | 3 | Heals strike the nearest enemy within 20 yd for 15% per rank |
+| Retribution | Judging Light [H] | 2 | Heals Judge every enemy within 8 yd, a hit of 25% per rank (3 sec) |
+| Retribution | Avenging Light [H] | 3 | Healing yourself: 5% more damage per rank for 5 sec |
+| Retribution | **Holy Nova** [H] | 1 | Heals burst outward: 50% as Holy to every enemy within 8 yd |
+
+A heal's damage is the heal's size turned to the ARPG's (Arpg::ToDamage) for each creature. With
+Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 
 #### Judgement
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Judgement | – | Unleash your Seal on an enemy. |
-| Chain | Chain of Judgement **[A]** | 3 | Judgement chains to 1/2/3 more enemies within 10 yd, at 50%. |
-| Chain | Echoing Verdict **[M]** | 3 | Chain jumps lose 10% less damage per rank. |
-| Chain | Final Verdict **[H]** | 1 | A Judgement kill refreshes its cooldown. *(capstone)* |
-| Burst | Hammer of Light **[A]** | 3 | Judgement bursts onto enemies within 4/6/8 yd at 40%. |
-| Burst | Radiance **[M]** | 4 | 8% more Judgement damage per rank. |
-| Burst | Sentence **[H]** | 1 | Judgement deals 100% more damage to stunned enemies. *(capstone)* |
-| Seal | Avenger **[H]** | 1 | Judgement no longer consumes your Seal; its cooldown is doubled. |
-| Seal | Swift Judgement **[M]** | 3 | −1 sec cooldown per rank. |
-| Seal | Righteous Mind **[H]** | 2 | Judgement restores 5/10% of max mana. |
+| Chain | Chain of Judgement [A] | 3 | Chains to 1/2/3 more within 10 yd, 50% |
+| Chain | Echoing Verdict [H] | 3 | Chain jumps deal 10% more per rank |
+| Chain | Condemn [Ail] | 3 | 10% per rank to Judge, beside its crits |
+| Chain | **Final Verdict** [H] | 1 | A Judgement kill readies Judgement |
+| Burst | Hammer of Light [A] | 3 | Bursts 4/6/8 yd round its target, 40% |
+| Burst | Radiance [H] | 4 | 8% more Judgement damage per rank |
+| Burst | Severity [M] | 3 | Critical strikes' bonus 20% more per rank |
+| Burst | **Sentence** [H] | 1 | 100% more on stunned enemies |
+| Verdict | Avenger [H] | 1 | Judgement keeps the Seal; its cooldown doubles |
+| Verdict | Swift Judgement [M] | 3 | -1 sec cooldown per rank |
+| Verdict | Unerring [M] | 3 | +5% critical strike chance per rank |
+| Verdict | Righteous Mind [H] | 2 | Restores 5% of maximum mana per rank |
+| Verdict | **Sanctified** [H] | 1 | On an enemy in your Consecration, bursts 8 yd at 50% |
 
 #### Consecration
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Consecration | – | Consecrate the ground under you. |
-| Ground | Wide Blessing **[M]** | 4 | +10% radius per rank (scales with Intellect too). |
-| Ground | Lasting Ground **[M]** | 3 | +2 sec duration per rank. |
-| Ground | Walking Consecration **[H]** | 1 | Consecration follows you. *(capstone)* |
-| Smite | Burning Ground **[M]** | 4 | 8% more Consecration damage per rank. |
-| Smite | Searing Light **[H]** | 2 | Your Holy damage is 5/10% more on enemies standing in it. |
-| Smite | Sanctified **[H]** | 1 | Your Judgements on consecrated enemies burst at 50% (stacks with Hammer of Light). *(synergy)* |
-| Refuge | Hallowed Ground **[H]** | 3 | You regenerate 1/2/3% health per second inside it. |
-| Refuge | Steadfast **[H]** | 1 | Inside it you can't be stunned. |
-| Refuge | Sacred Seal **[H]** | 1 | Seals hit twice on consecrated enemies. *(capstone)* |
+| Ground | Wide Blessing [M] | 4 | +10% radius per rank |
+| Ground | Lasting Ground [M] | 3 | +2 sec duration per rank |
+| Ground | Burning Ground [H] | 4 | 8% more damage per rank |
+| Ground | **Walking Consecration** [H] | 1 | It follows you |
+| Smite | Searing Light [H] | 2 | Your Holy damage 5% more per rank on enemies in it |
+| Smite | Swift Consecration [M] | 3 | -1 sec cooldown per rank |
+| Smite | **Sacred Seal** [H] | 1 | Seals strike twice on enemies in it |
+| Refuge | Hallowed Ground [H] | 3 | 1% health a second per rank inside |
+| Refuge | Steadfast [H] | 1 | No stuns inside |
+| Refuge | **Martyr's Ward** [H] | 1 | Retribution Aura burns every enemy within 10 yd each second, doubled |
 
-#### Hammer of Justice
+#### Hammers
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Hammer of Justice | – | Stun an enemy. |
-| Thrown | Hurled Hammer **[A]** | 1 | It becomes a skillshot thrown along your aim, 20 yd. |
-| Thrown | Ricochet **[A]** | 3 | The hammer chains to 1/2/3 more enemies. |
-| Thrown | Blessed Hammer **[H]** | 1 | Three hammers spiral out around you. *(capstone; the Diablo hammerdin)* |
-| Control | Shockwave Hammer **[A]** | 2 | Also stuns 1/2 enemies near the target. |
-| Control | Long Stun **[M]** | 3 | +0.5 sec stun per rank. |
-| Control | Quick Hammer **[M]** | 3 | −10 sec cooldown per rank. |
-| Holy | Holy Hammer **[H]** | 3 | The hammer deals Holy damage (weapon-based), more per rank. |
-| Holy | Sentence Passed **[H]** | 1 | Your damage is 15% more on stunned enemies. *(capstone)* |
+| Thrown | Hurled Hammer [M] | 1 | Hammer of Justice flies 10 yd farther |
+| Thrown | Ricochet [H] | 3 | Hammer of Justice bounces to 1 more per rank |
+| Thrown | Holy Hammer [H] | 3 | Hammer of Justice adds Holy of 30/45/60% of attack power |
+| Thrown | **Blessed Hammer** [H] | 1 | Also three blessed hammers at the nearest enemies |
+| Stun | Shockwave Hammer [A] | 2 | Stuns 1/2 more within 8 yd |
+| Stun | Long Stun [M] | 3 | +0.5 sec stun per rank |
+| Stun | Quick Hammer [M] | 3 | -10 sec Hammer of Justice cooldown per rank |
+| Stun | **Sentence Passed** [H] | 1 | 15% more damage on stunned enemies |
+| Execute | Hammer Volley [A] | 2 | Hammer of Wrath throws 1/2 more, 60% |
+| Execute | Weighted Hammer [M] | 4 | 8% more Hammer of Wrath damage per rank |
+| Execute | Righteous Hammer [M] | 3 | +5% Hammer of Wrath critical strike chance per rank |
+| Execute | Piercing Hammer [A] | 3 | Hammer of Wrath flies through 2/4/10, 60% |
+| Execute | **Executioner** [H] | 1 | 100% more below 20% health |
 
-#### Auras
+#### Wrath
 
-| Branch | Node | Max | Effect |
+| Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Root | Auras | – | Your auras, as one skill. |
-| Retribution | Martyr's Ward **[H]** | 3 | Retribution Aura also pulses at every enemy within 10 yd each second, at 50/75/100% of its damage. |
-| Retribution | Burning Aura **[M]** | 4 | +15% Retribution Aura damage per rank. |
-| Retribution | Sanctity Aura **[H]** | 1 | Learn Sanctity Aura (+10% Holy damage). |
-| Devotion | Bulwark **[M]** | 4 | +10% Devotion Aura armour per rank. |
-| Devotion | Unbroken **[H]** | 2 | −5/10% damage taken while three or more enemies are near. |
-| Concentration | Focused **[M]** | 3 | Concentration Aura also gives +5% cast speed per rank. |
-| All | Wide Aura **[M]** | 3 | +10 yd aura range per rank. |
-| All | Dual Aura **[H]** | 1 | Two auras at once. *(capstone)* |
-
-#### Exorcism, Holy Wrath and Hammer of Wrath (built)
-
-Specialising Exorcism or Holy Wrath lifts their undead-and-demon limit for that spell, as the
-web's Purifying Light does. Hammer of Wrath is usable at any health on this server (it never
-checked the target's health; the client keeps its button lit in the ARPG view).
-
-| Skill | Branch | Nodes | Capstone (Codex page home) |
-|---|---|---|---|
-| Exorcism | Burning | Holy Fire **[A]** (burst 4/6/8 yd, 35%), Searing Word **[M]** (10% more/rank) | Purging Light **[A]**: every enemy within 10 yd behind the target takes the full hit (Ras Frostwhisper, Scholomance) |
-| Exorcism | Chain | Chain Exorcism **[A]** (1/2/3 jumps, 60%), Swift Exorcism **[M]** (−2 s), Echoing Word **[A]** (every 4th/3rd repeats at 50%) | |
-| Exorcism | Purge | Exorcist **[M]** (+5% crit), Zealous Word **[M]** (−15% cost) | Twin Exorcism **[A]**: a second bolt at 70% (Magistrate Barthilas, Stratholme) |
-| Holy Wrath | Radius | Wide Wrath **[M]** (+12% radius), Searing Wrath **[M]** (10% more) | Wrathful **[H]**: fires on its own with 4+ enemies within 10 yd, every 12 s (Archivist Galford, Stratholme) |
-| Holy Wrath | Fury | Swift Wrath **[M]** (−8 s), Quick Wrath **[M]** (−0.4 s cast), Shattering Wrath **[A]** (each struck enemy bursts, 20/30%) | |
-| Holy Wrath | Zeal | Zealous Wrath **[M]** (−15% cost), Righteous Wrath **[M]** (+5% crit), Radiant Wrath **[M]** (10% more) | |
-| Hammer of Wrath | Volley | Hammer Volley **[A]** (1/2 more hammers, 60%), Weighted Hammer **[M]** (8% more) | Storm of Hammers **[A]**: every 2nd throw repeats at 60% (Warchief Rend Blackhand, Upper Blackrock Spire) |
-| Hammer of Wrath | Pierce | Piercing Hammer **[A]** (through 1/2/all, 60%), Long Throw **[M]** (+5 yd), Swift Hammer **[M]** (−1 s) | |
-| Hammer of Wrath | Execute | Righteous Hammer **[M]** (+5% crit), Zealous Hammer **[M]** (−15% cost) | Executioner **[H]**: 100% more damage below 20% health (Pyroguard Emberseer, Upper Blackrock Spire) |
-
-Runes: Chains, Shattering and Leech also fit Exorcism; Expanse fits Holy Wrath; Haste and Sanctity
-fit both. Hammer of Wrath takes no rune yet (a rune's skill mask is a byte, skills 1 to 7).
-
-#### The others, in brief
-
-| Skill | Branch ideas | Capstone |
-|---|---|---|
-| Exorcism | Burning (DoT after the hit), Chain (jumps), Purge (strips a buff) | Exorcism hits every enemy in a 10 yd cone |
-| Holy Shock | Chain (Arcing Shock), Return (heals you when it hits), Echo | Holy Shock hits an enemy and heals you at once |
-| Light | Overflow (overheal becomes holy damage nearby), Speed (cast time), Beacon | Dawnbringer: heals on yourself send a holy bolt at the nearest enemy |
-| Hammer of Wrath | Pierce, Extra hammers (kit A), Below-50% use | Usable at any health; executes below 20% |
-| Holy Wrath | Radius, Stun, Cooldown | Holy Wrath fires on its own whenever you're surrounded |
-| Divine | Shield (Divine Shield lets you attack, at half damage), Blessing (BoP on yourself grants speed) | Lay on Hands also nukes everything around you |
+| Exorcism | Holy Fire [A] | 3 | Exorcism bursts 4/6/8 yd, 35% |
+| Exorcism | Searing Word [M] | 4 | 10% more Exorcism damage per rank |
+| Exorcism | Chain Exorcism [A] | 3 | Leaps to 1/2/3 more within 10 yd, 60% |
+| Exorcism | **Purging Light** [A] | 1 | Passes through: everything within 10 yd behind takes the full hit |
+| Nova | Wide Wrath [M] | 4 | +12% Holy Wrath radius per rank |
+| Nova | Searing Wrath [M] | 3 | 10% more Holy Wrath damage per rank |
+| Nova | Shattering Wrath [A] | 2 | Each enemy struck bursts 4/6 yd, 20/30% |
+| Nova | **Wrathful** [H] | 1 | Holy Wrath fires on its own with 4+ enemies within 10 yd (12 sec) |
+| Zeal | Swift Exorcism [M] | 3 | -2 sec Exorcism cooldown per rank |
+| Zeal | Swift Wrath [M] | 3 | -8 sec Holy Wrath cooldown per rank |
+| Zeal | Exorcist [M] | 3 | +5% critical strike chance per rank, both |
+| Zeal | Quick Wrath [M] | 3 | -0.4 sec Holy Wrath cast time per rank |
+| Zeal | **Twin Exorcism** [A] | 1 | A second bolt beside the first, 70% |
 
 #### Paladin Codex pages
 
 | Capstone | Skill | Home boss |
 |---|---|---|
-| Crusader's Pace | Strike | Mr. Smite, Deadmines |
-| Whirling Strikes | Strike | Herod, Scarlet Monastery |
-| Shockwave | Strike | Ironaya, Uldaman |
-| Twin Seals | Seals | Arcanist Doan, Scarlet Monastery |
-| Light of the Crusader | Seals | High Inquisitor Fairbanks, Scarlet Monastery |
+| Whirling Strikes | Crusader | Herod, Scarlet Monastery |
+| Twin Seals | Crusader | Arcanist Doan, Scarlet Monastery |
+| Shockwave | Crusader | Ironaya, Uldaman |
+| Dawnbringer | Holy Light | Warchief Rend Blackhand, Upper Blackrock Spire |
+| Holy Nova | Holy Light | High Inquisitor Fairbanks, Scarlet Monastery |
 | Final Verdict | Judgement | Scarlet Commander Mograine, Scarlet Monastery |
 | Sentence | Judgement | Emperor Dagran Thaurissan, Blackrock Depths |
 | Walking Consecration | Consecration | High Inquisitor Whitemane, Scarlet Monastery |
 | Sacred Seal | Consecration | Balnazzar, Stratholme |
-| Blessed Hammer | Hammer of Justice | Baron Rivendare, Stratholme |
-| Sentence Passed | Hammer of Justice | Overlord Wyrmthalak, Lower Blackrock Spire |
-| Purging Light | Exorcism | Ras Frostwhisper, Scholomance |
-| Twin Exorcism | Exorcism | Magistrate Barthilas, Stratholme |
-| Wrathful | Holy Wrath | Archivist Galford, Stratholme |
-| Storm of Hammers | Hammer of Wrath | Warchief Rend Blackhand, Upper Blackrock Spire |
-| Executioner | Hammer of Wrath | Pyroguard Emberseer, Upper Blackrock Spire |
-| Dual Aura | Auras | Golemagg, Molten Core |
+| Martyr's Ward | Consecration | Mr. Smite, the Deadmines |
+| Blessed Hammer | Hammers | Baron Rivendare, Stratholme |
+| Sentence Passed | Hammers | Overlord Wyrmthalak, Lower Blackrock Spire |
+| Executioner | Hammers | Pyroguard Emberseer, Upper Blackrock Spire |
+| Purging Light | Wrath | Ras Frostwhisper, Scholomance |
+| Wrathful | Wrath | Archivist Galford, Stratholme |
+| Twin Exorcism | Wrath | Magistrate Barthilas, Stratholme |
 
-Scarlet Monastery holds five of them on purpose: it's the paladin's dungeon, and the levels
-where it's run (30 to 45) are when builds take shape.
+Sanctified has no page. Auras, Divine and Holy Shock stay out of the trees: castable from the
+spellbook, fed by the web and gear.
+
+**The Skills window** spaces a tree's rows to the window's height, however deep it runs.
 
 ### The paladin passive web
 
@@ -867,18 +856,19 @@ ranks" plans; Consecration comes at 6.
 
 ### Example builds at 60
 
-- **Hammerdin (Hammer of Justice, Judgement, Consecration, Seals, Auras).** Hammer of Justice
+- **Hammerdin (Hammers, Judgement, Consecration).** Hammer of Justice
   thrown with Blessed Hammer, Consecration walking with you, Judgement chaining. Web leans
   Lightbringer for Intellect (radius) and Spirit (cooldowns). Wants +Hammer of Justice affixes
   and Spirit gear: a caster-paladin in plate.
-- **Crusader (Strike, Seals, Judgement, Consecration, Divine).** Wide Swing and Sweeping Seal
+- **Crusader (Crusader, Judgement, Consecration).** Wide Swing and Sweeping Seal
   cleave every pack, Twin Seals, Avenger keeping the Seal up. Web takes Crusader with Zealot.
   Wants Strength (bigger arcs) and attack speed: Smite's Mighty Hammer early, Spinal Reaper late.
 - **Templar (Auras, Consecration, Hammer of Justice, Holy Shock, Light).** Martyr's Ward and
   Martyr keystone: stand in Consecration in the middle of a pack while auras burn it down. Wants
   Stamina (life on kill) and armour.
-- **Lightbringer (Light, Holy Shock, Exorcism, Holy Wrath, Consecration).** Lightforged turns
-  every heal into a bolt; Overflow chains overheal. Wants Intellect and Spirit, and +Light.
+- **Lightbringer (Holy Light, Wrath, Consecration).** Searing Radiance and Lightforged turn
+  every heal into a bolt, Judging Light judges what stands near the healed, and Holy Nova bursts
+  each critical heal; Overflow chains overheal. Wants Intellect and Spirit, and +Light.
 
 ## How it gets built
 
@@ -925,7 +915,8 @@ for capstones and hooks:
    window. It replaced the first tree.
 2. **Skill specialisation and spells without ranks.** Built: slots by level, the skill point
    pool, the first pass at spells without ranks, and the paladin's five most-wanted skill trees
-   (Strike, Seals, Judgement, Consecration, Hammer of Justice). See "What phase 2 built" below.
+   (Strike, Seals, Judgement, Consecration, Hammer of Justice), since reworked into six (see
+   "Paladin skills that can be specialised"). See "What phase 2 built" below.
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
 5. **Other classes**, one at a time, starting with whichever Jeff plays next.
