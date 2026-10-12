@@ -494,17 +494,33 @@ local function refreshEdges(dt)
 end
 
 -- The kill streak: kills in a row (each within a few seconds of the last), from three up, above
--- the skill bar. Each kill pops it; it fades a few seconds after the last; 10, 25, 50 and 100
--- name the streak and sound.
+-- the skill bar. Each kill pops it; it fades when the streak ends (STREAK_SECS, the client's
+-- STREAK_WINDOW_SECS); 10, 25, 50 and 100 name the streak and sound.
+local STREAK_SECS = 4.0
 local streak = CreateFrame("Frame", "ArpgHudStreak", UIParent)
 streak:SetWidth(320)
 streak:SetHeight(70)
 streak:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 120)
 streak:SetFrameStrata("MEDIUM")
 streak:EnableMouse(false)
-streak.count = streak:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-streak.count:SetPoint("CENTER", streak, "CENTER", 0, 10)
-streak.word = streak:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+-- The pop scales an inner frame centred on the streak's, so the anchor's offset stays put.
+streak.face = CreateFrame("Frame", nil, streak)
+streak.face:SetWidth(320)
+streak.face:SetHeight(70)
+streak.face:SetPoint("CENTER", streak, "CENTER", 0, 0)
+-- A font string in font object `font`, or a plain outlined face of `size` without it.
+local function streakText(font, size)
+    local fs = streak.face:CreateFontString(nil, "OVERLAY")
+    if font then
+        fs:SetFontObject(font)
+    else
+        fs:SetFont("Fonts\\FRIZQT__.TTF", size, "OUTLINE")
+    end
+    return fs
+end
+streak.count = streakText(GameFontNormalHuge, 26)
+streak.count:SetPoint("CENTER", streak.face, "CENTER", 0, 10)
+streak.word = streakText(GameFontNormalLarge, 16)
 streak.word:SetPoint("TOP", streak.count, "BOTTOM", 0, -2)
 streak.left, streak.pop, streak.wordLeft = 0, 0, 0
 streak:Hide()
@@ -529,7 +545,7 @@ function ArpgHud_Streak(n, word)
     end
     streak.count:SetText(n .. " Kills")
     streak.count:SetTextColor(r, g, b)
-    streak.left, streak.pop = 3.5, 1
+    streak.left, streak.pop = STREAK_SECS, 1
     if word then
         streak.word:SetText(word)
         streak.word:SetTextColor(r, g, b)
@@ -548,7 +564,7 @@ local function refreshStreak(dt)
         streak:Hide()
         return
     end
-    streak:SetScale(1 + 0.35 * streak.pop * streak.pop)
+    streak.face:SetScale(1 + 0.35 * streak.pop * streak.pop)
     streak:SetAlpha(math.min(1, streak.left / 0.8))
     if streak.wordLeft > 0 then streak.word:Show() else streak.word:Hide() end
 end

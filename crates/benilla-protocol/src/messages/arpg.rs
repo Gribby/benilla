@@ -455,7 +455,8 @@ pub struct ArpgProc {
     pub name: String,
     /// The enemy it struck or changed; 0 for none (it happened to the player).
     pub target: u64,
-    /// Its damage tag (0 Physical .. 6 Holy, as the server's `Arpg/ArpgTags.h`); 0xFF for none.
+    /// Its damage tag (the server's `Arpg/ArpgTags.h`: 0 Physical, 1 Holy, 2 Fire, 3 Frost,
+    /// 4 Arcane, 5 Nature, 6 Shadow); 0xFF for none.
     pub tag: u8,
 }
 

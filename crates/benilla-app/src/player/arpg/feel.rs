@@ -40,7 +40,7 @@ const CATEGORY_CRIT: u8 = 2;
 const LABEL_GAP_SECS: f64 = 0.8;
 /// How long the killing blow's type is remembered for a unit, in seconds.
 const BLOW_MEMORY_SECS: f64 = 4.0;
-/// Kills further apart than this end the streak, in seconds.
+/// Kills further apart than this end the streak, in seconds (the HUD's `STREAK_SECS`).
 const STREAK_WINDOW_SECS: f64 = 4.0;
 /// The world view's bloom: strength and threshold (`FfxBloom`).
 const BLOOM_STRENGTH: f32 = 0.55;
@@ -102,6 +102,9 @@ fn milestone(n: u32) -> Option<&'static str> {
 struct Streak {
     count: u32,
     last: f64,
+    /// The highest milestone crossed since the HUD was last told: several kills can land at
+    /// once and step over one.
+    word: Option<&'static str>,
     /// The count and flash the HUD has not yet been told of.
     dirty: bool,
     flash: Option<[f32; 3]>,
@@ -297,6 +300,9 @@ fn burst_kills(
         } else {
             1
         };
+        if let Some(word) = milestone(streak.count) {
+            streak.word = Some(word);
+        }
         streak.last = now;
         streak.dirty = true;
         if kill.tier > 0 {
@@ -318,7 +324,10 @@ fn push_streak(script: Option<NonSendMut<UiScript>>, mut streak: ResMut<Streak>)
         return;
     }
     streak.dirty = false;
-    let word = milestone(streak.count).map_or("nil".to_string(), |w| format!("{w:?}"));
+    let word = streak
+        .word
+        .take()
+        .map_or("nil".to_string(), |w| format!("{w:?}"));
     let mut chunk = format!(
         "if ArpgHud_Streak then ArpgHud_Streak({}, {word}) end\n",
         streak.count
