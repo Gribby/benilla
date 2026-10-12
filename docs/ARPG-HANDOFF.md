@@ -113,7 +113,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgSkills` | Skill specialisation slots and trees (paladin only so far), runes and sockets, held "things" (`Held`/`AddHeld`, table `character_arpg_held`) |
 | `ArpgCharacter` | Attributes and their ARPG effects, rest regen, keystones, the character sheet, leech, thorns, kill hooks, `UpdateCharacter` (called each player update) |
 | `ArpgUniques` | Authored unique mechanics (kits: extra projectiles, fragments, chain, burst, arc, pierce, echo, spread...), how they stack, impacts, `StrikeFoe` |
-| `ArpgProcs` | Cross-skill procs (runes Grace, Verdict, Anvil, Fervour, Zeal; six authored uniques) and the **unique power pool** (16 powers; each named unique without an authored power gets one, fixed by its entry) |
+| `ArpgProcs` | Cross-skill procs (runes Grace, Verdict, Anvil, Fervour, Zeal; six authored uniques) and **generated unique powers** (trigger, effect, damage type and rider, scaled by item level; every named unique without an authored power gets its own) |
 | `ArpgAffixes` | Rarity rolls, about 60 affixes scaling with item level and tier, seeds, crafted affix lists (`character_arpg_item`), crafting operations, salvage, `GiveRolledItem` |
 | `ArpgCraft` | Orbs (items 92001–92007, kept in a purse), the Forge's operations, `SMSG_ARPG_PURSE` |
 | `ArpgDamage` | The power scale (ARPG-sized damage, creature health to match), the critical multiplier bonus, added damage hits, the seven ailments |
@@ -179,7 +179,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 ## Design docs (client repo, `docs/`)
 
 - `ARPG-CHARACTER.md`: skills, runes, Codex, passive web, items, affixes, crafting,
-  cross-skill procs, the unique power pool, the base bank, no hit.
+  cross-skill procs, generated unique powers, the base bank, no hit.
 - `ARPG-PROGRESSION.md`: packs, camps, champions, dungeons and tiers, survival, threats, raids,
   zone events and bounties, build order.
 - `ARPG-UNIQUES.md`, `ARPG-ITEMISATION.md`, `ARPG-SKILL-TREES.md`.

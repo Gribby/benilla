@@ -359,30 +359,45 @@ How a proc works:
 The uniques' proc lines reach the tooltip with the mechanic lines (`SMSG_ARPG_ITEM_MECHANICS`).
 The runes drop as the others do.
 
-**Every unique has a power.** A named blue or purple without an authored mechanic or proc (the
-tables above and `ARPG-UNIQUES.md`) carries one from a pool. Which one is fixed by the item, so
-every copy of it has the same power, as it has the same affixes. Weapons draw from the weapon and general powers, armour
-from the armour and general ones, and jewellery from the general ones. The tooltip shows the power
-in gold under the "Unique" line.
+**Every unique has a power of its own.** A named blue or purple without an authored mechanic or
+proc (the tables above and `ARPG-UNIQUES.md`) carries a generated one (`ArpgProcs.cpp`,
+`GeneratedPowers`). It is built from four parts, with numbers that grow with the item's level:
 
-| Power | Fits | Effect |
-|---|---|---|
-| Edge of Ruin | Weapon | A critical swing: next spell +40% (6 s) |
-| Reaper's Haste | Any | A kill: next spell instant (15 s) |
-| Font of Power | Any | A critical spell: next spell free (8 s) |
-| Bloodthirst | Weapon | Each kill heals 6% of maximum health |
-| Soul Siphon | Any | Each kill restores 4% of maximum mana |
-| Pyre | Any | Slain enemies explode for 15% of their maximum health as Fire within 8 yd (at most 60% of your health) |
-| Thunder Edge | Weapon | A critical swing arcs lightning to 3 enemies for 35% of the hit |
-| Storm Conduit | Any | A critical spell arcs lightning to 3 enemies for 30% of the hit |
-| Second Wind | Armour | A blow of a fifth of your health heals 15% (30 s) |
-| Mender's Grace | Any | A critical heal: next spell instant (10 s) |
-| Executioner | Weapon | A kill: next spell a sure critical strike (8 s) |
-| Wellspring | Weapon | A critical swing restores 3% of maximum mana |
-| Bastion | Armour | A heavy blow: 50% of it back as holy fire to every enemy within 8 yd (8 s) |
-| Wrathstorm | Any | A critical spell: 25% of the hit as holy fire to every enemy within 8 yd (3 s) |
-| Vampiric Edge | Weapon | A critical swing heals 3% of maximum health |
-| Ironskin | Armour | A heavy blow restores 10% of maximum mana (15 s) |
+- **Trigger:** a critical swing, a critical spell, a kill, a heavy blow (a fifth of your health),
+  or a critical heal.
+- **Effect:**
+  - a nova of a damage type around you;
+  - an arc to the 3 enemies nearest the target;
+  - the slain enemy exploding (kills only);
+  - an ailment burst on every enemy within 8 yards (Bleed, Judged, Ignite, Chill, Overload,
+    Poison or Wither);
+  - a heal, mana, a fury (more damage for 6 sec) or swiftness (movement speed for 4 sec).
+- **Damage type:** for the four damaging effects, one of the seven.
+- **Rider:** a smaller second effect, or none: a heal, mana, a short fury or swiftness, or an
+  ailment on the target.
+
+A hit, heal or blow sets the size of the damage (a heal's or blow's at the ARPG's size against
+each creature); a kill's comes from the slain enemy's maximum health, held under 60% of yours.
+Each has its own cooldown by trigger: swings 2 sec, spells 3, kills 1, blows 8, heals 5, and a
+fury or swiftness no sooner than it runs out.
+
+**The numbers** at level 60, for a hit-based trigger:
+- nova 30% of the hit, arc 35%, ailment burst as a hit of 60%;
+- kills 8% / 10% / 15% of the slain enemy's maximum health, explosion 12%;
+- heal or mana 4% (12% and 8% on a heavy blow);
+- fury 15% more damage, swiftness 20%.
+
+They scale with the item's level: half at level 1, all at 60, then a quarter more per ten levels
+(about ×1.7 in Naxxramas). So a level 20 unique's power is about two thirds of a level 60 one's.
+
+**No two uniques of a kind share a power.** Each kind (weapons; armour; jewellery, cloaks and
+off-hands) has about 1,500 combinations of trigger, effect, damage type and rider. They are dealt
+out over that kind's uniques in entry order, a coprime stride apart, so set pieces that sit next
+to each other draw very different powers. The server log says how many uniques of each kind
+were dealt powers. The name is built from the parts ("Cinder Nova", "Rime Lash", "Greater
+Bloodrush"), and the tooltip shows it in gold under the "Unique" line with its full text, for
+example "A critical swing sends out a nova of fire: 30% of the hit to every enemy within 8
+yards, and heals you for 2% of your maximum health (once every 2 sec)."
 
 A readied "+damage" or "sure crit" waits for a spell that deals damage or heals, so a Seal or a
 blessing in between does not waste it.
