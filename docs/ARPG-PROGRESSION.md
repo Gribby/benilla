@@ -36,6 +36,19 @@ So the count follows the spawns already there, within 18 yards:
 - 2 or 3: it leads at most one follower.
 - Fewer: a lone wanderer still leads a full pack.
 
+**Outriders: twice the packs.** Vanilla spaces its spawns for slow fights, and an ARPG clears
+them several times faster, so the open world felt empty between camps (Jeff, after play: "the
+amount of packs" was too low, not their size). Each pack a vanilla spawn forms also places
+`Arpg.Packs.Extra` more (1 by default, so twice the packs; a fraction is a chance): a copy of the
+spawn, 22–45 yards off on walkable ground, leading a pack of its own. A spot is refused within 15
+yards of another creature, within a player's sight (the map's visibility distance), within 50
+of a town or any NPC friendly to players, or in a
+grid not yet loaded (loading one would form its own spawns' outriders, and so on across the
+map). Outriders are temporary like followers: the spawn's next formation (its respawn) or its
+grid unloading sends them away once they're out of combat. They give full XP and loot. Every
+follower also checks on its pack every 20 seconds and leaves, out of combat, once its leader is
+dead or gone: a pack left half-killed no longer stands for good.
+
 **Followers** are the leader's own kind, one or two levels lower, drawn a little smaller, with
 about 55% of its health and damage: a pack of five fights like about three ordinary mobs. Each
 gives about 30% of the XP, so a pack of four is worth about two kills, and area damage kills it
