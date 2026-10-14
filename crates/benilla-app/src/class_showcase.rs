@@ -46,6 +46,40 @@ pub(crate) struct ShowcaseRoster {
     asked: bool,
     /// The realm `chars` came from, off the character list; another realm's list forgets them.
     realm: Option<String>,
+    /// When the question went out, on the session clock, for the fallback.
+    asked_at: Option<f64>,
+    /// The slices stand [`fallback_chars`]: no answer came in [`ANSWER_WAIT`].
+    fallback: bool,
+}
+
+/// How long the screen waits for the server's showcase before standing its own.
+const ANSWER_WAIT: f64 = 4.0;
+
+/// The slices' characters when the server sends none (a server without `Arpg/ArpgShowcase.cpp`,
+/// or a lost answer): the server's own looks, unarmoured, so the screen never stands empty.
+fn fallback_chars() -> Vec<ArpgShowcaseChar> {
+    // class, race, sex, skin, face, hair style, hair colour, facial hair: cmangos `SHOWCASE`.
+    const LOOKS: [[u8; 8]; 5] = [
+        [2, 1, 0, 2, 3, 5, 3, 2],
+        [8, 5, 0, 1, 2, 4, 2, 1],
+        [11, 4, 1, 3, 2, 3, 4, 1],
+        [9, 2, 0, 2, 1, 3, 1, 2],
+        [7, 6, 0, 1, 2, 2, 1, 1],
+    ];
+    LOOKS
+        .iter()
+        .map(|l| ArpgShowcaseChar {
+            class: l[0],
+            race: l[1],
+            sex: l[2],
+            skin: l[3],
+            face: l[4],
+            hair_style: l[5],
+            hair_color: l[6],
+            facial_hair: l[7],
+            ..Default::default()
+        })
+        .collect()
 }
 
 /// One clickable control on the screen.
@@ -110,6 +144,7 @@ fn on_showcase(In(ev): In<SessionEvent>, mut roster: ResMut<ShowcaseRoster>) {
         );
         roster.chars = Some(chars);
         roster.asked = false;
+        roster.fallback = false;
     }
 }
 
@@ -167,15 +202,25 @@ fn free_class_lock(mut sel: ResMut<crate::char_create::CreateSelection>) {
 fn ask_for_showcase(
     mut roster: ResMut<ShowcaseRoster>,
     pick: Res<CharPick>,
+    time: Res<Time>,
     mut lists: MessageReader<CharListMessage>,
 ) {
     if lists.read().count() > 0 {
         roster.asked = false;
     }
-    if roster.chars.is_some() || roster.asked {
+    let now = time.elapsed_secs_f64();
+    // No answer in time: stand the screen's own, and keep listening for the server's.
+    if roster.chars.is_none() && roster.asked_at.is_some_and(|at| now - at >= ANSWER_WAIT) {
+        warn!("class screen: no showcase from the server after {ANSWER_WAIT} s; standing the stock looks");
+        roster.chars = Some(fallback_chars());
+        roster.fallback = true;
+    }
+    if (roster.chars.is_some() && !roster.fallback) || roster.asked {
         return;
     }
     roster.asked = true;
+    roster.asked_at.get_or_insert(now);
+    info!("class screen: asking the server for its showcase");
     let _ = pick.0.send(CharRequest::Showcase);
 }
 
@@ -421,6 +466,7 @@ mod tests {
                 chars: Some(vec![ch(7, 6), ch(2, 1), ch(9, 2)]),
                 asked: false,
                 realm: None,
+                ..Default::default()
             })
             .add_systems(Update, feed_looks);
         app.update();
@@ -454,6 +500,7 @@ mod tests {
                 chars: Some(Vec::new()),
                 asked: false,
                 realm: Some("Alpha".into()),
+                ..Default::default()
             })
             .add_systems(Update, forget_other_realm);
         app.world_mut().write_message(list_from("Alpha"));

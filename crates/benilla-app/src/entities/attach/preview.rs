@@ -375,6 +375,12 @@ pub(in crate::entities) fn build_showcase_previews(
             ghost: None,
             revision: bake.revision + 1,
         };
+        info!(
+            "class screen: slice {i} built — race {} sex {}, display {display_id}, {} part(s)",
+            look.race,
+            look.sex,
+            bake.parts.len()
+        );
         *built = true;
     }
 }

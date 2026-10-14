@@ -442,6 +442,11 @@ pub(super) fn sync_showcase_booths(
             if baked.is_none() {
                 continue;
             }
+            info!(
+                "class screen: {} stands at {spot:?} ({} part(s))",
+                crate::char_select::class_name(SHOWCASE[i].0),
+                bake.parts.len()
+            );
         }
         apply_yaw(&mut commands, booth.root, spot, facing, scale, preview.yaw);
         // A yaw-only pass must not record revisions it did not commit.
