@@ -220,7 +220,10 @@ Built:
 - Kit G on **Night Reaver** (1318, Heroic Strike) and **Felstriker** (12590, Eviscerate).
 - Kit B on **Witching Stave** (1484, Shadow Bolt pierces 1), **Bow of Searing Arrows** (2825,
   Auto Shot pierces all) and **Hammer of the Grand Crusader** (18717, Hammer of Wrath pierces
-  all). Pierce hits fly on from the struck unit like fragments.
+  all). A pierce is one bolt carrying on through the first target along the same line, out to
+  the spell's range (or into the last enemy it may pierce); each enemy on the way is hit as the
+  bolt reaches it. It used to relay a fresh bolt from each struck enemy to the next, which read
+  as a recast rather than a pass-through.
 - Kit F on **Venomstrike** (6469, Serpent Sting), **Living Root** (6631, Entangling Roots),
   **Hypnotic Blade** (7714, Polymorph): free copies of the spell land on the nearest enemies
   when it lands. **Lok'amir il Romathis** (19360): Shadow Word: Pain copies onto every enemy

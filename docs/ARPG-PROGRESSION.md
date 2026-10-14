@@ -204,6 +204,10 @@ Built (`Arpg/ArpgActions.{h,cpp}` on the server, `player/arpg/actions.rs` on the
   spline the client rides on the ground under it, so a small rise never cuts it short and it
   stops at a wall or a drop; for 0.45 s every blow and hostile spell at the player is dodged. Not while rooted, stunned, feared, mounted, swimming or falling. A bar
   right of the skill bar shows the cooldown.
+- **Short crowd control:** a creature's stun, root, fear, confuse, charm or silence holds an ARPG
+  player at most 2 seconds (`Arpg::CapControl`, `Arpg/ArpgDungeons.cpp`, applied in
+  `Spell.cpp` after diminishing returns). Vanilla's 8-second Frost Nova (a Cold Enchanted
+  champion's, or a caster mob's) kept the player rooted far longer than an ARPG fight allows.
 - **Flask (Q, the Strafe Left binding; A still walks left):** three charges, starting full. A
   charge heals 15% of maximum health at once and 25% more over three seconds. Kills refill it
   (a follower 1 point, a mob 2, an elite 4, a champion 5, a rare 10, a boss 20; ten points a
