@@ -851,6 +851,23 @@ pub(super) fn find_equip_slot(inventory_type: u32, has_relic_slot: bool) -> Vec<
 #[derive(Resource)]
 pub(crate) struct ItemSets(pub(crate) benilla_formats::ItemSetCatalog);
 
+/// Fork-only, not 1.12.1: the ARPG item sets (`SMSG_ARPG_SETS`, cmangos `Arpg/ArpgSets.h`), by id.
+/// Their ids follow `ItemSet.dbc`'s, from [`ARPG_SET_ID_FROM`].
+#[derive(Resource, Default)]
+pub(crate) struct ArpgItemSets(
+    pub(crate) std::collections::HashMap<u32, benilla_protocol::messages::arpg::ArpgItemSet>,
+);
+
+/// cmangos `Arpg::SET_ID_FROM`: an ARPG set's id; a set id past it waits for the catalog.
+pub(crate) const ARPG_SET_ID_FROM: u32 = 1001;
+
+fn on_arpg_sets(In(ev): In<benilla_protocol::SessionEvent>, mut sets: ResMut<ArpgItemSets>) {
+    if let benilla_protocol::SessionEvent::ArpgSets { sets: list } = ev {
+        info!("ui_items: {} ARPG item sets", list.len());
+        sets.0 = list.into_iter().map(|s| (s.id, s)).collect();
+    }
+}
+
 /// `ItemSubClass.dbc`: the slot and type line's alternate-proficiency and hidden-name gates.
 #[derive(Resource)]
 pub(crate) struct ItemSubClasses(pub(crate) benilla_formats::ItemSubClassCatalog);
@@ -916,6 +933,11 @@ pub(crate) struct UiItemsPlugin;
 impl Plugin for UiItemsPlugin {
     fn build(&self, app: &mut App) {
         net::register(app);
+        {
+            use crate::net::NetHandlerApp;
+            app.init_resource::<ArpgItemSets>()
+                .net_handler(benilla_protocol::SessionEventKind::ArpgSets, on_arpg_sets);
+        }
         // The icons come from the equipment renderer's `ItemDisplays`.
         app.init_resource::<EquipErrors>()
             .init_resource::<PendingItemOps>()

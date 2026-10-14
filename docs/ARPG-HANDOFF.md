@@ -128,6 +128,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgEvents` | Zone events (Purge, Hunt, Siege) and zone-bound bounties (`character_arpg_zone_bounty`) |
 | `ArpgTags` | Spell tags (Holy, Area, Projectile, Seal, Channel...) |
 | `ArpgMage` | The mage's keystone hooks (on hit, periodic tick, kill, blow taken); its web is in `ArpgTree`, its trees in `ArpgSkills` |
+| `ArpgSets` | The twelve item sets (20/30/40/50 per class): pieces written into item_template with vanilla looks, bonuses into the item totals, whole-set powers as kit rows, drops, `SMSG_ARPG_SETS` |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:

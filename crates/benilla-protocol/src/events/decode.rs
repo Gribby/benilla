@@ -70,6 +70,7 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::ArpgPurse(purse) => vec![SessionEvent::ArpgPurse { purse }],
         ServerPacket::ArpgCompare(items) => vec![SessionEvent::ArpgCompare { items }],
         ServerPacket::ArpgShowcase(chars) => vec![SessionEvent::ArpgShowcase { chars }],
+        ServerPacket::ArpgSets(sets) => vec![SessionEvent::ArpgSets { sets }],
         ServerPacket::Weather {
             weather_type,
             grade,

@@ -472,6 +472,10 @@ pub enum SessionEvent {
     ArpgShowcase {
         chars: Vec<crate::messages::arpg::ArpgShowcaseChar>,
     },
+    /// Fork-only, not 1.12.1: the ARPG item set catalog (`SMSG_ARPG_SETS`).
+    ArpgSets {
+        sets: Vec<crate::messages::arpg::ArpgItemSet>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

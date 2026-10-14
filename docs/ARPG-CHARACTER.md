@@ -614,6 +614,45 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
 - **Affix text** reaches the client the way uniques' lines do, as a table sent at the hello, so
   the tooltip shows "+1 to Judgement" in the item's own colour.
 
+### Sets
+
+Built. Twelve sets, one per class at levels 20, 30, 40 and 50, for the classes there are so far
+(cmangos `Arpg/ArpgSets.{h,cpp}`).
+
+- **Pieces:** four at 20 and 30 (chest, legs, hands, feet), five at 40 and 50 (head, shoulders,
+  chest, legs, hands), in the class's armour: the paladin's mail, then plate from 40; the mage's
+  cloth; the druid's leather. Green, wearable by the class alone, with the class's attributes
+  (paladin Strength, Stamina, Intellect; mage Intellect, Stamina, Spirit; druid Agility,
+  Intellect, Stamina) on a budget of the level and slot. They never roll affixes.
+- **Looks:** each piece wears a vanilla item's model and armour, from gear at that level. The
+  server picks a look family for the set: the vanilla greens and blues of that armour at the
+  set's level (3 below to 6 above) whose names share their first word ("Glimmering",
+  "Scorpashi"...) and cover the most of its slots, so the pieces match; a slot the family lacks
+  takes the nearest item of its armour and slot. The server log names each set's family.
+- **Drops:** a creature in the set's level band (its level to 9 above; the 50s' to 63) drops a
+  random piece of the looter's class's set: a boss 25%, a rare 12%, a champion or elite 4%, the
+  rest 0.6%.
+- **Bonuses** add into the item totals as affixes do; the whole set gives a power, a uniques-kit
+  row on a class spell, named for the set.
+- **Tooltips:** the pieces' `itemset` is the set's own id (1001 up, past `ItemSet.dbc`'s), and the
+  server sends the catalog with the hello (`SMSG_ARPG_SETS`, 0x34F); the client's stock set block
+  draws it, worn pieces white and met bonuses green.
+
+| Set | Class | Level | 2 pieces | 3 pieces | 4 pieces | Whole set |
+|---|---|---|---|---|---|---|
+| Squire's Resolve | Paladin | 20 | +8 Strength | +10% Holy damage | | Judgement chains to 1 more within 10 yd, 50% |
+| Crusader's Vow | Paladin | 30 | +12 Stamina | +6% attack speed | | Seal of Righteousness strikes all in front, 30% |
+| Lightbringer's Bulwark | Paladin | 40 | +10% armour | +12% Holy damage | +1 to all Holy skills | Judgement bursts within 6 yd, 40% |
+| Ashen Oath | Paladin | 50 | +15 Strength | +15% critical strike damage | +1 to all Melee skills | Exorcism chains to 2 more within 10 yd, 60% |
+| Apprentice's Embers | Mage | 20 | +8 Intellect | +10% Fire damage | | Fireball launches 1 extra, 40% |
+| Frostweave Mantle | Mage | 30 | +10% Frost damage | +5% cast speed | | Frostbolt shatters into 2 shards within 8 yd, 35% |
+| Arcanist's Lattice | Mage | 40 | +15 Intellect | +12% Arcane damage | +10% maximum mana | Each Arcane Missile jumps to 1 more, 40% |
+| Archmage's Conflux | Mage | 50 | +20 Intellect | +15% critical strike damage | +1 to all Spell skills | Every 3rd Fireball echoes, 60% |
+| Grovewalker's Hide | Druid | 20 | +8 Agility | +10% Nature damage | | Wrath chains to 1 more within 10 yd, 50% |
+| Moonshadow Garb | Druid | 30 | +10 Intellect | +10% Arcane damage | | Moonfire also lands on 1 more within 8 yd |
+| Feralheart Raiment | Druid | 40 | +15 Agility | +12% Melee damage | +6% attack speed | Claw strikes all in front, 40% |
+| Wildheart Vestments | Druid | 50 | +15 Intellect | +12% Nature damage | +1 to all Spell skills | Starfire bursts within 8 yd, 40% |
+
 ## The paladin, in full
 
 ### Identity

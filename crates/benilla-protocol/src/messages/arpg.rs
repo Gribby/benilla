@@ -742,6 +742,53 @@ pub fn read_arpg_showcase(r: &mut impl io::Read) -> io::Result<Vec<ArpgShowcaseC
     Ok(out)
 }
 
+/// The ARPG item set catalog (cmangos `Arpg/ArpgSets.h`), sent with every hello.
+pub const SMSG_ARPG_SETS: u16 = 0x034F;
+
+/// One ARPG set: its pieces' item entries and its bonuses' texts, by the pieces each needs. Its id
+/// is the pieces' `itemset`, past `ItemSet.dbc`'s.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgItemSet {
+    pub id: u32,
+    pub name: String,
+    pub class: u8,
+    pub level: u8,
+    pub pieces: Vec<u32>,
+    pub bonuses: Vec<(u8, String)>,
+}
+
+/// `SMSG_ARPG_SETS`: `u8` count, per set `u32` id, cstring name, `u8` class, `u8` level, `u8`
+/// piece count and a `u32` entry each, `u8` bonus count and per bonus `u8` pieces, cstring text.
+pub fn read_arpg_sets(r: &mut impl io::Read) -> io::Result<Vec<ArpgItemSet>> {
+    let n = read_u8(r)?;
+    let mut out = Vec::with_capacity(capacity_hint(n, 255));
+    for _ in 0..n {
+        let id = read_u32_le(r)?;
+        let name = read_cstring(r)?;
+        let class = read_u8(r)?;
+        let level = read_u8(r)?;
+        let count = read_u8(r)?;
+        let mut pieces = Vec::with_capacity(capacity_hint(count, 255));
+        for _ in 0..count {
+            pieces.push(read_u32_le(r)?);
+        }
+        let count = read_u8(r)?;
+        let mut bonuses = Vec::with_capacity(capacity_hint(count, 255));
+        for _ in 0..count {
+            bonuses.push((read_u8(r)?, read_cstring(r)?));
+        }
+        out.push(ArpgItemSet {
+            id,
+            name,
+            class,
+            level,
+            pieces,
+            bonuses,
+        });
+    }
+    Ok(out)
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {

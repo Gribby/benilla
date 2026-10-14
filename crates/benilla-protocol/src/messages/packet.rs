@@ -416,6 +416,8 @@ pub enum ServerPacket {
     ArpgCompare(Vec<crate::messages::arpg::ArpgItemCompare>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_SHOWCASE`, the class screen's characters.
     ArpgShowcase(Vec<crate::messages::arpg::ArpgShowcaseChar>),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_SETS`, the ARPG item set catalog.
+    ArpgSets(Vec<crate::messages::arpg::ArpgItemSet>),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1403,6 +1405,7 @@ impl ServerPacket {
             ServerPacket::ArpgPurse(_) => "SMSG_ARPG_PURSE".into(),
             ServerPacket::ArpgCompare(_) => "SMSG_ARPG_COMPARE".into(),
             ServerPacket::ArpgShowcase(_) => "SMSG_ARPG_SHOWCASE".into(),
+            ServerPacket::ArpgSets(_) => "SMSG_ARPG_SETS".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

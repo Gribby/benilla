@@ -256,12 +256,37 @@ fn template_view(
     }
 }
 
+/// Fork-only, not 1.12.1: an ARPG set's tooltip block, its bonuses' texts as the server wrote them.
+fn arpg_set_view(
+    set: &benilla_protocol::messages::arpg::ArpgItemSet,
+    items: &Items,
+    commands: &NetCommands,
+) -> benilla_ui::script::ItemSetView {
+    benilla_ui::script::ItemSetView {
+        name: set.name.clone(),
+        members: set
+            .pieces
+            .iter()
+            .map(|&id| (id, items.template(id, 0, commands).map(|t| t.name.clone())))
+            .collect(),
+        bonuses: set
+            .bonuses
+            .iter()
+            .map(|(n, text)| (u32::from(*n), text.clone()))
+            .collect(),
+        required_skill: 0,
+        required_skill_rank: 0,
+        required_skill_name: None,
+    }
+}
+
 /// Answers the engine's set-id asks from `ItemSet.dbc`: member names from the template cache, each
 /// miss queried as the reference queries set members, and bonus text from the `$`-engine. A set
 /// stays pending, re-pushing, until every member resolves.
 pub(super) fn feed_item_sets(
     script: Option<NonSendMut<UiScript>>,
     sets: Option<Res<super::ItemSets>>,
+    arpg_sets: Res<super::ArpgItemSets>,
     items: Res<Items>,
     commands: Res<NetCommands>,
     spells: Option<Res<crate::ui_action::Spells>>,
@@ -308,7 +333,20 @@ pub(super) fn feed_item_sets(
     let global = |key: &str| benilla_ui::strings::global(script.lua(), key);
     for (&set_id, last) in pending.iter_mut() {
         let Some(row) = sets.0.set(set_id) else {
-            done.push(set_id); // no such row: drop the ask
+            // Fork-only, not 1.12.1: an ARPG set (cmangos `Arpg/ArpgSets.h`), from its catalog;
+            // one asked before the catalog came stays pending.
+            if let Some(set) = arpg_sets.0.get(&set_id) {
+                let view = arpg_set_view(set, &items, &commands);
+                if view.members.iter().all(|(_, n)| n.is_some()) {
+                    done.push(set_id);
+                }
+                if *last != view {
+                    *last = view.clone();
+                    push.push((set_id, view));
+                }
+            } else if set_id < super::ARPG_SET_ID_FROM {
+                done.push(set_id); // no such row: drop the ask
+            }
             continue;
         };
         if bonuses_have_mod_tokens(&row.bonuses, spell_res) {
