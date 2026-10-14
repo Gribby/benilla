@@ -26,7 +26,10 @@ use display::{
 
 /// Attaching a visual to each net entity: skeleton, animation, character geosets and skin, fade.
 mod attach;
-use attach::{attach_entity_visuals, build_dressup_preview, build_glue_pet, build_glue_preview};
+use attach::{
+    attach_entity_visuals, build_dressup_preview, build_glue_pet, build_glue_preview,
+    build_showcase_previews,
+};
 
 /// Composited body skins by look, built off the main thread.
 mod skin_composite;
@@ -630,11 +633,16 @@ impl Plugin for EntitiesPlugin {
                 // The dest-anchored lane's three independent producers also create entries.
                 (arm_ground_effects, spawn_ground_bursts, tick_shard_emitters),
                 update_display_models.in_set(DisplayBuildSet),
-                // The glue screens' character, assembled from the display built just above.
-                build_glue_preview,
-                // The select screen's pet, on its own latch so a slow pet model never holds the
-                // character back.
-                build_glue_pet,
+                (
+                    // The glue screens' character, assembled from the display built just above.
+                    build_glue_preview,
+                    // The select screen's pet, on its own latch so a slow pet model never holds
+                    // the character back.
+                    build_glue_pet,
+                    // Fork-only: the ARPG class screen's five characters, the same assembly.
+                    build_showcase_previews,
+                )
+                    .chain(),
                 // The dressing room's preview, the same assembly and latch.
                 build_dressup_preview,
                 attach_entity_visuals,
@@ -943,8 +951,12 @@ fn update_display_models(
     mut uv_reg: ResMut<benilla_world::doodad_anim::UvAnimMaterials>,
     mut anim_table: ResMut<benilla_world::mat_anim_table::MatAnimTable>,
     mut bones: ResMut<corpse::BonesModels>,
-    // The glue screens' body display, wanted with no wire entity.
-    glue_preview: Option<Res<crate::portrait::GluePreview>>,
+    // The glue screens' body display, wanted with no wire entity; and the ARPG class screen's
+    // five (fork-only).
+    (glue_preview, showcase): (
+        Option<Res<crate::portrait::GluePreview>>,
+        Option<Res<crate::portrait::ShowcasePreview>>,
+    ),
     char_create: Option<Res<CharCreate>>,
     // The stable pane's pet (`SetPetStablePaperdoll`, `0x4cb870`), with no wire entity.
     stable_booth: Option<Res<crate::portrait::StableBooth>>,
@@ -988,6 +1000,16 @@ fn update_display_models(
             let (race, sex) = look.body();
             if let Some(disp) = cc.0.body_display(race, sex) {
                 actives.push((EntityKind::Player, disp));
+            }
+        }
+    }
+    // The class screen's five bodies, while it is up.
+    if let (Some(showcase), Some(cc)) = (showcase.as_deref(), char_create.as_deref()) {
+        if showcase.active {
+            for look in showcase.looks.iter().flatten() {
+                if let Some(disp) = cc.0.body_display(look.race, look.sex) {
+                    actives.push((EntityKind::Player, disp));
+                }
             }
         }
     }

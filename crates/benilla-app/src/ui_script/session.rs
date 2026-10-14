@@ -160,6 +160,9 @@ mod tests {
     /// `Local`s in VM-holding systems that are not memory about the VM, keyed
     /// `(path under src/, parameter name)`.
     const EXEMPT: &[(&str, &str)] = &[
+        // Marks that carry `script.session()` themselves, so a fresh VM never matches them.
+        ("player/arpg/actions.rs", "pushed"),
+        ("player/arpg/champions.rs", "pushed"),
         // A raster fact; a fresh VM re-seats its measurer on `!has_text_measurer()` anyway.
         ("ui_script/extract/mod.rs", "last_seam"),
         // The plate driver's anti-overlap scratch, cleared at the top of every run.

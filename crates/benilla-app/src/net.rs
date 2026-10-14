@@ -393,6 +393,9 @@ pub(crate) enum CharRequest {
     Delete(u64),
     /// Select's Back: drop the session and return to the pre-logon park.
     Abandon,
+    /// Fork-only, not 1.12.1: ask the ARPG server for the class screen's showcase characters
+    /// (`CMSG_ARPG_SHOWCASE_QUERY`), answered by a `SessionEvent::ArpgShowcase`, then stay parked.
+    Showcase,
 }
 
 /// The realm channel: the answer to each [`RealmListMessage`]. Two parks listen, the login-side

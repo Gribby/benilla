@@ -60,7 +60,9 @@ pub(crate) use glue_booth::{
 };
 mod light;
 pub(crate) use light::{material_variant, VariantLane};
+mod showcase;
 use light::{model_pane_light, studio_light, BoothLight};
+pub(crate) use showcase::{ShowcaseBakes, ShowcasePreview, SHOWCASE, SHOWCASE_TOKENS};
 pub(crate) mod test_bake;
 
 /// The round portrait slots, each with its own layer and camera. `"npc"` is an interaction
@@ -149,6 +151,11 @@ pub(crate) const UI_MODELS_LAYER: usize = MINIMAP_COMPOSITE_LAYER + 1;
 pub(crate) const UI_MODEL_CAM_LAYER_BASE: usize = UI_MODELS_LAYER + 1;
 /// How many perspective model panes draw at once; a ninth draws nothing.
 pub(crate) const UI_MODEL_CAM_LAYERS: usize = 8;
+/// Fork-only, not 1.12.1: the ARPG class screen's first booth layer, past the model pane block;
+/// each of its [`SHOWCASE_SLOTS`] stages renders on a layer of its own ([`showcase`]).
+pub(crate) const SHOWCASE_LAYER_BASE: usize = UI_MODEL_CAM_LAYER_BASE + UI_MODEL_CAM_LAYERS;
+/// Fork-only, not 1.12.1: how many classes the class screen stands side by side.
+pub(crate) const SHOWCASE_SLOTS: usize = 5;
 
 // A booth camera's layer is its identity, for rendering and for the emitter-to-camera match.
 const _: () = assert!(
@@ -167,12 +174,20 @@ const _: () = assert!(
         && WARM_ORTHO_LAYER > WARM_BOOTH_LAYER
         && MINIMAP_COMPOSITE_LAYER > WARM_ORTHO_LAYER
         && UI_MODELS_LAYER > MINIMAP_COMPOSITE_LAYER
-        && UI_MODEL_CAM_LAYER_BASE > UI_MODELS_LAYER,
+        && UI_MODEL_CAM_LAYER_BASE > UI_MODELS_LAYER
+        && SHOWCASE_LAYER_BASE >= UI_MODEL_CAM_LAYER_BASE + UI_MODEL_CAM_LAYERS,
     "booth render layers must be distinct — see GLUE_LAYER"
 );
 const _: () = assert!(
     PAPERDOLL_LAYER > PORTRAIT_LAYER_BASE + SLOTS.len() - 1,
     "booth layers must not overlap the per-slot portrait layers"
+);
+// Bevy's `RenderLayers` is a growable bitset, but the class screen's block tops the ladder: a
+// layer added past it must start at its end.
+const _: () = assert!(
+    SHOWCASE_LAYER_BASE + SHOWCASE_SLOTS > SHOWCASE_LAYER_BASE
+        && SHOWCASE_LAYER_BASE > UI_MODEL_CAM_LAYER_BASE + UI_MODEL_CAM_LAYERS - 1,
+    "the class screen's booth layers must not overlap the model pane block"
 );
 /// The round portraits' bake size, square (the reference bakes 64²); `ui_quad.wgsl`'s `circular`
 /// cuts the circle at draw time.
@@ -762,6 +777,8 @@ impl Plugin for PortraitPlugin {
             .init_resource::<glue_booth::GluePreview>()
             .init_resource::<glue_booth::GluePreviewBake>()
             .init_resource::<glue_booth::GluePetBake>()
+            .init_resource::<showcase::ShowcasePreview>()
+            .init_resource::<showcase::ShowcaseBakes>()
             .init_resource::<dressup::DressUpPreview>()
             .init_resource::<dressup::DressUpBake>()
             .init_resource::<Booths>()
@@ -797,6 +814,9 @@ impl Plugin for PortraitPlugin {
                     glue_booth::pillarbox_glue_scene,
                     // After the scene: the pet's seat and its light are the scene's to publish.
                     glue_booth::sync_glue_pet,
+                    // The ARPG class screen's five stages, each scene before its character.
+                    showcase::sync_showcase_scenes,
+                    showcase::sync_showcase_booths,
                     dressup::sync_dressup_booth,
                     // After the syncs, the only writers of the yaw it spends.
                     booth::drive_booth_turn,
@@ -1048,6 +1068,8 @@ fn setup_booths(
     glue_booth::spawn_glue_booth(&mut commands, &mut images, &mut portraits, &mut booths);
     // The dressing room: tuple-driven like the glue booth, lit like the paper doll.
     dressup::spawn_dressup_booth(&mut commands, &mut images, &mut portraits, &mut booths);
+    // The ARPG class screen's five stages, idle and small until the screen opens.
+    showcase::spawn_showcase_booths(&mut commands, &mut images, &mut portraits, &mut booths);
 }
 
 /// `true` while the `WOW_PORTRAIT_TEST` debug bake owns the booths (read once).
@@ -2029,6 +2051,8 @@ fn gate_booth_cameras(
     mut commands: Commands,
     mut booths: ResMut<Booths>,
     preview: Res<GluePreview>,
+    // The class screen's stages are live scenes while it is up.
+    showcase: Res<ShowcasePreview>,
     panes: Res<BoothPanes>,
     images: Res<Assets<Image>>,
     warm: Res<crate::pipe_warm::WarmPass>,
@@ -2103,7 +2127,8 @@ fn gate_booth_cameras(
             booth.pipes_since = None;
             false
         };
-        let live_scene = token.as_str() == GLUE_SLOT && preview.scene.is_some();
+        let live_scene = (token.as_str() == GLUE_SLOT && preview.scene.is_some())
+            || (showcase.active && SHOWCASE_TOKENS.contains(&token.as_str()));
         // The glue screens publish no pane and stay on `live_scene`.
         let live_pane = booth.live && panes.0.contains_key(token.as_str());
         let active = test

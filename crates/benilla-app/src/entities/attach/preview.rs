@@ -14,7 +14,7 @@ use bevy::prelude::*;
 use crate::portrait::{
     BoothTwins, DressUpBake, DressUpLook, DressUpPreview, GhostKit, GlueLook, GluePetBake,
     GluePreview, GluePreviewBake, PetLook, PreviewBillboard, PreviewEffects, PreviewPart,
-    PreviewRider,
+    PreviewRider, SelectLook, ShowcaseBakes, ShowcasePreview,
 };
 use benilla_assets::materials::WowModelMaterial;
 
@@ -270,6 +270,113 @@ pub(in crate::entities) fn build_glue_preview(
         revision: bake.revision + 1,
     };
     state.built = true;
+}
+
+/// Fork-only, not 1.12.1: assemble the ARPG class screen's five characters
+/// ([`crate::portrait::ShowcasePreview`]), each as [`build_glue_preview`] assembles a select
+/// look: the server's look and gear, no ghost and no pet. Each slice keeps its own latch and
+/// retries on its own while a model loads.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::entities) fn build_showcase_previews(
+    preview: Res<ShowcasePreview>,
+    mut bakes: ResMut<ShowcaseBakes>,
+    creatures: Option<Res<Creatures>>,
+    characters: Option<Res<Characters>>,
+    char_create: Option<Res<CharCreate>>,
+    mut displays: Option<ResMut<ItemDisplays>>,
+    mut glows: Option<ResMut<ItemGlows>>,
+    sections: Option<Res<SkinSections>>,
+    mut images: ResMut<Assets<Image>>,
+    mut skin_composites: ResMut<SkinComposites>,
+    asset_server: Res<AssetServer>,
+    mut mats: benilla_world::model_render::M2BatchMaterials,
+    mut state: Local<[(Option<SelectLook>, bool); crate::portrait::SHOWCASE_SLOTS]>,
+) {
+    // A closed screen stands nobody.
+    let looks = if preview.active {
+        preview.looks
+    } else {
+        [None; crate::portrait::SHOWCASE_SLOTS]
+    };
+    for (i, look) in looks.into_iter().enumerate() {
+        let (last, built) = &mut state[i];
+        if *last != look {
+            *last = look;
+            *built = false;
+        }
+        if *built {
+            continue;
+        }
+        let bake = &mut bakes.0[i];
+        let Some(look) = look else {
+            if bake.look.is_some() || !bake.parts.is_empty() {
+                *bake = GluePreviewBake {
+                    revision: bake.revision + 1,
+                    ..default()
+                };
+            }
+            *built = true;
+            continue;
+        };
+        let (Some(creatures), Some(char_create)) = (creatures.as_deref(), char_create.as_deref())
+        else {
+            return;
+        };
+        let Some(display_id) = char_create.0.body_display(look.race, look.sex) else {
+            // A non-playable race: nothing to show, and nobody left standing from before.
+            if bake.look.is_some() || !bake.parts.is_empty() {
+                *bake = GluePreviewBake {
+                    revision: bake.revision + 1,
+                    ..default()
+                };
+            }
+            *built = true;
+            continue;
+        };
+        let spec = PreviewSpec {
+            display_id,
+            race: look.race,
+            sex: look.sex,
+            skin: look.skin,
+            face: look.face,
+            hair_style: look.hair_style,
+            hair_color: look.hair_color,
+            facial_hair: look.facial_hair,
+            equipment: look.equipment,
+            emblem: None,
+            flags: look.flags,
+            // A showcase holds what it holds in its hands; it carries no ranged weapon.
+            ranged_in_hand: false,
+        };
+        let Some(a) = assemble(
+            &spec,
+            &mut PreviewCtx {
+                creatures,
+                characters: characters.as_deref(),
+                displays: displays.as_deref_mut(),
+                glows: glows.as_deref_mut(),
+                sections: sections.as_deref(),
+                images: &mut images,
+                skin_composites: &mut skin_composites,
+                asset_server: &asset_server,
+                mats: &mut mats,
+            },
+        ) else {
+            continue; // a model is still loading: retry next frame
+        };
+        *bake = GluePreviewBake {
+            look: Some(GlueLook::Select(look)),
+            display_id,
+            parts: a.parts,
+            riders: a.riders,
+            effects: a.effects,
+            billboards: a.billboards,
+            grip: a.grip,
+            ghost: None,
+            revision: bake.revision + 1,
+        };
+        *built = true;
+    }
 }
 
 /// Assemble the dressing room's look, whose equipment [`crate::ui_dressup`] composed from the

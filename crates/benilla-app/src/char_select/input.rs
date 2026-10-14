@@ -76,7 +76,12 @@ pub(super) fn select_input(
             }
             SelectAction::CreateChar => {
                 sounds.write(GlueSound("gsCharacterSelectionCreateNew"));
-                next.set(ClientState::CharCreate);
+                // Fork-only: an ARPG session picks its class first, on the class screen.
+                next.set(if crate::player::arpg_session() {
+                    ClientState::ClassShowcase
+                } else {
+                    ClientState::CharCreate
+                });
             }
             SelectAction::Addons => {
                 // The stock `OnClick` plays no sound (`CharacterSelect.xml:231-233`); this plays

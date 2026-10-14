@@ -501,12 +501,12 @@ pub struct ArpgSheet {
 pub fn read_arpg_sheet(r: &mut impl io::Read) -> io::Result<ArpgSheet> {
     let _version = read_u8(r)?;
     let count = read_u8(r)?;
-    let mut attributes = Vec::with_capacity(count as usize);
+    let mut attributes = Vec::with_capacity(capacity_hint(count, 255));
     for _ in 0..count {
         attributes.push(read_cstring(r)?);
     }
     let count = read_u8(r)?;
-    let mut skills = Vec::with_capacity(count as usize);
+    let mut skills = Vec::with_capacity(capacity_hint(count, 255));
     for _ in 0..count {
         let id = read_u8(r)?;
         skills.push((id, read_cstring(r)?));
@@ -602,7 +602,7 @@ pub struct ArpgBounty {
 /// cstring title, cstring reward.
 pub fn read_arpg_bounties(r: &mut impl io::Read) -> io::Result<Vec<ArpgBounty>> {
     let n = read_u8(r)?;
-    let mut out = Vec::with_capacity(usize::from(n));
+    let mut out = Vec::with_capacity(capacity_hint(n, 255));
     for _ in 0..n {
         out.push(ArpgBounty {
             slot: read_u8(r)?,
@@ -649,7 +649,7 @@ pub struct ArpgPurse {
 /// `u16` shard count, per shard `u16` affix, `u16` held, cstring name.
 pub fn read_arpg_purse(r: &mut impl io::Read) -> io::Result<ArpgPurse> {
     let n = read_u8(r)?;
-    let mut orbs = Vec::with_capacity(usize::from(n));
+    let mut orbs = Vec::with_capacity(capacity_hint(n, 255));
     for _ in 0..n {
         orbs.push(ArpgOrb {
             id: read_u8(r)?,

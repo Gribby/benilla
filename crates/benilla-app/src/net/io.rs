@@ -77,6 +77,10 @@ pub(super) struct Parks {
 /// How long a realm-list refresh waits for realmd; the park serving the list is deaf that long.
 const REALM_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Fork-only, not 1.12.1: how long the park waits for `SMSG_ARPG_SHOWCASE`. A stock server never
+/// answers, and the park is deaf to the screen for this long, so it is short.
+const SHOWCASE_TIMEOUT: Duration = Duration::from_secs(3);
+
 /// The reference's 30 s ping timer (`0x537ff0`). vmangos kicks a socket whose pings come faster
 /// than 27 s apart more than twice (`WorldSocket::_HandlePing`), so this must not shrink.
 const PING_INTERVAL: Duration = Duration::from_secs(30);
@@ -567,6 +571,21 @@ fn run(
                     }
                     Ok(CharRequest::Delete(target)) => {
                         Parked::Acted(CharAction::Delete, session.delete_character(target)?)
+                    }
+                    // Fork-only, not 1.12.1: the class screen's characters. A stock server stays
+                    // silent and the wait ends with no answer, which sends nothing, so the screen
+                    // asks again when it next opens.
+                    Ok(CharRequest::Showcase) => {
+                        match session.arpg_showcase(SHOWCASE_TIMEOUT)? {
+                            Some(chars) => {
+                                if events_tx.send(SessionEvent::ArpgShowcase { chars }).is_err() {
+                                    Parked::Exit
+                                } else {
+                                    Parked::StayPut
+                                }
+                            }
+                            None => Parked::StayPut,
+                        }
                     }
                 },
             };

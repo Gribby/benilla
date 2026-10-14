@@ -12,7 +12,7 @@ use super::parts::{
     CharCreateUi, DialRow, DynIcon, DynText, DynTint, InfoKind, InfoScroll, ScrollArrow,
     ScrollHides, ScrollThumb,
 };
-use super::{class_file, race_classes, CreateAction, CreateSelection, ALLIANCE};
+use super::{class_file, CreateAction, CreateSelection, ALLIANCE};
 use crate::glue::art::{
     class_tc, race_tc, tc_rect, GlueArt, ALLIANCE_FILL, BACKDROP_ALLIANCE, BACKDROP_HORDE, BTN_BG,
     BTN_HOVER, FALLBACK_ALPHA, HORDE_FILL,
@@ -48,7 +48,7 @@ pub(super) fn refresh_dynamic(
     let cat = catalog.as_deref();
     let empty = GlueStrings::default();
     let strings = strings.as_deref().unwrap_or(&empty);
-    let classes = race_classes(cat, sel.race);
+    let classes = sel.classes(cat);
     let alliance = ALLIANCE.contains(&sel.race);
     let file = cat
         .and_then(|c| c.0.race_file(sel.race))
@@ -233,7 +233,7 @@ pub(super) fn refresh_hover(
     mut disables: Query<(&CreateAction, &mut GlueDisabled)>,
 ) {
     let cat = catalog.as_deref();
-    let classes = race_classes(cat, sel.race);
+    let classes = sel.classes(cat);
     let selected = |action: &CreateAction| match *action {
         CreateAction::Race(r) => sel.race == r,
         CreateAction::Gender(g) => sel.sex == g,

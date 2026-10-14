@@ -32,6 +32,9 @@ pub(crate) enum ClientState {
     /// The character-creation screen, still parked at select (the IO thread serves create and
     /// delete in place).
     CharCreate,
+    /// Fork-only, not 1.12.1: the ARPG class screen between select and create, still parked at
+    /// select (`crate::class_showcase`).
+    ClassShowcase,
     /// A character is in (or entering) the world.
     InWorld,
 }

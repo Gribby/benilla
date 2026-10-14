@@ -1109,6 +1109,38 @@ rank 3, Frost spells 15% less mana) and Frostfire (Frost–Fire: +8% Frost and F
   Overload everything; Overcharge and Arcane Flux make the bursts the damage and the mana.
   Web: Arcane Flux, Arcane Mind, Brimming Mind with a deep pool.
 
+## Making a character
+
+Built. On an ARPG realm, Create New Character opens the class screen first: five vertical
+slices, one per ARPG class, each standing a character in its tier 2 set with an epic weapon in
+front of a stock character-creation scene, animated as the original glue screens are.
+
+| Slice | Character | Set | Held | Scene |
+| --- | --- | --- | --- | --- |
+| Paladin | human male | Judgement Armor | Sulfuras, Hand of Ragnaros | human creation scene |
+| Mage | undead male | Netherwind Regalia | Atiesh, Greatstaff of the Guardian | undead creation scene |
+| Druid | night elf female | Stormrage Raiment | Staff of the Shadow Flame | night elf creation scene |
+| Warlock | orc male | Nemesis Raiment | Dragonfang Blade, Fire Runed Grimoire | the Dark Portal (main menu) |
+| Shaman | tauren male | The Ten Storms | Aurastone Hammer, Drillborer Disk | tauren creation scene |
+
+- **Clicking a slice** opens the usual creation screen locked to that class, with every race
+  open. Back (or Escape) from it returns to the class screen, and Back from there to the
+  character list.
+- **Any race as any class.** The server builds a missing race and class pair from the race's
+  warrior entry (start position, base stats) and a race that has the class (spells, action bar,
+  starting gear); `BuildArpgPlayerInfo` in `ObjectMgr.cpp`.
+- **The gear is chosen by name** in cmangos `Arpg/ArpgShowcase.cpp`: a set by its `ItemSet.dbc`
+  name, a weapon by its item name, so the database supplies the displays. A name it lacks is
+  logged and the slot left bare. The client asks with `CMSG_ARPG_SHOWCASE_QUERY` (0x34D) at the
+  character screen and gets `SMSG_ARPG_SHOWCASE` (0x34E): per character, class, race, sex,
+  look, then 19 equipment slots as `SMSG_CHAR_ENUM` sends them.
+- **How the client draws it:** five extra portrait booths (`portrait/showcase.rs`), each a glue
+  scene and a dressed character on its own render layer, rendered to a fifth of the window while
+  the screen is up and parked at 64x64 otherwise. The screen itself is `class_showcase.rs`.
+- **Not yet:** the scenes are the stock race scenes, not the cathedral, mage tower, moonwell,
+  demonic landscape and Ten Storms locations first asked for; live world locations would need a
+  world loaded per slice. Framing may need tuning once seen.
+
 ## How it gets built
 
 ### Server effect primitives

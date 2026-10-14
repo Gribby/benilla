@@ -136,6 +136,7 @@ impl PluginGroup for GamePlugins {
             .add(crate::login::LoginPlugin)
             .add(crate::realm_select::RealmSelectPlugin)
             .add(crate::char_create::CharCreatePlugin)
+            .add(crate::class_showcase::ClassShowcasePlugin)
             .add(SoundPlugin)
             .add(TargetPlugin)
             .add(TransportPlugin)
@@ -683,6 +684,13 @@ pub(crate) mod schedule_tests {
     ///   disjoint-lane kind. The dispatchers also carry the walk's start (`Player`,
     ///   `FollowState`, `Approach`, the stand request), which only a click, an arrival or a
     ///   crate's interaction writes;
+    /// - the ARPG class screen (`class_showcase`, `portrait::showcase`, and
+    ///   `build_showcase_previews`), which copies the create screen's and glue booth's schedule:
+    ///   its UI chain runs only in `ClientState::ClassShowcase`, a state no world system runs in,
+    ///   and its five stages are chained with the glue booth's, so its `Visibility`, `Transform`,
+    ///   asset and glue-art pairs are the same state-exclusive kind as `char_create`'s;
+    ///   `class_showcase::forget_other_realm` touches only the class screen's own roster, so its one
+    ///   pair (against `finish_colliders`, on no named component) is the same;
     /// - a crate's interaction (`target::click::act_on_interact`) against what
     ///   `act_on_right_click` and the cursor classifier already pair with: it runs the click's
     ///   dispatchers over the classifier's reading of its object, and its attack leg
@@ -691,7 +699,7 @@ pub(crate) mod schedule_tests {
     /// Raising the ceiling is a claim that a new undeclared order is acceptable: make it with the
     /// reason read off the dump, or declare the order (`.after`, a set, a `chain`). A resource
     /// that commutes by construction belongs in [`Classes`].
-    const UPDATE_ACTIONABLE_CEILING: usize = 4_980;
+    const UPDATE_ACTIONABLE_CEILING: usize = 5_210;
     const UPDATE_ACTIONABLE_SLACK: usize = 40;
 
     fn ratchet(what: &str, n: usize, ceiling: usize, slack: usize) {

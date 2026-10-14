@@ -216,6 +216,9 @@ pub(crate) struct CreateSelection {
     name: EditBoxState,
     /// Waiting on `SMSG_CHAR_CREATE`: Create is disarmed.
     creating: bool,
+    /// Fork-only, not 1.12.1: the class the ARPG class screen chose (`crate::class_showcase`).
+    /// While set, it is the one class offered whatever the race, and Back returns to that screen.
+    class_lock: Option<u8>,
 }
 
 /// The five dial counts for a (race, sex), or `[1; 5]` without the catalog.
@@ -227,13 +230,29 @@ fn dial_counts(catalog: Option<&CharCreate>, race: u8, sex: u8) -> [u8; 5] {
 }
 
 impl CreateSelection {
-    /// Reset to Human, male, its first class, dials 0.
+    /// Fork-only, not 1.12.1: lock the screen to one class (the class screen's pick), or free it.
+    pub(crate) fn set_class_lock(&mut self, class: Option<u8>) {
+        self.class_lock = class;
+        if let Some(c) = class {
+            self.class = c;
+        }
+    }
+
+    /// The classes the current race may pick: the race's own, or the locked one alone.
+    fn classes(&self, catalog: Option<&CharCreate>) -> Vec<u8> {
+        self.class_lock
+            .map_or_else(|| race_classes(catalog, self.race), |c| vec![c])
+    }
+
+    /// Reset to Human, male, its first class (or the locked one), dials 0.
     fn reset(&mut self, catalog: Option<&CharCreate>) {
         self.race = 1;
         self.sex = 0;
-        self.class = catalog
-            .and_then(|c| c.0.classes_for_race(1).first().copied())
-            .unwrap_or(1);
+        self.class = self.class_lock.unwrap_or_else(|| {
+            catalog
+                .and_then(|c| c.0.classes_for_race(1).first().copied())
+                .unwrap_or(1)
+        });
         self.dials = [0; 5];
         self.name.set_text("");
         self.creating = false;
@@ -241,7 +260,9 @@ impl CreateSelection {
 
     /// Re-clamp class and dials into the current (race, sex)'s valid ranges.
     fn clamp(&mut self, catalog: Option<&CharCreate>) {
-        if let Some(c) = catalog {
+        if let Some(c) = self.class_lock {
+            self.class = c;
+        } else if let Some(c) = catalog {
             if !c.0.allows(self.race, self.class) {
                 self.class =
                     c.0.classes_for_race(self.race)
@@ -313,6 +334,15 @@ fn race_classes(catalog: Option<&CharCreate>, race: u8) -> Vec<u8> {
         .unwrap_or_else(|| vec![1, 2, 3, 4, 5, 7, 8, 9, 11])
 }
 
+/// Where Back leaves for: the ARPG class screen when it chose the class, else character select.
+fn back_to(sel: &CreateSelection) -> ClientState {
+    if sel.class_lock.is_some() {
+        ClientState::ClassShowcase
+    } else {
+        ClientState::CharSelect
+    }
+}
+
 /// A class id's file string, the `CLASS_ICON_TCOORDS` key.
 fn class_file(class: u8) -> &'static str {
     match class {
@@ -371,7 +401,7 @@ fn create_input(
                 sounds.write(GlueSound("gsCharacterCreationClass"));
                 if sel.race != r {
                     sel.race = r;
-                    sel.class = race_classes(cat, r).first().copied().unwrap_or(1);
+                    sel.class = sel.classes(cat).first().copied().unwrap_or(1);
                     sel.clamp(cat);
                     preview.yaw = INITIAL_FACING;
                     changed_look = true;
@@ -387,7 +417,7 @@ fn create_input(
             }
             CreateAction::ClassSlot(slot) => {
                 // The reference always clicks and re-dresses only on a real change (`0x470f50`).
-                if let Some(&class) = race_classes(cat, sel.race).get(slot as usize) {
+                if let Some(&class) = sel.classes(cat).get(slot as usize) {
                     sounds.write(GlueSound("gsCharacterCreationClass"));
                     if sel.class != class {
                         sel.class = class;
@@ -408,7 +438,7 @@ fn create_input(
             CreateAction::Create => do_create = true,
             CreateAction::Back => {
                 sounds.write(GlueSound("gsCharacterCreationCancel"));
-                next.set(ClientState::CharSelect);
+                next.set(back_to(&sel));
             }
             CreateAction::RotateLeft | CreateAction::RotateRight | CreateAction::Model => {}
         }
@@ -436,7 +466,7 @@ fn create_input(
     }
     if keys.just_pressed(KeyCode::Escape) {
         sounds.write(GlueSound("gsCharacterCreationCancel"));
-        next.set(ClientState::CharSelect);
+        next.set(back_to(&sel));
     }
 
     if do_create && !sel.creating {

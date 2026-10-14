@@ -262,6 +262,49 @@ impl WorldSession {
         }
     }
 
+    /// Fork-only, not 1.12.1: ask the ARPG server for the class screen's showcase characters
+    /// (`CMSG_ARPG_SHOWCASE_QUERY`) and wait up to `timeout` for `SMSG_ARPG_SHOWCASE`, skipping
+    /// whatever else the server interleaves at select.
+    ///
+    /// A stock server has no such opcode and never answers, so silence is `None`, never an error:
+    /// the park at character select must outlive the question. The wait peeks for a packet's
+    /// first byte under what is left of the deadline, so running out consumes nothing and the
+    /// stream and its header crypto stay in step; once a packet has started it is read whole
+    /// under the handshake's timeout, and a fault there is a real one, returned.
+    pub fn arpg_showcase(
+        &mut self,
+        timeout: std::time::Duration,
+    ) -> Result<Option<Vec<messages::arpg::ArpgShowcaseChar>>> {
+        self.send(messages::arpg::CMSG_ARPG_SHOWCASE_QUERY, &[])?;
+        let deadline = std::time::Instant::now() + timeout;
+        let answer = loop {
+            let left = deadline.saturating_duration_since(std::time::Instant::now());
+            if left.is_zero() {
+                break None;
+            }
+            self.set_read_timeout(Some(left))?;
+            let waiting = self.stream.peek(&mut [0u8; 1]);
+            self.set_read_timeout(Some(HANDSHAKE_READ_TIMEOUT))?;
+            match waiting {
+                Ok(0) => bail!("world server closed the connection"),
+                Ok(_) => {}
+                Err(e)
+                    if matches!(
+                        e.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
+                {
+                    break None;
+                }
+                Err(e) => return Err(e).context("waiting for the ARPG showcase"),
+            }
+            if let ServerPacket::ArpgShowcase(chars) = self.recv()? {
+                break Some(chars);
+            }
+        };
+        Ok(answer)
+    }
+
     /// Delete a character at character select; returns the `SMSG_CHAR_DELETE` result byte.
     pub fn delete_character(&mut self, guid: u64) -> Result<u8> {
         self.send(opcode::CMSG_CHAR_DELETE, &messages::full_guid(guid))?;
