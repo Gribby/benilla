@@ -614,6 +614,48 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
 - **Affix text** reaches the client the way uniques' lines do, as a table sent at the hello, so
   the tooltip shows "+1 to Judgement" in the item's own colour.
 
+### Synergies
+
+Built. One skill sets another up: the cross-skill proc engine (`Arpg/ArpgProcs.cpp`, "Cross-skill
+procs" above) now takes its rows from the skill trees too. Every major skill has a **synergy
+node** [Syn], one rank, in place of a plain numbers node: a hit, crit, stun or landing with one
+skill readies the next cast of another, within a few seconds, once every few seconds. A readied
+cast is instant, free, empowered (more damage), a sure crit, wider (more area), or carries a
+uniques-kit row of its own for that one cast (a burst, a chain, shards, a spread, a pierce),
+spent by the cast and gone when its hits are done. The client hears of the instant cast as stock
+(its cast bar), and the proc line names what was readied.
+
+| Class | Node | Skill | Sets up |
+|---|---|---|---|
+| Mage | Kindling Blast | Fire Blast | Critical Fireball → Fire Blast 60% more, bursts within 6 yd for 50% (4 sec) |
+| Mage | Hot Streak | Fireball | Critical Fire Blast or Scorch → instant Pyroblast |
+| Mage | Winter's Grasp | Frostbolt | Frost Nova → instant Frostbolt that shatters into 3 shards for 50% |
+| Mage | Arcane Echoes | Arcane Missiles | Critical Arcane Explosion → free Arcane Missiles, each missile chaining once for 50% |
+| Mage | Resonance | Arcane Explosion | Critical Arcane Missile → Arcane Explosion 50% wider |
+| Mage | Firestorm | Storms | Critical Fire Blast or Scorch → instant Flamestrike |
+| Paladin | Crusader's Verdict | Judgement | Critical swing → Judgement 50% more |
+| Paladin | Hallowed Strike | Consecration | Judgement hits → Consecration off cooldown |
+| Paladin | Wrath of the Light | Hammers | Critical Judgement or Exorcism → Hammer of Wrath 60% more, piercing every enemy for 60% |
+| Paladin | Righteous Thunder | Wrath | Hammer of Justice stuns → instant Holy Wrath |
+| Paladin | Crusader's Grace | Holy Light | Critical Judgement, Exorcism or Hammer of Wrath → instant Holy Light or Flash of Light |
+| Druid | Lunar Eclipse | Wrath | Critical Wrath → instant Starfire bursting within 6 yd for 40% |
+| Druid | Moonkissed | Moonfire | Critical Wrath or Starfire → Moonfire lands on 3 more |
+| Druid | Gathering Storm | Hurricane | Critical Moonfire or Starfire → free Hurricane |
+| Druid | Roaring Swipe | Bear | Demoralizing Roar → Swipe 60% more |
+| Druid | Bloodied Bite | Cat | Critical Claw or Shred → Ferocious Bite a sure crit |
+| Druid | Overgrowth's Gift | Rejuvenation | Entangling Roots → instant Regrowth or Healing Touch |
+
+**Synergy uniques** (found by item name, as the druid's are):
+
+| Item | Sets up |
+|---|---|
+| Mana Igniting Cord | Critical Fireball → Fire Blast off cooldown |
+| Robe of the Archmage | Frost Nova → Fire Blast a sure crit |
+| Wolfshead Helm | Critical Claw or Shred → Rake or Rip free (beside its Shred arc) |
+| Staff of the Shadow Flame | Critical Wrath → Starfire 50% more (beside its Starfire echo) |
+
+The paladin's synergy runes (Grace, Verdict, Anvil, Fervour, Zeal) and its proc uniques stay.
+
 ### Sets
 
 Built. Twelve sets, one per class at levels 20, 30, 40 and 50, for the classes there are so far
@@ -718,7 +760,7 @@ the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled i
 | Radiance | Healing Light [M] | 4 | 6% more healing per rank |
 | Radiance | Light's Grace [M] | 3 | +4% critical strike chance per rank |
 | Radiance | Swift Light [M] | 3 | -0.2 sec cast time per rank |
-| Radiance | Divine Grace [M] | 3 | 10% less mana cost per rank |
+| Radiance | **Crusader's Grace** [Syn] | 1 | A critical Judgement, Exorcism or Hammer of Wrath makes the next Holy Light or Flash of Light instant |
 | Radiance | **Dawnbringer** [H] | 1 | Heals on yourself also send half their amount as a Holy bolt |
 | Retribution | Searing Radiance [H] | 3 | Heals strike the nearest enemy within 20 yd for 15% per rank |
 | Retribution | Judging Light [H] | 2 | Heals Judge every enemy within 8 yd, a hit of 25% per rank (3 sec) |
@@ -742,7 +784,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Burst | **Sentence** [H] | 1 | 100% more on stunned enemies |
 | Verdict | Avenger [H] | 1 | Judgement keeps the Seal; its cooldown doubles |
 | Verdict | Swift Judgement [M] | 3 | -1 sec cooldown per rank |
-| Verdict | Unerring [M] | 3 | +5% critical strike chance per rank |
+| Verdict | **Crusader's Verdict** [Syn] | 1 | A critical swing makes the next Judgement deal 50% more |
 | Verdict | Righteous Mind [H] | 2 | Restores 5% of maximum mana per rank |
 | Verdict | **Sanctified** [H] | 1 | On an enemy in your Consecration, bursts 8 yd at 50% |
 
@@ -755,7 +797,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Ground | Burning Ground [H] | 4 | 8% more damage per rank |
 | Ground | **Walking Consecration** [H] | 1 | It follows you |
 | Smite | Searing Light [H] | 2 | Your Holy damage 5% more per rank on enemies in it |
-| Smite | Swift Consecration [M] | 3 | -1 sec cooldown per rank |
+| Smite | **Hallowed Strike** [Syn] | 1 | A Judgement that hits ends Consecration's cooldown |
 | Smite | **Sacred Seal** [H] | 1 | Seals strike twice on enemies in it |
 | Refuge | Hallowed Ground [H] | 3 | 1% health a second per rank inside |
 | Refuge | Steadfast [H] | 1 | No stuns inside |
@@ -775,7 +817,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Stun | **Sentence Passed** [H] | 1 | 15% more damage on stunned enemies |
 | Execute | Hammer Volley [A] | 2 | Hammer of Wrath throws 1/2 more, 60% |
 | Execute | Weighted Hammer [M] | 4 | 8% more Hammer of Wrath damage per rank |
-| Execute | Righteous Hammer [M] | 3 | +5% Hammer of Wrath critical strike chance per rank |
+| Execute | **Wrath of the Light** [Syn] | 1 | A critical Judgement or Exorcism makes the next Hammer of Wrath deal 60% more and pierce every enemy for 60% |
 | Execute | Piercing Hammer [A] | 3 | Hammer of Wrath flies through 2/4/10, 60% |
 | Execute | **Executioner** [H] | 1 | 100% more below 20% health |
 
@@ -792,7 +834,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Nova | Shattering Wrath [A] | 2 | Each enemy struck bursts 4/6 yd, 20/30% |
 | Nova | **Wrathful** [H] | 1 | Holy Wrath fires on its own with 4+ enemies within 10 yd (12 sec) |
 | Zeal | Swift Exorcism [M] | 3 | -2 sec Exorcism cooldown per rank |
-| Zeal | Swift Wrath [M] | 3 | -8 sec Holy Wrath cooldown per rank |
+| Zeal | **Righteous Thunder** [Syn] | 1 | A Hammer of Justice stun makes the next Holy Wrath instant |
 | Zeal | Exorcist [M] | 3 | +5% critical strike chance per rank, both |
 | Zeal | Quick Wrath [M] | 3 | -0.4 sec Holy Wrath cast time per rank |
 | Zeal | **Twin Exorcism** [A] | 1 | A second bolt beside the first, 70% |
@@ -966,7 +1008,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Inferno | Lingering Flame [M] | 3 | 15% more burn per rank |
 | Inferno | **Pyroclasm** [H] | 1 | Critical hits explode for 60% within 8 yd |
 | Pyre | Quick Pyre [M] | 3 | -0.5 sec Pyroblast cast time per rank |
-| Pyre | Hot Streak [M] | 3 | +5% Pyroblast critical strike chance per rank |
+| Pyre | **Hot Streak** [Syn] | 1 | A critical Fire Blast or Scorch makes the next Pyroblast instant |
 | Pyre | Pyre [M] | 3 | Pyroblast's critical strikes 20% more of their bonus per rank |
 | Pyre | **Cataclysm** [A] | 1 | Pyroblast bursts within 10 yd, at 60% |
 
@@ -979,7 +1021,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Shards | Glacial Chain [A] | 2 | Chains to 1/2 more within 10 yd, at 50% |
 | Shards | **Echoing Frost** [A] | 1 | Every 3rd Frostbolt echoes, at 60% |
 | Winter | Deep Chill [Ail] | 3 | 10% per rank to chill (a critical hit on the chilled freezes) |
-| Winter | Brittle [M] | 3 | +4% critical strike chance per rank |
+| Winter | **Winter's Grasp** [Syn] | 1 | Frost Nova makes the next Frostbolt instant, and it shatters into 3 shards for 50% |
 | Winter | Razor Ice [M] | 3 | Critical strikes 20% more of their bonus per rank |
 | Winter | **Shatterstorm** [H] | 1 | Frostbolt on a frozen enemy shatters for 80% within 8 yd |
 | Cone | Wide Cone [M] | 3 | +15% Cone of Cold area per rank |
@@ -997,7 +1039,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Barrage | **Arcane Barrage** [A] | 1 | Each missile bursts within 4 yd, at 30% |
 | Flux | Unstable Missiles [Ail] | 3 | 6% per rank to Overload |
 | Flux | Sharp Mind [M] | 3 | +3% critical strike chance per rank |
-| Flux | Arcane Thrift [M] | 3 | 10% less mana cost per rank |
+| Flux | **Arcane Echoes** [Syn] | 1 | A critical Arcane Explosion makes the next Arcane Missiles free, each missile jumping to 1 more for 50% |
 | Flux | **Overcharge** [H] | 1 | Your Overload bursts deal 40% more |
 | Focus | Focused Mind [M] | 3 | Critical strikes 15% more of their bonus per rank |
 | Focus | Long Reach [M] | 2 | +10% range per rank |
@@ -1015,7 +1057,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Fury | Arcane Fury [M] | 3 | Critical strikes 20% more of their bonus per rank |
 | Fury | **Arcane Nova** [M] | 1 | 40% larger radius |
 | Mana | Mana Efficiency [M] | 3 | 10% less mana cost per rank |
-| Mana | Resonance [M] | 3 | 5% more damage per rank |
+| Mana | **Resonance** [Syn] | 1 | A critical Arcane Missile makes the next Arcane Explosion 50% wider |
 | Mana | **Mana Burst** [H] | 1 | 1% of maximum mana per enemy hit, 5% at most a cast |
 
 #### Storms
@@ -1030,7 +1072,7 @@ ailment of its own; Glacial Storm is the hook on its ticks (`OnPeriodicHit`, cal
 | Blizzard | Biting Storm [M] | 4 | 8% more Blizzard damage per rank |
 | Blizzard | Thrifty Storm [M] | 3 | 10% less Blizzard mana cost per rank |
 | Blizzard | **Glacial Storm** [H] | 1 | Blizzard chills; each strike has 15% to freeze the chilled |
-| Storm | Stormcaller [M] | 3 | 10% less mana cost per rank |
+| Storm | **Firestorm** [Syn] | 1 | A critical Fire Blast or Scorch makes the next Flamestrike instant |
 | Storm | Storm Surge [M] | 3 | +8% radius per rank |
 | Storm | Raging Storm [M] | 3 | Blizzard's strikes and Flamestrike's burn 6% more per rank |
 | Storm | **Eye of the Storm** [M] | 1 | 30% wider |
@@ -1051,7 +1093,7 @@ ailment of its own; Glacial Storm is the hook on its ticks (`OnPeriodicHit`, cal
 | Scorch | Arcing Scorch [A] | 2 | Chains to 1/2 more within 10 yd, at 60% |
 | Scorch | Scorching [Ail] | 3 | 10% per rank to Ignite |
 | Scorch | **Searing Brand** [H] | 1 | Scorch brands with Fire Vulnerability (3% more Fire taken per stack, 5 at most) |
-| Combust | Flashpoint [M] | 3 | Critical strikes 15% more of their bonus per rank |
+| Combust | **Kindling Blast** [Syn] | 1 | Within 4 sec of a critical Fireball, Fire Blast deals 60% more and bursts within 6 yd for 50% |
 | Combust | Blazing [M] | 4 | 6% more damage per rank |
 | Combust | **Detonate** [H] | 1 | Fire Blast sets off your Ignite on its target at once: the burn left strikes it and every enemy within 6 yd |
 
@@ -1197,7 +1239,7 @@ Six skills for five slots. The hooks are in `ArpgDruid.cpp`.
 | Starfall | **Starfall** [A] | 1 | Starfire bursts within 10 yd, at 60% |
 | Grace | Nature's Grace [M] | 3 | +3% critical strike chance per rank |
 | Grace | Moonfury [M] | 3 | Critical strikes 20% more of their bonus per rank |
-| Grace | Vengeance [M] | 3 | 5% more damage per rank |
+| Grace | **Lunar Eclipse** [Syn] | 1 | A critical Wrath makes the next Starfire instant, bursting within 6 yd for 40% |
 | Grace | **Eclipse** [H] | 1 | Critical Wraths and Starfires restore 2% of maximum mana and make the next cast 0.5 sec quicker |
 
 #### Moonfire
@@ -1209,7 +1251,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 |---|---|---|---|
 | Lunar | Spreading Moon [F] | 3 | Moonfire also lands on 1/2/3 more within 8 yd |
 | Lunar | Lunar Burn [M] | 3 | 15% more Moonfire burn per rank |
-| Lunar | Bright Moon [M] | 3 | 8% more Moonfire hit damage per rank |
+| Lunar | **Moonkissed** [Syn] | 1 | A critical Wrath or Starfire makes the next Moonfire also land on 3 more within 8 yd |
 | Lunar | **Full Moon** [F] | 1 | Moonfire spreads to every enemy within 10 yd when its target dies |
 | Swarm | Plague [F] | 2 | Insect Swarm also lands on 1/2 more within 8 yd |
 | Swarm | Locusts [Ail] | 3 | Moonfire's hits 10% per rank to Poison |
@@ -1225,7 +1267,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 |---|---|---|---|
 | Gale | Wide Hurricane [M] | 3 | +12% radius per rank |
 | Gale | Howling Gale [M] | 4 | 8% more damage per rank |
-| Gale | Thrifty Gale [M] | 3 | 10% less mana cost per rank |
+| Gale | **Gathering Storm** [Syn] | 1 | A critical Moonfire or Starfire makes the next Hurricane free |
 | Gale | **Tempest** [H] | 1 | Each strike has 10% to hurl a Wrath at the enemy struck, for three times the strike (2 a second at most) |
 | Hail | Grasping Winds [M] | 2 | +2 sec duration per rank |
 | Hail | Biting Hail [H] | 3 | Each strike has 5% per rank to chill |
@@ -1240,7 +1282,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 | Maul | Mauling Arc [G] | 3 | Maul strikes every enemy in front, the extras at 20/35/50% |
 | Maul | Savage Maul [Ail] | 3 | 10% per rank to Bleed |
 | Maul | **Earthshaker** [H] | 1 | Maul sends a shockwave 10 yd ahead, at 60% |
-| Swipe | Feral Swipe [M] | 4 | 8% more Swipe damage per rank |
+| Swipe | **Roaring Swipe** [Syn] | 1 | Demoralizing Roar makes the next Swipe deal 60% more |
 | Swipe | Wide Swipe [M] | 2 | +15% Swipe area per rank |
 | Swipe | **Ravaging Swipe** [M] | 1 | Swipe strikes up to 10 enemies (3 in vanilla) |
 | Guardian | Bristling Fur [H] | 3 | In Bear Form, each blow taken gives 2 rage per rank (once a second) |
@@ -1259,7 +1301,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 | Bleed | Rending Claws [Ail] | 3 | 8% per rank to Bleed |
 | Bleed | Spreading Rake [F] | 2 | Rake also lands on 1/2 more within 8 yd |
 | Bleed | **Bloodletting** [F] | 1 | Rip also lands on 4 more within 8 yd |
-| Finisher | Ferocity [M] | 3 | 10% more Ferocious Bite damage per rank |
+| Finisher | **Bloodied Bite** [Syn] | 1 | A critical Claw or Shred makes the next Ferocious Bite a sure critical strike |
 | Finisher | Savagery [M] | 3 | +4% critical strike chance per rank |
 | Finisher | Savage Fury [H] | 1 | Critical Claws, Shreds and Rakes give an extra combo point |
 | Finisher | **Feast** [G] | 1 | Ferocious Bite strikes every enemy in front, at 60% |
@@ -1272,7 +1314,7 @@ Like the paladin's Holy Light: heals, which the tree turns on enemies too.
 |---|---|---|---|
 | Bloom | Lush Growth [M] | 4 | 6% more Regrowth and Healing Touch healing per rank |
 | Bloom | Living Bloom [M] | 3 | Rejuvenation and Regrowth heal 10% more over time per rank |
-| Bloom | Quick Growth [M] | 3 | -0.2 sec cast time per rank |
+| Bloom | **Overgrowth's Gift** [Syn] | 1 | Entangling Roots makes the next Regrowth or Healing Touch instant |
 | Bloom | **Bloom** [H] | 1 | Your heals burst: every enemy within 8 yd takes 50% of the heal as Nature |
 | Wild | Nature's Wrath [H] | 3 | Your heals strike the nearest enemy within 20 yd for 15% of the heal per rank, as Nature |
 | Wild | Verdant Fury [H] | 2 | Healing yourself gives 5% more damage per rank for 5 sec |

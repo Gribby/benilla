@@ -157,6 +157,19 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 - tree, skills and Codex tables;
 - the dungeon tier table.
 
+## Play statistics
+
+The server records how play goes (cmangos `Arpg/ArpgStats.{h,cpp}`, `Arpg.Stats`, on by default)
+as JSON lines in `arpg-stats/YYYY-MM-DD.jsonl` beside mangosd: deaths with their killer and the
+last 10 seconds of blows, pack fight times, and every 5 minutes a session summary (levels and the
+minutes each took, kills by kind, damage by spell, damage taken by source, seconds in combat, low
+on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone).
+`update-arpg-server.bat` runs `send-arpg-stats.bat`, which commits them to the server repo's
+`arpg-stats` branch (its own clone in `.arpg-stats`). To read them: `git fetch origin arpg-stats`
+in the server repo, then `git show origin/arpg-stats:stats/<date>.jsonl`. Use them before tuning:
+deaths say what kills, `lowManaSec` against `combatSec` says whether mana runs dry, `dealt` says
+which skills carry a build.
+
 ## Client systems (`crates/benilla-app/src/player/`)
 
 - `arpg.rs`: the view, camera, steering, the HUD addon install (`HUD_LUA`, `HUD_BINDINGS`) and
