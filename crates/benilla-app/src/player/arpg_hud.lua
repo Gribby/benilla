@@ -200,6 +200,36 @@ end
 local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET)
 local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET)
 
+-- Fork-only: the combo points over the power orb (ArpgHud_Combo, pushed from actions.rs). An ARPG
+-- character's points carry from enemy to enemy, so the count shows whatever is targeted; with
+-- none, the pips hide.
+local COMBO_PIP = 9
+local COMBO_LIT = { 1.0, 0.82, 0.2 }
+local COMBO_DARK = { 0.25, 0.18, 0.05 }
+local comboPips = {}
+for i = 1, 5 do
+    local pip = powerOrb:CreateTexture(nil, "OVERLAY")
+    pip:SetWidth(COMBO_PIP)
+    pip:SetHeight(COMBO_PIP)
+    pip:SetPoint("BOTTOM", powerOrb, "TOP", (i - 3) * (COMBO_PIP + 4), 4)
+    pip:Hide()
+    comboPips[i] = pip
+end
+
+function ArpgHud_Combo(points)
+    for i = 1, 5 do
+        local pip = comboPips[i]
+        if points > 0 then
+            local c = COMBO_DARK
+            if i <= points then c = COMBO_LIT end
+            pip:SetTexture(c[1], c[2], c[3], 1)
+            pip:Show()
+        else
+            pip:Hide()
+        end
+    end
+end
+
 -- The orb is to stand `fraction` full in this colour; animateOrb carries it there.
 local function paintOrb(orb, fraction, color, value)
     orb.target = math.max(math.min(fraction, 1), 0)

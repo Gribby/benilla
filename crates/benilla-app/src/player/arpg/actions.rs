@@ -125,7 +125,38 @@ pub(super) fn plugin(app: &mut App) {
             .before(control)
             .in_set(crate::char_select::InWorldGated),
     )
-    .add_systems(Update, push_status);
+    .add_systems(Update, (push_status, push_combo));
+}
+
+/// Fork-only, not 1.12.1: the combo points over the power orb (`ArpgHud_Combo` in
+/// `arpg_hud.lua`). An ARPG character's points are its own, carried from enemy to enemy (cmangos
+/// `Arpg/ArpgDruid.h`), so the pips show the count whatever is targeted; stock
+/// `GetComboPoints` counts only the points banked on the current target.
+fn push_combo(
+    script: Option<NonSendMut<UiScript>>,
+    me: Query<&crate::net::ObjectStore, With<crate::net::SelfPlayer>>,
+    mut pushed: Local<crate::ui_script::VmMemo<Option<u8>>>,
+) {
+    let (Some(script), Ok(store)) = (script, me.single()) else {
+        return;
+    };
+    let points = store.0.player_combo_points().unwrap_or(0).min(5);
+    let last = pushed.get(&script);
+    if *last == Some(points) {
+        return;
+    }
+    match script.eval::<bool>(&combo_chunk(points)) {
+        Ok(true) => *last = Some(points),
+        Ok(false) => {}
+        Err(e) => {
+            warn!("arpg: the orb refused the combo points: {e}");
+            *last = Some(points);
+        }
+    }
+}
+
+fn combo_chunk(points: u8) -> String {
+    format!("if not ArpgHud_Combo then return false end\nArpgHud_Combo({points})\nreturn true")
 }
 
 /// Where a roll goes: along the movement keys' walk when one is held, else at the cursor's aim.

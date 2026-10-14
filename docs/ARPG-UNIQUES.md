@@ -131,6 +131,26 @@ off those, from the first dungeons on.
 Holy Shock and Seal of Command are talents. The server checks every row against its data when
 the first ARPG player says hello and logs a wrong item or spell id as an error.
 
+### Druid set
+
+Built with the druid ("The druid, in full" in `ARPG-CHARACTER.md`). These rows name their item,
+not its id: the server finds each by name in `item_template` when the table is first read and
+logs one it lacks ("ARPG uniques: no item named ..."), so a wrong id can't make a unique
+silently do nothing.
+
+| Item | Drops from | Kit | Mechanic |
+|---|---|---|---|
+| Rod of the Sleepwalker | Twilight Lord Kelris, Blackfathom Deeps | D | Wrath bursts into 3 motes that strike the nearest enemies within 8 yd for 30% (from before) |
+| Living Root | Verdan the Everliving, Wailing Caverns | F | Entangling Roots also roots 2 more within 6 yd (from before) |
+| Manual Crowd Pummeler | Gnomeregan | G | Maul strikes every enemy in front of you; the extras take 60% |
+| Wolfshead Helm | Leatherworking | G | Shred strikes every enemy in front of you; the extras take 50% |
+| Mooncloth Robe | Tailoring | F | Moonfire also lands on 2 more within 8 yd |
+| Hide of the Wild | Leatherworking | F | Rip spreads to every enemy within 8 yd when its target dies |
+| Warden Staff | World drop | E | Each enemy Swipe strikes bursts onto those within 4 yd for 25% |
+| Will of Arlokk | High Priestess Arlokk, Zul'Gurub | A | Wrath fires 3 bolts in a 30° fan, the extras at 50% |
+| Rune of Metamorphosis | Broodlord Lashlayer, Blackwing Lair | F | Rake also lands on 2 more within 6 yd |
+| Staff of the Shadow Flame | Nefarian, Blackwing Lair | I | Every 3rd Starfire echoes for free at 70% |
+
 ### Raids
 
 | Item | Id | Drops from | Kit | Mechanic (tooltip line) | For |

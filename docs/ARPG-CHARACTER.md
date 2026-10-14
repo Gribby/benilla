@@ -1109,6 +1109,234 @@ rank 3, Frost spells 15% less mana) and Frostfire (Frost–Fire: +8% Frost and F
   Overload everything; Overcharge and Arcane Flux make the bursts the damage and the mana.
   Web: Arcane Flux, Arcane Mind, Brimming Mind with a deep pool.
 
+## The druid, in full
+
+### Identity
+
+The third class, and the shapeshifter. Three ways to play that pull apart: **Balance** (Wrath,
+Starfire, Moonfire, Hurricane: Nature that Poisons, Arcane that Overloads), **Feral** (the cat's
+Bleeds and finishers, the bear's Maul and Swipe) and **Restoration** (heals that hurt, Thorns,
+roots). As with the mage, every skill tree leans into an ailment: Poison for Balance, Bleed for
+the cat, Overload for Starfire and Moonfire.
+
+**What an ARPG druid gets beyond the stock class:**
+- **Bear Form and Swipe at level 10**, free (Bear Form is a quest in vanilla, Swipe a level 16
+  spell): a druid without area damage can't play an ARPG, as the paladin's Consecration at 6.
+- **Hurricane at level 20**, free (40 in vanilla), for the same reason on the caster's side.
+- **Combo points are the druid's, not the target's.** Points carry from one enemy to the next and
+  outlive the enemy they were built on, so a finisher always has its points whichever enemy is
+  under the cursor (cmangos `Unit::AddComboPoints`, `Spell::CheckCast`). The HUD shows them as
+  five pips above the power orb. A spread copy of a Rake or a Rip (Spreading Rake, Bloodletting,
+  the uniques) adds no points and spends none, and a copied Rip strikes with the points held.
+- Talent-granted spells (Insect Swarm, Moonkin Form, Swiftmend…) come free at their row's
+  level, as for every class.
+
+### Druid skills that can be specialised
+
+Six skills for five slots. The hooks are in `ArpgDruid.cpp`.
+
+| Skill | Covers | Branches | Role |
+|---|---|---|---|
+| **Wrath** | Wrath, Starfire | Volley, Starfall, Grace | The bolts: split, chain, Starfire bursts |
+| **Moonfire** | Moonfire, Insect Swarm | Lunar, Swarm, Moonglow | Damage over time that spreads |
+| **Hurricane** | Hurricane | Gale, Hail | The storm |
+| **Bear** | Maul, Swipe, Demoralizing Roar | Maul, Swipe, Guardian | The bear: cleave and endure |
+| **Cat** | Claw, Shred, Rake, Rip, Ferocious Bite | Claws, Bleed, Finisher | The cat: Bleeds and finishers |
+| **Rejuvenation** | Rejuvenation, Regrowth, Healing Touch, Entangling Roots | Bloom, Wild, Roots | Heals that hurt, and roots |
+
+#### Wrath
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Volley | Splitting Wrath [A] | 3 | 1/1/2 extra bolts, at 45/60/60% |
+| Volley | Quick Wrath [M] | 3 | -0.1 sec Wrath cast time per rank |
+| Volley | Thorned Wrath [Ail] | 3 | 8% per rank to Poison |
+| Volley | **Wrath of Cenarius** [A] | 1 | Wrath chains to 3 more within 10 yd, at 60% |
+| Starfall | Lunar Fury [M] | 4 | 6% more Starfire damage per rank |
+| Starfall | Quick Starfire [M] | 3 | -0.2 sec Starfire cast time per rank |
+| Starfall | Moonstruck [Ail] | 3 | 10% per rank to Overload |
+| Starfall | **Starfall** [A] | 1 | Starfire bursts within 10 yd, at 60% |
+| Grace | Nature's Grace [M] | 3 | +3% critical strike chance per rank |
+| Grace | Moonfury [M] | 3 | Critical strikes 20% more of their bonus per rank |
+| Grace | Vengeance [M] | 3 | 5% more damage per rank |
+| Grace | **Eclipse** [H] | 1 | Critical Wraths and Starfires restore 2% of maximum mana and make the next cast 0.5 sec quicker |
+
+#### Moonfire
+
+Moonfire and Insect Swarm do most of their damage as ticks, so the Swarm and Moonglow capstones
+are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Lunar | Spreading Moon [F] | 3 | Moonfire also lands on 1/2/3 more within 8 yd |
+| Lunar | Lunar Burn [M] | 3 | 15% more Moonfire burn per rank |
+| Lunar | Bright Moon [M] | 3 | 8% more Moonfire hit damage per rank |
+| Lunar | **Full Moon** [F] | 1 | Moonfire spreads to every enemy within 10 yd when its target dies |
+| Swarm | Plague [F] | 2 | Insect Swarm also lands on 1/2 more within 8 yd |
+| Swarm | Locusts [Ail] | 3 | Moonfire's hits 10% per rank to Poison |
+| Swarm | Swarm Fury [M] | 3 | 10% more Insect Swarm damage per rank |
+| Swarm | **Hive Mind** [H] | 1 | Every Insect Swarm tick Poisons its target |
+| Moonglow | Moonglow [M] | 3 | 10% less mana cost per rank |
+| Moonglow | Long Night [M] | 2 | +3 sec duration per rank |
+| Moonglow | **Lunar Tide** [H] | 1 | Every Moonfire and Insect Swarm tick restores 0.5% of maximum mana (2% a second at most) |
+
+#### Hurricane
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Gale | Wide Hurricane [M] | 3 | +12% radius per rank |
+| Gale | Howling Gale [M] | 4 | 8% more damage per rank |
+| Gale | Thrifty Gale [M] | 3 | 10% less mana cost per rank |
+| Gale | **Tempest** [H] | 1 | Each strike has 10% to hurl a Wrath at the enemy struck, for three times the strike (2 a second at most) |
+| Hail | Grasping Winds [M] | 2 | +2 sec duration per rank |
+| Hail | Biting Hail [H] | 3 | Each strike has 5% per rank to chill |
+| Hail | Eye of the Wild [H] | 3 | Each enemy struck heals you 0.3% of maximum health per rank (3% a second at most) |
+| Hail | **Thunderhead** [M] | 1 | Hurricane costs half the mana |
+
+#### Bear
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Maul | Brutal Maul [M] | 4 | 8% more Maul damage per rank |
+| Maul | Mauling Arc [G] | 3 | Maul strikes every enemy in front, the extras at 20/35/50% |
+| Maul | Savage Maul [Ail] | 3 | 10% per rank to Bleed |
+| Maul | **Earthshaker** [H] | 1 | Maul sends a shockwave 10 yd ahead, at 60% |
+| Swipe | Feral Swipe [M] | 4 | 8% more Swipe damage per rank |
+| Swipe | Wide Swipe [M] | 2 | +15% Swipe area per rank |
+| Swipe | **Ravaging Swipe** [M] | 1 | Swipe strikes up to 10 enemies (3 in vanilla) |
+| Guardian | Bristling Fur [H] | 3 | In Bear Form, each blow taken gives 2 rage per rank (once a second) |
+| Guardian | Survival Instincts [H] | 3 | Bear hits heal you for 2% of their damage per rank |
+| Guardian | **Thorned Hide** [H] | 1 | In Bear Form, enemies that hit you take 30% of your attack power as Nature (once a second each) |
+
+#### Cat
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Claws | Sharpened Claws [M] | 4 | 6% more Cat damage per rank |
+| Claws | Raking Claws [G] | 3 | Claw strikes every enemy in front, the extras at 20/35/50% |
+| Claws | Light Paws [M] | 2 | Cat abilities cost 5 less energy per rank |
+| Claws | **Stalker's Step** [K] | 1 | A kill with Shred steps you behind the nearest enemy within 10 yd |
+| Bleed | Deep Wounds [M] | 3 | 15% more Rake and Rip damage per rank |
+| Bleed | Rending Claws [Ail] | 3 | 8% per rank to Bleed |
+| Bleed | Spreading Rake [F] | 2 | Rake also lands on 1/2 more within 8 yd |
+| Bleed | **Bloodletting** [F] | 1 | Rip also lands on 4 more within 8 yd |
+| Finisher | Ferocity [M] | 3 | 10% more Ferocious Bite damage per rank |
+| Finisher | Savagery [M] | 3 | +4% critical strike chance per rank |
+| Finisher | Savage Fury [H] | 1 | Critical Claws, Shreds and Rakes give an extra combo point |
+| Finisher | **Feast** [G] | 1 | Ferocious Bite strikes every enemy in front, at 60% |
+
+#### Rejuvenation
+
+Like the paladin's Holy Light: heals, which the tree turns on enemies too.
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Bloom | Lush Growth [M] | 4 | 6% more Regrowth and Healing Touch healing per rank |
+| Bloom | Living Bloom [M] | 3 | Rejuvenation and Regrowth heal 10% more over time per rank |
+| Bloom | Quick Growth [M] | 3 | -0.2 sec cast time per rank |
+| Bloom | **Bloom** [H] | 1 | Your heals burst: every enemy within 8 yd takes 50% of the heal as Nature |
+| Wild | Nature's Wrath [H] | 3 | Your heals strike the nearest enemy within 20 yd for 15% of the heal per rank, as Nature |
+| Wild | Verdant Fury [H] | 2 | Healing yourself gives 5% more damage per rank for 5 sec |
+| Wild | **Wrath of the Wild** [H] | 1 | Your heals Poison every enemy within 8 yd, a hit of 30% of the heal (once every 3 sec) |
+| Roots | Living Root [F] | 2 | Entangling Roots also roots 1/2 more within 6 yd |
+| Roots | Grasping Vines [M] | 3 | 20% more Entangling Roots damage per rank |
+| Roots | **Overgrowth** [F] | 1 | Entangling Roots roots every enemy within 10 yd of its target |
+
+#### Druid Codex pages
+
+| Capstone | Skill | Home boss |
+|---|---|---|
+| Wrath of Cenarius | Wrath | Alzzin the Wildshaper, Dire Maul |
+| Starfall | Wrath | Shade of Eranikus, the Temple of Atal'Hakkar |
+| Eclipse | Wrath | Princess Theradras, Maraudon |
+| Full Moon | Moonfire | Twilight Lord Kelris, Blackfathom Deeps |
+| Hive Mind | Moonfire | Noxxion, Maraudon |
+| Lunar Tide | Moonfire | Aku'mai, Blackfathom Deeps |
+| Tempest | Hurricane | Mutanus the Devourer, Wailing Caverns |
+| Thunderhead | Hurricane | Lord Serpentis, Wailing Caverns |
+| Earthshaker | Bear | Charlga Razorflank, Razorfen Kraul |
+| Ravaging Swipe | Bear | Tendris Warpwood, Dire Maul |
+| Thorned Hide | Bear | Celebras the Cursed, Maraudon |
+| Stalker's Step | Cat | Lord Cobrahn, Wailing Caverns |
+| Bloodletting | Cat | Herod, Scarlet Monastery |
+| Feast | Cat | King Gordok, Dire Maul |
+| Bloom | Rejuvenation | Verdan the Everliving, Wailing Caverns |
+| Wrath of the Wild | Rejuvenation | Lady Anacondra, Wailing Caverns |
+| Overgrowth | Rejuvenation | Lord Pythas, Wailing Caverns |
+
+**Runes** fit the druid's skills too: Chains (Wrath, Moonfire), Shattering (Wrath, Moonfire, Bear,
+Cat), Expanse (Hurricane, Bear), Lingering (Moonfire, Hurricane, Rejuvenation), Leech (all but
+Rejuvenation) and Sanctity (all).
+
+Thorns, Faerie Fire, the forms' other abilities (Tiger's Fury, Dash, Bash, Pounce...) and the
+travel forms stay out of the trees: castable from the spellbook, fed by the web and gear.
+
+### The druid passive web
+
+The same layout as the others, with the druid's nodes. Notables teach the druid's talents.
+
+**Balance region (north-west):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Starlight | +4% Arcane damage |
+| Notable | Improved Wrath | Talent, rank 5: -0.5 sec Wrath cast time |
+| **Keystone** | **Celestial Focus** | 30% more Arcane and Nature spell damage; your attacks 40% less |
+| Arm (×5) | Insight | +5 Intellect |
+| Notable | Moonglow | Talent, rank 3: 9% less mana cost for Moonfire, Starfire, Wrath and the heals |
+| Notable | Improved Moonfire | Talent, rank 5: +10% Moonfire damage and critical strike chance |
+| Arm (×5) | Growth | +4% Nature damage |
+| Notable | Nature's Grace | Talent: a spell critical strike makes the next cast 0.5 sec quicker |
+| **Keystone** | **Nature's Bounty** | Your Poisons deal 50% more; your hits 15% less |
+| Side | Expanse, Moonwell | +5% spell area; +4 Spirit and +3 mana on hit |
+
+**Feral region (north-east):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Ferocity | +4% Melee damage |
+| Notable | Sharpened Claws | Talent, rank 3: +6% critical strike chance in Bear and Cat Form |
+| **Keystone** | **Predator** | Your Bleeds deal 60% more; your spells 30% less |
+| Arm (×5) | Hide | +6 Stamina |
+| Notable | Thick Hide | Talent, rank 5: +10% armour from items |
+| Notable | Heart of the Wild | Talent, rank 5: +20% Intellect; more Stamina in Bear Form, attack power in Cat Form |
+| Arm (×5) | Claws | +5 Agility |
+| Notable | Predatory Strikes | Talent, rank 3: attack power in the forms, 150% of your level |
+| **Keystone** | **King of the Jungle** | 4% more Melee damage per kill in the last 6 sec (10 at most); your heals 50% less |
+| Side | Swiftness, Wildness | +3% movement speed; +8 life on kill |
+
+**Restoration region (south):**
+
+| Kind | Name | Effect |
+|---|---|---|
+| Arm (×5) | Blossom | +4% healing |
+| Notable | Improved Rejuvenation | Talent, rank 3: 15% more Rejuvenation |
+| **Keystone** | **Tree of Life** | Your heals 50% more; your damage 20% less |
+| Arm (×5) | Spirit | +4 Spirit |
+| Notable | Furor | Talent, rank 5: rage or energy on shifting |
+| Notable | Improved Healing Touch | Talent, rank 5: -0.5 sec Healing Touch cast time |
+| Arm (×5) | Bark | +4% armour and +2 Stamina |
+| Notable | Improved Thorns | Talent, rank 3: 75% more Thorns damage |
+| **Keystone** | **Living Thorns** | Thorns on you strikes every enemy within 8 yd each second for its damage; your heals 30% less |
+| Side | Endurance, Tranquility | +8 life on kill; +4% cooldown recovery |
+
+**Between the regions:** three "Wild" nodes (+3% movement speed) near the start, and the bridges
+Natural Weapons (Balance–Feral: talent, rank 5, +10% melee damage), Leader of the Pack
+(Feral–Restoration: talent, +3% critical strike chance for the party in the forms) and Gift of
+Nature (Restoration–Balance: talent, rank 5, +10% healing).
+
+### Example druid builds at 60
+
+- **Moonkin (Wrath, Moonfire, Hurricane).** Splitting Wrath and Wrath of Cenarius chain through
+  packs, Thorned Wrath and Hive Mind stack Poison, Full Moon carries Moonfire from body to body.
+  Web: Celestial Focus and Nature's Bounty.
+- **Feral cat (Cat, Bear, Rejuvenation).** Rake and Rip spread with Spreading Rake and
+  Bloodletting, points carry between kills, Feast finishes a pack. Web: Predator and King of
+  the Jungle.
+- **Thornwarden (Bear, Rejuvenation, Hurricane).** Ravaging Swipe and Earthshaker for clearing,
+  Thorned Hide and Living Thorns punish everything that touches you, Bloom turns each heal into
+  a burst. Web: Living Thorns, Thick Hide, Tree of Life.
+
 ## Making a character
 
 Built. On an ARPG realm, Create New Character opens the class screen first: five vertical
@@ -1190,8 +1418,8 @@ for capstones and hooks:
    "Paladin skills that can be specialised"). See "What phase 2 built" below.
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
-5. **Other classes**, one at a time: the mage is built ("The mage, in full"); next the druid,
-   the warlock and the shaman.
+5. **Other classes**, one at a time: the mage and the druid are built ("The mage, in full",
+   "The druid, in full"); next the warlock and the shaman.
 
 ### What phase 2 built
 
