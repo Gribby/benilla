@@ -193,6 +193,10 @@ fn aim_point(aim: Aim, units: &AttachPosQuery, joints: &Query<&GlobalTransform>)
     }
 }
 
+/// Fork-only, not 1.12.1: how high over its feet an ARPG relay leaves the enemy it carries on
+/// from, in yards: about the middle of a man-sized body.
+const RELAY_LAUNCH_HEIGHT: f32 = 1.0;
+
 /// The caster's launch point: the fired release event's own marker, as the dispatcher passes the
 /// event's live position (`0x5ffbd0` → `0x60c940`), else the `0x60c9b0` cascade at this pose.
 fn launch_world_pos(
@@ -255,6 +259,7 @@ impl PendingMissiles {
             weapon_visual: None,
             missile_sound: None,
             awaits_release: true,
+            relay: false,
         };
         app.world_mut()
             .resource_mut::<Self>()
@@ -579,9 +584,18 @@ pub(super) fn spawn_missiles(
             queued: 0.0,
             saw_oneshot: false,
         };
+        // Fork-only: an ARPG relay leaves the middle of the enemy it carries on from.
+        let launch = if spawn.relay {
+            units
+                .get(spawn.caster)
+                .ok()
+                .map(|(base, _, _)| base.translation() + Vec3::Y * RELAY_LAUNCH_HEIGHT)
+        } else {
+            launch_world_pos(spawn.caster, None, &units, &joints)
+        };
         if spawn.awaits_release {
             pending.0.entry(spawn.caster).or_default().push(go);
-        } else if let Some(launch) = launch_world_pos(spawn.caster, None, &units, &joints) {
+        } else if let Some(launch) = launch {
             launch_go(
                 &go,
                 launch,
@@ -836,6 +850,7 @@ mod tests {
             weapon_visual: None,
             missile_sound: None,
             awaits_release,
+            relay: false,
         }
     }
 

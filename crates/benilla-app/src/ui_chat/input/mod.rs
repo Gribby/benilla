@@ -822,6 +822,7 @@ pub(super) fn drain_chat_input(
                                     dest,
                                     ammo_display_id: None,
                                     seq: play_seq.next(),
+                                    relay: false,
                                 });
                             } else if let Some(me) = me.filter(|&m| m != entity) {
                                 go_targets.write(crate::creature_anim::SpellGoTargets {
@@ -834,6 +835,7 @@ pub(super) fn drain_chat_input(
                                     // Rough Arrow, display id 5996.
                                     ammo_display_id: Some(5996),
                                     seq: play_seq.next(),
+                                    relay: false,
                                 });
                             }
                         }

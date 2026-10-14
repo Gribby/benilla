@@ -817,6 +817,9 @@ const GO_TYPE_CHEST: i32 = 3;
 
 /// `SMSG_SPELL_GO`: the cast launched. The server schedules damage off `Spell.dbc` Speed; the
 /// packet carries the hit and miss lists and the ammo display id, and the flight is rebuilt from
+/// Fork-only, not 1.12.1: the GO flag cmangos sets on an ARPG relay (`Arpg/ArpgUniques.cpp`).
+const ARPG_CAST_FLAG_RELAY: u16 = 0x4000;
+
 /// the same Speed column ([`SpellGoTargets`]).
 fn spell_go(
     caster: u64,
@@ -1081,13 +1084,19 @@ fn spell_go(
         // reference gates it on the attribute predicate `0x6e4870`, whose role here is untraced;
         // this fills unconditionally, harmless since consumption needs a chain proc and every fill
         // clears.
+        // Fork-only, not 1.12.1: an ARPG relay (cmangos `Arpg/ArpgUniques.cpp`'s
+        // `ARPG_CAST_FLAG_RELAY`) is a hit carrying on from an enemy, which casts nothing: no Go
+        // for its cast kit and animation.
+        let relay = crate::player::arpg_session() && cast_flags & ARPG_CAST_FLAG_RELAY != 0;
         fill_chain_hops(caster, e, &hits, commands, index);
-        cast_events.write(CastEvent {
-            entity: e,
-            spell_id,
-            kind: CastEventKind::Go,
-            seq,
-        });
+        if !relay {
+            cast_events.write(CastEvent {
+                entity: e,
+                spell_id,
+                kind: CastEventKind::Go,
+                seq,
+            });
+        }
         // Targets not streamed to us drop out. The miss code picks the victim's dodge or block
         // clip on the missile's arrival.
         let hits: Vec<Entity> = hits
@@ -1109,6 +1118,7 @@ fn spell_go(
                 dest,
                 ammo_display_id,
                 seq,
+                relay,
             });
         }
     }

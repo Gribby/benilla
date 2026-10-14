@@ -501,6 +501,10 @@ pub(crate) struct SpellGoTargets {
     pub(crate) ammo_display_id: Option<u32>,
     /// `PlaySeq` stamp, the GO's `CastEvent`'s.
     pub(crate) seq: u64,
+    /// Fork-only, not 1.12.1: an ARPG hit carrying on from an enemy (a chain's jump, a bolt
+    /// passing through; cmangos `Arpg/ArpgUniques.cpp`'s `ARPG_CAST_FLAG_RELAY`): its "caster" is
+    /// the enemy it leaves, which plays no cast, and its missile leaves that enemy's body.
+    pub(crate) relay: bool,
 }
 
 /// The sheath policy: requests, ceremony overlays, the `AnimationData.dbc` table.

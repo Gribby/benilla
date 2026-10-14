@@ -196,6 +196,9 @@ pub(crate) struct MissileSpawn {
     /// Launch at the cast animation's release event (`0x5ffbd0` → `0x60c940`), not at GO; the
     /// reference launches at GO only when the cast kit plays no body animation (`0x6e7a70`).
     pub(crate) awaits_release: bool,
+    /// Fork-only, not 1.12.1: an ARPG relay ([`super::SpellGoTargets::relay`]): it launches at
+    /// once from the middle of the "caster's" body, as a hit carrying on through it.
+    pub(crate) relay: bool,
 }
 
 /// Load `SpellVisual.dbc` and `SpellVisualKit.dbc` off the patch chain at startup.
@@ -887,7 +890,8 @@ pub(super) fn route_cast_visuals(
                     ground_aim,
                     weapon_visual: wv,
                     missile_sound,
-                    awaits_release,
+                    awaits_release: awaits_release && !go.relay,
+                    relay: go.relay,
                 });
             }
         }
