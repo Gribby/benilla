@@ -60,9 +60,10 @@ item becomes a data row.
 | A | Extra projectiles | A line skillshot fires N more lines, fanned around the aim | spell, N, fan angle, damage % |
 | B | Pierce | A line skillshot carries on through N enemies after the first | spell, N, damage % per pierce |
 
-A piercing skillshot flies as a bolt (cmangos `Spell::HandleArpgBolt`): it picks no target at
-launch, flies its whole range (to a wall at most) and strikes each enemy it reaches as it goes,
-one that steps into its path included. Each strike is the real spell (its burn, slow, crit and
+Every skillshot with a travel time flies as a bolt (cmangos `Spell::HandleArpgBolt`; `ARPG.md`): it
+picks no target at launch, flies its whole range (to a wall at most) and strikes what it reaches as
+it goes, one that steps into its path included. Without a pierce it stops in the first; a piercing
+one goes on through each enemy it reaches, stopping in the last it may strike. Each strike is the real spell (its burn, slow, crit and
 procs), the ones after the first at the pierce's damage share; the on-hit kits go off with the
 first strike only. A spell with a self-buff or targetless effect, or cast from an item, keeps the
 older pierce: chosen at the hit, relayed along the line.

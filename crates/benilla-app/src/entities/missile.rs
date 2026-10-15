@@ -140,6 +140,9 @@ pub(super) struct Missile {
     /// Where it left from, for an ARPG bolt's path ([`Aim::Unit`]'s `fixed`).
     from: Vec3,
     parts_spawned: bool,
+    /// Fork-only, not 1.12.1: the ARPG server stopped this bolt in an enemy ([`stop_bolts`]); it
+    /// ends where it is with no arrival of its own, the hit's impact playing on the enemy.
+    stopped: bool,
     /// The caster's ranged-weapon `SpellVisual`, resolved at GO, so a basic shot's impact kit
     /// resolves even if the caster despawns mid-flight.
     weapon_visual: Option<u32>,
@@ -495,6 +498,7 @@ fn launch_go(
             from: launch,
             // An invisible flight has no parts to wait on.
             parts_spawned: go.key.is_none(),
+            stopped: false,
             weapon_visual: go.spawn.weapon_visual,
         };
         if missile.arrive_in <= 0.0 {
@@ -749,6 +753,11 @@ pub(super) fn move_missiles(
 ) {
     let dt = time.delta_secs();
     for (entity, mut missile, mut transform) in &mut missiles {
+        if missile.stopped {
+            sounds.write(MissileSound::Stop { entity });
+            commands.entity(entity).despawn();
+            continue;
+        }
         let Some(aim) = aim_point(missile.aim, &units, &joints) else {
             // A unit target streamed out mid-flight: the reference's `0x61d870` plays on the
             // caster and floats a word per guid from the missile's list (`0x61d9dc`, calling
@@ -776,6 +785,78 @@ pub(super) fn move_missiles(
         missile.arrive_in -= dt;
         if let Some(dir) = to_target.try_normalize() {
             transform.rotation = missile_facing(dir);
+        }
+    }
+}
+
+/// Fork-only, not 1.12.1: the ARPG server's bolt stops (`SMSG_ARPG_BOLT_STOP`, cmangos
+/// `Arpg/ArpgUniques.h`): a skillshot flies as a bolt at the far end of its range and stops in the
+/// first enemy it reaches (the last, for a pierce), so its missile, flying at that far point, ends
+/// there instead. Each waits a moment for a missile still queued behind its cast's release.
+#[derive(Resource, Default)]
+pub(crate) struct BoltStops(Vec<(benilla_protocol::messages::arpg::ArpgBoltStop, f64)>);
+
+/// How long a stop waits for its missile, in seconds.
+const BOLT_STOP_WAIT: f64 = 1.5;
+
+pub(super) fn on_bolt_stop(
+    In(ev): In<benilla_protocol::SessionEvent>,
+    time: Res<Time>,
+    mut stops: ResMut<BoltStops>,
+) {
+    if let benilla_protocol::SessionEvent::ArpgBoltStop { stop } = ev {
+        if stops.0.len() >= 64 {
+            stops.0.remove(0);
+        }
+        stops.0.push((stop, time.elapsed_secs_f64()));
+    }
+}
+
+/// Mark each stopped bolt's missile: its caster's flight of that spell at a point, the one
+/// nearest the stop. [`move_missiles`] then ends it with no ground impact of its own, the hit's
+/// impact playing on the enemy (`SMSG_ARPG_IMPACT`).
+pub(super) fn stop_bolts(
+    time: Res<Time>,
+    mut stops: ResMut<BoltStops>,
+    index: Res<crate::net::GuidIndex>,
+    mut missiles: Query<(Entity, &mut Missile, &GlobalTransform)>,
+) {
+    if stops.0.is_empty() {
+        return;
+    }
+    let now = time.elapsed_secs_f64();
+    let mut ended: Vec<Entity> = Vec::new();
+    stops.0.retain(|(stop, at)| {
+        let Some(&caster) = index.0.get(&stop.caster) else {
+            return false;
+        };
+        let point = benilla_assets::coords::wow_to_bevy(stop.pos);
+        let found = missiles
+            .iter()
+            .filter(|(e, m, _)| {
+                m.caster == caster
+                    && m.spell_id == stop.spell
+                    && matches!(m.aim, Aim::Ground(_))
+                    && !m.stopped
+                    && !ended.contains(e)
+            })
+            .min_by(|a, b| {
+                a.2.translation()
+                    .distance_squared(point)
+                    .total_cmp(&b.2.translation().distance_squared(point))
+            })
+            .map(|(e, ..)| e);
+        match found {
+            Some(entity) => {
+                ended.push(entity);
+                false
+            }
+            None => now - at < BOLT_STOP_WAIT,
+        }
+    });
+    for entity in ended {
+        if let Ok((_, mut missile, _)) = missiles.get_mut(entity) {
+            missile.stopped = true;
         }
     }
 }

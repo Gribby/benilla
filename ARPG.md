@@ -67,8 +67,12 @@ player's; only with `Arpg.DevTools = 1`). A swing, cast, aim or loot action also
 can arrive while the character still loads). Server to client: `SMSG_ARPG_LOOT` = 0x33D (`u64`
 corpse, `u32` gold, `u8` n, then n × `u8` slot, `u32` item, `u32` display, `u8` quality, `u8`
 count), sent at the kill, after any change, and on a query (`src/game/Arpg/ArpgLoot.{h,cpp}`). Swings strike whoever is in the
-frontal arc or whiff; line skillshots pick the first enemy along the aim and, with none (or a target
-that dies mid-flight), fly on to max range and are spent.
+frontal arc or whiff. A line skillshot with a travel time flies as a bolt (cmangos
+`Spell::HandleArpgBolt`): it picks no target at launch, flies its whole range (to a wall at most)
+and strikes the first enemy it actually reaches, one that stepped into the line included and one
+that stepped out of it missed; the server then sends `SMSG_ARPG_BOLT_STOP` (0x351) and the client
+ends the missile there (`entities/missile.rs`, `stop_bolts`). An instant line spell picks the first
+enemy along the aim, as before.
 
 ## Roadmap
 

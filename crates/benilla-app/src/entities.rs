@@ -12,7 +12,7 @@ use benilla_formats::{
 use benilla_protocol::EntityKind;
 use bevy::prelude::*;
 
-use crate::net::NetEntity;
+use crate::net::{NetEntity, NetHandlerApp};
 use benilla_assets::{AssetSet, LockRecover, WorldAssets};
 use benilla_world::model_fade::apply_render_fade;
 use benilla_world::schedule::WorldStage;
@@ -591,6 +591,12 @@ impl Plugin for EntitiesPlugin {
         .init_resource::<spell_fx::FxTintAnims>()
         // The per-caster pending-projectile queues (the client's `unit+0xac` lists).
         .init_resource::<missile::PendingMissiles>()
+        // Fork-only, not 1.12.1: the ARPG server's bolt stops end their missiles.
+        .init_resource::<missile::BoltStops>()
+        .net_handler(
+            benilla_protocol::SessionEventKind::ArpgBoltStop,
+            missile::on_bolt_stop,
+        )
         .add_message::<MissileSound>()
         .add_message::<MissileMiss>()
         .add_message::<dest_fx::GroundBurst>()
@@ -628,7 +634,8 @@ impl Plugin for EntitiesPlugin {
                 (resolve_equipment, resolve_corpse_equipment),
                 // Spell effects and missiles create `SpellFx` entries too.
                 resolve_spell_fx,
-                move_missiles,
+                // A stopped ARPG bolt's missile ends before the flights move.
+                (missile::stop_bolts, move_missiles).chain(),
                 spawn_missiles,
                 // The dest-anchored lane's three independent producers also create entries.
                 (arm_ground_effects, spawn_ground_bursts, tick_shard_emitters),

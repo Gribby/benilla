@@ -694,12 +694,15 @@ pub(crate) mod schedule_tests {
     /// - a crate's interaction (`target::click::act_on_interact`) against what
     ///   `act_on_right_click` and the cursor classifier already pair with: it runs the click's
     ///   dispatchers over the classifier's reading of its object, and its attack leg
-    ///   selects as the click does, so it writes `Selection` where the click's drain does.
+    ///   selects as the click does, so it writes `Selection` where the click's drain does;
+    /// - the ARPG bolt stop (`entities::missile::stop_bolts`) reads missiles' `GlobalTransform`;
+    ///   its two pairs, `finish_colliders` and `publish_camera_pose`, touch that component only on
+    ///   terrain colliders and the camera, never on a missile.
     ///
     /// Raising the ceiling is a claim that a new undeclared order is acceptable: make it with the
     /// reason read off the dump, or declare the order (`.after`, a set, a `chain`). A resource
     /// that commutes by construction belongs in [`Classes`].
-    const UPDATE_ACTIONABLE_CEILING: usize = 5_210;
+    const UPDATE_ACTIONABLE_CEILING: usize = 5_212;
     const UPDATE_ACTIONABLE_SLACK: usize = 40;
 
     fn ratchet(what: &str, n: usize, ceiling: usize, slack: usize) {

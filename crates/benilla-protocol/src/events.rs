@@ -479,6 +479,10 @@ pub enum SessionEvent {
     /// Fork-only, not 1.12.1: the ARPG costs of the player's mana spells (`SMSG_ARPG_COSTS`), by
     /// spell id.
     ArpgCosts { costs: Vec<(u32, u32)> },
+    /// Fork-only, not 1.12.1: a skillshot bolt stopped in an enemy (`SMSG_ARPG_BOLT_STOP`).
+    ArpgBoltStop {
+        stop: crate::messages::arpg::ArpgBoltStop,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

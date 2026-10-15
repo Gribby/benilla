@@ -804,6 +804,28 @@ pub fn read_arpg_costs(r: &mut impl io::Read) -> io::Result<Vec<(u32, u32)>> {
     Ok(out)
 }
 
+/// A skillshot bolt stopped in an enemy (cmangos `Arpg/ArpgUniques.h`, `SendBoltStop`): its caster,
+/// its spell, and where, in WoW coordinates. The bolt flew at the far end of its range; its missile
+/// ends here instead.
+pub const SMSG_ARPG_BOLT_STOP: u16 = 0x0351;
+
+/// One [`SMSG_ARPG_BOLT_STOP`].
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ArpgBoltStop {
+    pub caster: u64,
+    pub spell: u32,
+    pub pos: [f32; 3],
+}
+
+/// `SMSG_ARPG_BOLT_STOP`: `u64` caster, `u32` spell, `f32` x y z.
+pub fn read_arpg_bolt_stop(r: &mut impl io::Read) -> io::Result<ArpgBoltStop> {
+    Ok(ArpgBoltStop {
+        caster: read_u64_le(r)?,
+        spell: read_u32_le(r)?,
+        pos: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+    })
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
