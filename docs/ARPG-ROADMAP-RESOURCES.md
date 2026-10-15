@@ -91,6 +91,12 @@ adds damage through Chill. That answers "I'm only incentivised to cast Fireball"
 
 ## Phase 2: difficulty
 
+**Built, first pass** (cmangos `Arpg::DifficultyDamageMod`, `mangosd.conf`): every creature's
+damage x `Arpg.Difficulty.Damage` (1.3), x (1 + `DamagePerLevel` 0.008 per creature level), x
+`DungeonDamage` (1.25) in a dungeon; the per-hit caps rise by the square root, so a pack's
+pressure grows more than any one blow (about x1.95 damage and x1.4 caps at level 25 in a
+dungeon). Tune the three knobs from the statistics' deaths and low-health time.
+
 - **Monster damage by area level**, compounding about 8% a level, then rarity multipliers
   (champion x1.5, rare x2.5, boss x4) and a solo multiplier for dungeons built for five.
 - **Tune by time to kill the player**: face-tanking a trash pack should kill in 6-10 s; a boss's
