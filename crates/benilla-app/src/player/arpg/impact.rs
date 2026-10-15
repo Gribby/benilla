@@ -449,12 +449,20 @@ fn apply_recoil(
                     t.translation = out;
                     dirty = true;
                 }
-                if let Some(f) = scale {
-                    let want = Vec3::splat(f);
-                    if t.scale != want {
-                        t.scale = want;
-                        dirty = true;
-                    }
+            }
+        }
+        // The scale on the roots, and on any bone that drops its parent's scale, which the roots'
+        // would otherwise miss and leave standing full size.
+        if let Some(f) = scale {
+            let want = Vec3::splat(f);
+            for bone in 0..rig.locals.len() {
+                if rig.parents[bone] >= 0 && !rig.drops_parent_scale(bone) {
+                    continue;
+                }
+                let t = &mut rig.locals[bone];
+                if t.scale != want {
+                    t.scale = want;
+                    dirty = true;
                 }
             }
         }

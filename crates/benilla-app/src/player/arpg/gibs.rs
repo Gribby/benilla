@@ -34,6 +34,8 @@ const SPIN_MAX: f32 = 3.0;
 const GRAVITY: f32 = 22.0;
 const BOUNCE_KEEP: f32 = 0.32;
 const SLIDE_KEEP: f32 = 0.55;
+/// What of a lying chunk's slide and tumble survives a second on the ground.
+const REST_KEEP_PER_SEC: f32 = 0.002;
 /// A chunk lies this long, then shrinks away over the next stretch.
 const LIE_SECS: f32 = 2.4;
 const SHRINK_SECS: f32 = 0.7;
@@ -224,10 +226,16 @@ fn fly_gibs(
                 if gib.vel.y < 0.6 {
                     gib.vel.y = 0.0;
                 }
+                // Each landing scrubs the slide and the tumble.
+                gib.vel.x *= SLIDE_KEEP;
+                gib.vel.z *= SLIDE_KEEP;
+                gib.spin *= SLIDE_KEEP;
             }
-            gib.vel.x *= SLIDE_KEEP;
-            gib.vel.z *= SLIDE_KEEP;
-            gib.spin *= SLIDE_KEEP;
+            // Lying, friction by the second, so it stops alike at any frame rate.
+            let rub = REST_KEEP_PER_SEC.powf(dt);
+            gib.vel.x *= rub;
+            gib.vel.z *= rub;
+            gib.spin *= rub;
         }
         let spin = gib.spin * dt;
         tf.rotate(Quat::from_scaled_axis(spin));

@@ -40,6 +40,16 @@ pub struct RigPose {
 }
 
 impl RigPose {
+    /// Bone `bone` drops its parent's scale (`flags & 0x2`), so a scale laid on the roots misses it.
+    pub fn drops_parent_scale(&self, bone: usize) -> bool {
+        use benilla_formats::ParentBasis;
+        self.arms
+            .get(bone)
+            .copied()
+            .flatten()
+            .is_some_and(|a| matches!(a.basis, ParentBasis::UnitNormalize | ParentBasis::RootBasis))
+    }
+
     /// The rig at bind pose, composed; anchors come from [`Self::anchor_for`].
     pub fn new(joints_root: Entity, skeleton: &ModelSkeleton) -> Self {
         let locals: Vec<Transform> = skeleton
