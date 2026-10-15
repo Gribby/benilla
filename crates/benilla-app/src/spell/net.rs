@@ -48,7 +48,15 @@ pub(super) fn register(app: &mut App) {
         .net_handler(K::ChannelStart, on_channel)
         .net_handler(K::ChannelUpdate, on_channel)
         .net_handler(K::AuraDuration, on_aura_duration)
-        .net_handler(K::SpellModifier, on_spell_modifier);
+        .net_handler(K::SpellModifier, on_spell_modifier)
+        .net_handler(K::ArpgCosts, on_arpg_costs);
+}
+
+/// Fork-only, not 1.12.1: the ARPG server's spell costs (cmangos `Arpg/ArpgResources.h`).
+fn on_arpg_costs(In(ev): In<SessionEvent>, mut mods: ResMut<super::SpellModifiers>) {
+    if let SessionEvent::ArpgCosts { costs } = ev {
+        mods.set_arpg_costs(costs);
+    }
 }
 
 /// The cast lifecycle's state and catalogs, which every handler here folds its packet into,

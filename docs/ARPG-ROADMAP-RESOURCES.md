@@ -1,8 +1,8 @@
 # ARPG roadmap: resources and difficulty
 
 Where mana, rage and energy and the game's difficulty go next, from how other ARPGs do it and from
-our own play statistics (`ARPG-HANDOFF.md`, "Play statistics"). Nothing here is built yet; each
-phase is small enough to play and measure before the next.
+our own play statistics (`ARPG-HANDOFF.md`, "Play statistics"). Each phase is small enough to play
+and measure before the next.
 
 ## What the stats say now
 
@@ -32,6 +32,18 @@ The 1.12 "five second rule" (no mana regen for 5 s after a cast) goes: it punish
 is the whole game.
 
 ## Phase 1: the resource model
+
+**Built** (cmangos `Arpg/ArpgResources.{h,cpp}`, client `spell/usable.rs` and `spell/mods.rs`):
+overdraw with at least half the cost left (rather than any mana at all, so Frostbolt's refund
+cannot buy a Pyroblast), mana costs as a share of the pool by the tables below, the fillers'
+refunds (Frostbolt and Wrath 3% once a cast, a sealed paladin swing 2%), free shapeshifting,
+regeneration of 1.5% a second with no five-second rule, globes giving 8% mana, and
+`SMSG_ARPG_COSTS` (0x350) so the client shows and checks the same costs. The play statistics count
+overdraws and read low mana at 20% and low health at 35%.
+
+**Not yet:** the mana flask, the orb's low-mana pulse and sound, a cast at nothing left trying the
+filler, bear rage on entering the form, the cat's free fallback, the cost and mana-on-hit affixes,
+Chill.
 
 **All classes**
 

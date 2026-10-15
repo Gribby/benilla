@@ -479,9 +479,15 @@ pub(crate) fn power_cost_at(
         CostBasis::Fixed(value) => value,
     };
     let level_delta = i64::from(level) - i64::from(d.base_level);
-    let cost = i64::from(d.mana_cost)
-        + level_delta * i64::from(d.mana_cost_per_level)
-        + i64::from(base) * i64::from(d.mana_cost_pct) / 100;
+    // Fork-only, not 1.12.1: the ARPG server's cost stands for the base terms.
+    let cost = match mods.arpg_cost(d.id) {
+        Some(arpg) => i64::from(arpg),
+        None => {
+            i64::from(d.mana_cost)
+                + level_delta * i64::from(d.mana_cost_per_level)
+                + i64::from(base) * i64::from(d.mana_cost_pct) / 100
+        }
+    };
     // The talent cut applies before the clamp at 0.
     let cost = cost.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
     u32::try_from(mods.apply(d, OP_COST, cost)).unwrap_or(0)
@@ -529,7 +535,17 @@ pub(crate) fn can_afford(d: &SpellDisplay, store: &ObjectStore, mods: &SpellModi
     } else {
         store.0.unit_power(power_type as u8).unwrap_or(0)
     };
-    avail >= power_cost(d, store, mods)
+    let cost = power_cost(d, store, mods);
+    // Fork-only, not 1.12.1: an ARPG mana or rage spell casts with half its cost left, and takes
+    // what is left (overdraw, cmangos `Arpg/ArpgResources.h`).
+    if (power_type == 0 || power_type == 1)
+        && avail > 0
+        && u64::from(avail) * 2 >= u64::from(cost)
+        && mods.arpg_cost(d.id).is_some()
+    {
+        return true;
+    }
+    avail >= cost
 }
 
 #[cfg(test)]
@@ -861,6 +877,32 @@ mod tests {
             ..d
         };
         assert_eq!(power_cost(&other_class, &store, &mods), 100);
+    }
+
+    /// Fork-only: the ARPG server's cost replaces the DBC's, and half of it left casts it.
+    #[test]
+    fn an_arpg_cost_stands_and_half_of_it_left_casts_it() {
+        let d = SpellDisplay {
+            id: 133,
+            mana_cost: 30,
+            ..Default::default()
+        };
+        let mut mods = SpellModifiers::default();
+        mods.set_arpg_costs([(133, 120)]);
+        let some = ObjectStore(ObjectFields::from_pairs(&[(23, 60)]));
+        assert_eq!(power_cost(&d, &some, &mods), 120);
+        assert!(can_afford(&d, &some, &mods), "60 mana overdraws a 120 cost");
+        let little = ObjectStore(ObjectFields::from_pairs(&[(23, 59)]));
+        assert!(!can_afford(&d, &little, &mods), "under half is not enough");
+        let none = ObjectStore(ObjectFields::from_pairs(&[(23, 0)]));
+        assert!(!can_afford(&d, &none, &mods), "empty is empty");
+        // A spell the server named no cost for keeps the stock rule.
+        let other = SpellDisplay { id: 9, ..d };
+        let ten = ObjectStore(ObjectFields::from_pairs(&[(23, 10)]));
+        assert!(
+            !can_afford(&other, &ten, &mods),
+            "10 mana does not buy its stock 30"
+        );
     }
 
     /// Each gate trips alone; only the power leg raises notEnoughMana (`0x6e3feb`).

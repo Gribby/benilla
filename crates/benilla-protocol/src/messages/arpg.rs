@@ -789,6 +789,21 @@ pub fn read_arpg_sets(r: &mut impl io::Read) -> io::Result<Vec<ArpgItemSet>> {
     Ok(out)
 }
 
+/// The ARPG costs of the player's mana spells (cmangos `Arpg/ArpgResources.h`), sent with the
+/// hello and whenever maximum mana or the spells known change.
+pub const SMSG_ARPG_COSTS: u16 = 0x0350;
+
+/// `SMSG_ARPG_COSTS`: `u16` count, per spell `u32` id and `u32` cost (every cost term but the spell
+/// modifiers, which the client applies).
+pub fn read_arpg_costs(r: &mut impl io::Read) -> io::Result<Vec<(u32, u32)>> {
+    let n = read_u16_le(r)?;
+    let mut out = Vec::with_capacity(capacity_hint(n, 1024));
+    for _ in 0..n {
+        out.push((read_u32_le(r)?, read_u32_le(r)?));
+    }
+    Ok(out)
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {

@@ -90,6 +90,11 @@ pub(crate) struct SpellModifiers {
     /// The local player's class spell-family (`ChrClasses.dbc` field 15); 0 until the avatar
     /// resolves, which the reader's `SpellFamilyName != 0` gate covers.
     class_family: u32,
+    /// Fork-only, not 1.12.1: the ARPG server's costs of the player's mana spells by spell id
+    /// (`SMSG_ARPG_COSTS`, cmangos `Arpg/ArpgResources.h`), every term but these modifiers. A
+    /// spell here also casts on any power left (overdraw). Kept across world-enter: the server
+    /// sends them with the hello and on a change.
+    arpg_costs: std::collections::HashMap<u32, u32>,
 }
 
 impl Default for SpellModifiers {
@@ -98,6 +103,7 @@ impl Default for SpellModifiers {
             flat: [0; CELLS],
             pct: [0; CELLS],
             class_family: 0,
+            arpg_costs: std::collections::HashMap::new(),
         }
     }
 }
@@ -121,6 +127,16 @@ impl SpellModifiers {
         } else {
             self.pct[cell] = value;
         }
+    }
+
+    /// Fork-only, not 1.12.1: replace the ARPG server's spell costs.
+    pub(crate) fn set_arpg_costs(&mut self, costs: impl IntoIterator<Item = (u32, u32)>) {
+        self.arpg_costs = costs.into_iter().collect();
+    }
+
+    /// Fork-only, not 1.12.1: the ARPG server's cost of spell `id`, if it sent one.
+    pub(crate) fn arpg_cost(&self, id: u32) -> Option<u32> {
+        self.arpg_costs.get(&id).copied()
     }
 
     /// Set the gate's class family (`0x6e6ca0`).
