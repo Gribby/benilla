@@ -136,7 +136,9 @@ bonuses with the main hit's delivery (Melee, Spell, Area) and the skill's more b
 critical when the main hit was, and it can inflict its own ailment. Swings take the attack
 affixes, spells the spell ones; a Seal's proc takes none, as the swing it rides on has them
 already; at most the two biggest types land beside one hit. The
-affix shows and deals its numbers at the ARPG's size for the item's level. This is what makes an
+affix shows and deals its numbers at the ARPG's size for the item's level, eight times vanilla's
+stat growth, so an affix lands near a fifth of the hit it rides on (at vanilla's size it was about
+2%, noise beside a skill). This is what makes an
 off-type affix worth having: a Holy paladin with Fire added to attacks ignites.
 
 ### Ailments
@@ -981,6 +983,12 @@ the level their talent row needs.
   is told only of the bits no other spell carries, for its tooltips.
 - The generated unique powers already suit every class. The authored uniques' kits are by spell,
   and six are the mage's already (Fireball, Frostbolt, Arcane Missiles, Polymorph).
+
+### Thermal Shock: Frostbolt sets up, fire pays off
+
+Every mage has it, no node needed: Frostbolt, the free filler that gives 3% mana back
+(`ARPG-ROADMAP-RESOURCES.md`), always chills what it hits, and fire spells deal 30% more to a
+chilled enemy. Frostbolt then Fireball beats Fireball alone, in damage and in mana.
 
 ### Mage skills that can be specialised
 

@@ -106,6 +106,9 @@ dungeon). Tune the three knobs from the statistics' deaths and low-health time.
 
 ## Phase 3: skill variety
 
+**Built, first pass:** added damage eight times bigger (a fifth of the hit it rides on, not 2%);
+Thermal Shock for every mage (Frostbolt always chills, fire deals 30% more to the chilled).
+
 - Make the procs and secondary hits scale with spell power so they matter (today they are
   near-zero).
 - More synergies like Chill: one skill sets up, another pays off.
