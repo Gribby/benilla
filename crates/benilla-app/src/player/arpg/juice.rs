@@ -58,8 +58,9 @@ const SHAKE_SPEED: f32 = 47.0;
 /// numbers can land on a corpse, none of which may burst it again.
 #[derive(Resource, Default)]
 struct StruckUnits {
-    /// The unit, the last hit's time, its damage and whether it was a crit.
-    live: Vec<(Entity, f64, u32, bool)>,
+    /// The unit, the last hit's time, its damage, whether it was a crit, and its school index
+    /// (Physical to Arcane, as the combat log's; 0 for none known).
+    live: Vec<(Entity, f64, u32, bool, u8)>,
     burst: std::collections::HashSet<Entity>,
 }
 
@@ -88,13 +89,16 @@ struct Burst {
     rgb: [f32; 3],
 }
 
-/// A unit the player struck died: where, and whether the blow that did it was heavy (a crit, or
-/// a quarter of its health at once), which flings the corpse (`super::impact`).
+/// A unit the player struck died: where, whether the blow that did it was a true overkill (a crit
+/// for at least its whole health, or a blow of half again its whole health), which bursts the
+/// corpse (`super::impact`, `super::gibs`), and the blow's school.
 #[derive(Message, Clone, Copy, Debug)]
 pub(crate) struct ArpgKill {
     pub(crate) unit: Entity,
     pub(crate) at: Vec3,
     pub(crate) overkill: bool,
+    /// The killing blow's school index (Physical to Arcane, as the combat log's).
+    pub(crate) school: u8,
     /// The unit's champion tier: 0 none, 1 a champion, 2 a rare.
     pub(crate) tier: u8,
 }
@@ -169,6 +173,15 @@ fn note_hits(
             now,
             text_damage(&spawn.text),
             spawn.category == CATEGORY_CRIT,
+            match spawn.arpg {
+                Some((
+                    crate::combat_text::ArpgText::Hit { school, .. }
+                    | crate::combat_text::ArpgText::Tick { school }
+                    | crate::combat_text::ArpgText::Label { school },
+                    _,
+                )) => school,
+                _ => 0,
+            },
         ));
     }
     struck
@@ -187,6 +200,18 @@ fn taken_kick(damage: u32, most: u32) -> f32 {
         return 0.0;
     }
     (SHAKE_TAKEN_MAX * share / TAKEN_SHARE_MAX).min(SHAKE_TAKEN_MAX)
+}
+
+/// Whether a killing blow of `damage` against `max` health bursts the corpse: a crit for at least
+/// the whole health bar, or any blow of half again it. Not every kill: one that just finishes a
+/// unit off leaves it whole.
+fn is_overkill(damage: u32, max: u32, crit: bool) -> bool {
+    if max == 0 {
+        return false;
+    }
+    let damage = u64::from(damage);
+    let max = u64::from(max);
+    (crit && damage >= max) || damage * 2 >= max * 3
 }
 
 /// The burst's colour and size for a kill of a unit of champion tier `tier` (0 for none).
@@ -217,15 +242,16 @@ fn spot_kills(
     let mut killed = Vec::new();
     struck
         .live
-        .retain(|(unit, _, damage, crit)| match units.get(*unit) {
+        .retain(|(unit, _, damage, crit, school)| match units.get(*unit) {
             Ok((at, store, guid)) if store.0.unit_health() == Some(0) => {
                 let tier = guid.and_then(|g| champions.tier_of(g.0)).unwrap_or(0);
                 let max = store.0.unit_max_health().unwrap_or(0);
-                let overkill = *crit || (max > 0 && damage.saturating_mul(4) >= max);
+                let overkill = is_overkill(*damage, max, *crit);
                 kills.write(ArpgKill {
                     unit: *unit,
                     at: at.translation,
                     overkill,
+                    school: *school,
                     tier,
                 });
                 killed.push((*unit, at.translation, tier));
@@ -349,6 +375,18 @@ fn shake_camera(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_true_overkill_bursts_the_corpse() {
+        // A blow that just finishes a unit off leaves it whole, crit or not.
+        assert!(!is_overkill(300, 1000, false));
+        assert!(!is_overkill(900, 1000, true));
+        // A crit for the whole bar, or any blow of half again it, bursts it.
+        assert!(is_overkill(1000, 1000, true));
+        assert!(!is_overkill(1400, 1000, false));
+        assert!(is_overkill(1500, 1000, false));
+        assert!(!is_overkill(5000, 0, true));
+    }
 
     #[test]
     fn a_burst_swells_and_fades_then_ends() {

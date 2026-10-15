@@ -185,7 +185,9 @@ which skills carry a build.
   - `champions.rs`;
   - `actions.rs` flask/roll status;
   - `impact.rs`: hit recoil, and a heavy kill's corpse swelling then collapsing (`RecoilKind::Gib`);
-  - `gibs.rs`: a heavy kill's chunks (flesh, or stone for bloodless units) that bounce, lie and fade;
+  - `gibs.rs`: a true overkill's chunks (a crit for the whole health bar, or a blow of 1.5x it),
+    in the killing blow's element (fire embers cooling to char, ice, venom, shadow, arcane and holy
+    light; physical: flesh or stone), bouncing, lying and fading;
   - `juice.rs`: hitstop and camera shake, including a kick when the player takes a big blow;
   - `fx.rs`;
   - `feel.rs`: proc labels and their kits, kills bursting in the killing blow's damage type, the

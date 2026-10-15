@@ -1,9 +1,12 @@
 //! Fork-only, not 1.12.1: the ARPG view's gibs. A kill by a heavy blow (a crit, or a quarter of
 //! the health at once: `super::juice`'s overkill) bursts the corpse: its body collapses away
 //! (`super::impact`) as a spray of chunks flies out of it, tumbling, bouncing on the ground and
-//! settling, then shrinking away. A creature that bleeds comes apart in flesh and a little bone; one
-//! that does not (an elemental, a skeleton, a construct) in grey stone and bone. A champion or a
-//! rare comes apart in more pieces. Beside it, `super::strikes` sprays the creature's own blood
+//! settling, then shrinking away. A physical blow tears a creature that bleeds into flesh and a
+//! little bone, one that does not (an elemental, a skeleton, a construct) into grey stone and
+//! bone. A spell's kill comes apart in its element: fire in burning embers that cool to char,
+//! frost in ice shards that skid, nature in sizzling green, shadow in dark motes that sink slowly
+//! and fade, arcane and holy in glowing shards that float up. A champion or a rare comes apart in
+//! more pieces. Beside it, `super::strikes` sprays the creature's own blood
 //! and `super::impact` lays its blood on the ground.
 //!
 //! Drawing only, local to this client, as the rest of the feel is.
@@ -30,13 +33,13 @@ const OUT_MAX: f32 = 7.0;
 const UP_MIN: f32 = 2.5;
 const UP_MAX: f32 = 7.5;
 const SPIN_MAX: f32 = 3.0;
-/// Gravity, and what a bounce keeps of the fall and of the slide.
+/// Gravity (at an element's weight of 1), and what a bounce keeps of the fall and of the slide.
 const GRAVITY: f32 = 22.0;
 const BOUNCE_KEEP: f32 = 0.32;
 const SLIDE_KEEP: f32 = 0.55;
 /// What of a lying chunk's slide and tumble survives a second on the ground.
 const REST_KEEP_PER_SEC: f32 = 0.002;
-/// A chunk lies this long, then shrinks away over the next stretch.
+/// A chunk lies this long (at an element's), then shrinks away over the next stretch.
 const LIE_SECS: f32 = 2.4;
 const SHRINK_SECS: f32 = 0.7;
 
@@ -47,25 +50,142 @@ const BONE: [f32; 3] = [0.82, 0.77, 0.66];
 /// One chunk in this many is bone.
 const BONE_EVERY: u32 = 5;
 
+/// The elements' chunks: fire's embers and the char they cool to, frost's ice, nature's green,
+/// shadow's dark motes, arcane's and holy's light.
+const EMBER: [[f32; 3]; 3] = [[1.0, 0.42, 0.06], [1.0, 0.68, 0.18], [0.95, 0.22, 0.03]];
+const CHAR: [[f32; 3]; 3] = [[0.07, 0.05, 0.04], [0.16, 0.09, 0.05], [0.3, 0.07, 0.02]];
+const ICE: [[f32; 3]; 3] = [[0.72, 0.88, 1.0], [0.5, 0.72, 0.98], [0.88, 0.96, 1.0]];
+const VENOM: [[f32; 3]; 3] = [[0.38, 0.8, 0.18], [0.2, 0.52, 0.1], [0.62, 0.95, 0.38]];
+const GLOOM: [[f32; 3]; 3] = [[0.32, 0.12, 0.45], [0.14, 0.05, 0.2], [0.5, 0.22, 0.66]];
+const ARCANE: [[f32; 3]; 3] = [[0.9, 0.5, 1.0], [0.62, 0.38, 1.0], [1.0, 0.78, 1.0]];
+const RADIANT: [[f32; 3]; 3] = [[1.0, 0.9, 0.5], [1.0, 0.78, 0.3], [1.0, 1.0, 0.8]];
+/// Fire's embers burn this long, between the two, before they are char.
+const EMBER_SECS: (f32, f32) = (0.5, 1.6);
+
+/// How a kill's chunks look and move, by the killing blow's element.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Look {
+    /// The palette's key in [`GibArt`], and its colours.
+    key: u8,
+    palette: &'static [[f32; 3]],
+    /// The palette's brightness: past 1 it glows under the bloom.
+    glow: f32,
+    /// What a chunk cools to (fire's char), and after how long.
+    cooled: Option<&'static [[f32; 3]]>,
+    /// Bone among the chunks.
+    bone: bool,
+    /// Gravity's share: under 1 drifts, below 0 floats up.
+    weight: f32,
+    /// Lying time, chunk count and size, against a physical kill's.
+    lie: f32,
+    count: f32,
+    size: f32,
+    /// What a lying chunk keeps of its slide over a second (ice skids).
+    rest_keep: f32,
+}
+
+/// The chunks of a kill by a blow of school `school` (Physical to Arcane, as the combat log's), on
+/// a creature that `bleeds` or not.
+fn look_of(school: u8, bleeds: bool) -> Look {
+    let base = Look {
+        key: 0,
+        palette: &FLESH,
+        glow: 1.0,
+        cooled: None,
+        bone: true,
+        weight: 1.0,
+        lie: LIE_SECS,
+        count: 1.0,
+        size: 1.0,
+        rest_keep: REST_KEEP_PER_SEC,
+    };
+    let magic = |key, palette, glow| Look {
+        key,
+        palette,
+        glow,
+        bone: false,
+        ..base
+    };
+    match school {
+        1 => Look {
+            weight: -0.12,
+            lie: 1.1,
+            ..magic(1, &RADIANT[..], 2.6)
+        },
+        2 => Look {
+            cooled: Some(&CHAR[..]),
+            bone: true,
+            ..magic(2, &EMBER[..], 3.2)
+        },
+        3 => magic(3, &VENOM[..], 1.6),
+        4 => Look {
+            count: 1.5,
+            size: 0.8,
+            rest_keep: 0.25,
+            ..magic(4, &ICE[..], 1.3)
+        },
+        5 => Look {
+            weight: 0.3,
+            lie: 1.3,
+            ..magic(5, &GLOOM[..], 1.5)
+        },
+        6 => Look {
+            weight: -0.15,
+            lie: 1.0,
+            ..magic(6, &ARCANE[..], 2.6)
+        },
+        _ if bleeds => base,
+        _ => Look {
+            key: 7,
+            palette: &STONE,
+            ..base
+        },
+    }
+}
+
 /// One chunk in flight or at rest.
 #[derive(Component)]
 struct Gib {
     vel: Vec3,
     spin: Vec3,
     age: f32,
+    /// Its element's gravity share, lying time and resting slide ([`Look`]).
+    weight: f32,
+    lie: f32,
+    rest_keep: f32,
+    /// What it cools to, and when (fire's embers to char).
+    cool: Option<(f32, Handle<StandardMaterial>)>,
     /// The ground under it (the corpse's feet), and its half-size, so it lies on it.
     ground: f32,
     half: f32,
     size: f32,
 }
 
-/// The chunk mesh and the palette's materials, made once.
+/// The chunk mesh and the palettes' materials, each made once: by [`Look::key`], and the cooled
+/// palettes past [`COOLED_KEY`].
 #[derive(Resource, Default)]
 struct GibArt {
     mesh: Option<Handle<Mesh>>,
-    flesh: Vec<Handle<StandardMaterial>>,
-    stone: Vec<Handle<StandardMaterial>>,
+    palettes: std::collections::HashMap<u8, Vec<Handle<StandardMaterial>>>,
     bone: Option<Handle<StandardMaterial>>,
+}
+
+/// Added to a look's key for its cooled palette's.
+const COOLED_KEY: u8 = 100;
+
+impl GibArt {
+    fn palette(
+        &mut self,
+        materials: &mut Assets<StandardMaterial>,
+        key: u8,
+        colours: &[[f32; 3]],
+        glow: f32,
+    ) -> Vec<Handle<StandardMaterial>> {
+        self.palettes
+            .entry(key)
+            .or_insert_with(|| colours.iter().map(|&c| unlit(materials, c, glow)).collect())
+            .clone()
+    }
 }
 
 pub(super) fn plugin(app: &mut App) {
@@ -93,9 +213,19 @@ fn chunk_count(scale: f32, tier: u8) -> u32 {
     (CHUNKS * scale.clamp(0.7, 2.5)).round() as u32 + u32::from(tier.min(2)) * CHUNKS_PER_TIER
 }
 
-fn unlit(materials: &mut Assets<StandardMaterial>, rgb: [f32; 3]) -> Handle<StandardMaterial> {
+/// An unlit chunk material; a `glow` past 1 lifts it past white, for the bloom to catch.
+fn unlit(
+    materials: &mut Assets<StandardMaterial>,
+    rgb: [f32; 3],
+    glow: f32,
+) -> Handle<StandardMaterial> {
+    let base = Color::srgb(rgb[0], rgb[1], rgb[2]).to_linear();
     materials.add(StandardMaterial {
-        base_color: Color::srgb(rgb[0], rgb[1], rgb[2]),
+        base_color: Color::LinearRgba(LinearRgba::rgb(
+            base.red * glow,
+            base.green * glow,
+            base.blue * glow,
+        )),
         unlit: true,
         ..default()
     })
@@ -134,22 +264,25 @@ fn burst_corpses(
         };
         if art.mesh.is_none() {
             art.mesh = Some(meshes.add(Cuboid::new(1.0, 1.0, 1.0)));
-            art.flesh = FLESH.iter().map(|&c| unlit(&mut materials, c)).collect();
-            art.stone = STONE.iter().map(|&c| unlit(&mut materials, c)).collect();
-            art.bone = Some(unlit(&mut materials, BONE));
+            art.bone = Some(unlit(&mut materials, BONE, 1.0));
         }
         let (Some(mesh), Some(bone)) = (art.mesh.clone(), art.bone.clone()) else {
             continue;
         };
-        let palette = if bleeds { &art.flesh } else { &art.stone };
-        let count = (chunk_count(scale, kill.tier) as usize).min(room);
+        let look = look_of(kill.school, bleeds);
+        let palette = art.palette(&mut materials, look.key, look.palette, look.glow);
+        let cooled = look
+            .cooled
+            .map(|c| art.palette(&mut materials, look.key + COOLED_KEY, c, 1.0));
+        let count =
+            ((chunk_count(scale, kill.tier) as f32 * look.count).round() as usize).min(room);
         room -= count;
         let mut rng = Scatter(
             kill.unit.to_bits() ^ 0x9E37_79B9_7F4A_7C15 ^ (kill.at.x.to_bits() as u64) << 20,
         );
         let origin = kill.at + Vec3::Y * BURST_HEIGHT * scale;
         for i in 0..count as u32 {
-            let size = rng.range(SIZE_MIN, SIZE_MAX) * scale.sqrt();
+            let size = rng.range(SIZE_MIN, SIZE_MAX) * scale.sqrt() * look.size;
             let angle = rng.range(0.0, std::f32::consts::TAU);
             let out = rng.range(OUT_MIN, OUT_MAX);
             let vel = Vec3::new(
@@ -163,11 +296,16 @@ fn burst_corpses(
                 rng.range(-1.0, 1.0),
             ) * SPIN_MAX
                 * std::f32::consts::TAU;
-            let material = if i % BONE_EVERY == BONE_EVERY - 1 {
+            let shade = i as usize % palette.len();
+            let is_bone = look.bone && i % BONE_EVERY == BONE_EVERY - 1;
+            let material = if is_bone && look.cooled.is_none() {
                 bone.clone()
             } else {
-                palette[i as usize % palette.len()].clone()
+                palette[shade].clone()
             };
+            let cool = cooled
+                .as_ref()
+                .map(|c| (rng.range(EMBER_SECS.0, EMBER_SECS.1), c[shade].clone()));
             // Not cubes: each chunk stretched its own way.
             let shape = Vec3::new(
                 rng.range(0.6, 1.4),
@@ -184,6 +322,10 @@ fn burst_corpses(
                     vel,
                     spin,
                     age: 0.0,
+                    weight: look.weight,
+                    lie: look.lie,
+                    rest_keep: look.rest_keep,
+                    cool,
                     ground: kill.at.y,
                     half: shape.y * 0.5,
                     size: 1.0,
@@ -194,29 +336,40 @@ fn burst_corpses(
     }
 }
 
-/// The scale a chunk `age` seconds old keeps: whole while it lies, then shrinking to nothing.
-fn gib_left(age: f32) -> f32 {
-    if age <= LIE_SECS {
+/// The scale a chunk `age` seconds old keeps: whole while it lies `lie` seconds, then shrinking
+/// to nothing.
+fn gib_left(age: f32, lie: f32) -> f32 {
+    if age <= lie {
         return 1.0;
     }
-    (1.0 - (age - LIE_SECS) / SHRINK_SECS).max(0.0)
+    (1.0 - (age - lie) / SHRINK_SECS).max(0.0)
 }
 
 /// Fly, bounce, settle and shrink each chunk.
 fn fly_gibs(
     mut commands: Commands,
     time: Res<Time>,
-    mut gibs: Query<(Entity, &mut Gib, &mut Transform)>,
+    mut gibs: Query<(
+        Entity,
+        &mut Gib,
+        &mut Transform,
+        &mut MeshMaterial3d<StandardMaterial>,
+    )>,
 ) {
     let dt = time.delta_secs().min(0.05);
-    for (entity, mut gib, mut tf) in &mut gibs {
+    for (entity, mut gib, mut tf, mut material) in &mut gibs {
         gib.age += dt;
-        let left = gib_left(gib.age);
+        let left = gib_left(gib.age, gib.lie);
         if left <= 0.0 {
             commands.entity(entity).despawn();
             continue;
         }
-        gib.vel.y -= GRAVITY * dt;
+        if gib.cool.as_ref().is_some_and(|(at, _)| gib.age >= *at) {
+            if let Some((_, cooled)) = gib.cool.take() {
+                material.0 = cooled;
+            }
+        }
+        gib.vel.y -= GRAVITY * gib.weight * dt;
         tf.translation += gib.vel * dt;
         let rest = gib.ground + gib.half;
         if tf.translation.y < rest {
@@ -232,7 +385,7 @@ fn fly_gibs(
                 gib.spin *= SLIDE_KEEP;
             }
             // Lying, friction by the second, so it stops alike at any frame rate.
-            let rub = REST_KEEP_PER_SEC.powf(dt);
+            let rub = gib.rest_keep.powf(dt);
             gib.vel.x *= rub;
             gib.vel.z *= rub;
             gib.spin *= rub;
@@ -259,9 +412,32 @@ mod tests {
 
     #[test]
     fn a_chunk_lies_whole_then_shrinks_away() {
-        assert_eq!(gib_left(0.0), 1.0);
-        assert_eq!(gib_left(LIE_SECS), 1.0);
-        assert!(gib_left(LIE_SECS + SHRINK_SECS * 0.5) > 0.4);
-        assert_eq!(gib_left(LIE_SECS + SHRINK_SECS), 0.0);
+        assert_eq!(gib_left(0.0, LIE_SECS), 1.0);
+        assert_eq!(gib_left(LIE_SECS, LIE_SECS), 1.0);
+        assert!(gib_left(LIE_SECS + SHRINK_SECS * 0.5, LIE_SECS) > 0.4);
+        assert_eq!(gib_left(LIE_SECS + SHRINK_SECS, LIE_SECS), 0.0);
+    }
+
+    #[test]
+    fn each_element_comes_apart_its_own_way() {
+        // Physical: flesh on a bleeder, stone on the rest, both with bone.
+        assert_eq!(look_of(0, true).palette, &FLESH[..]);
+        assert_eq!(look_of(0, false).palette, &STONE[..]);
+        assert!(look_of(0, true).bone);
+        // Fire burns, glowing, and cools to char.
+        let fire = look_of(2, true);
+        assert!(fire.glow > 1.0 && fire.cooled == Some(&CHAR[..]));
+        // Frost shatters finer and skids.
+        let frost = look_of(4, false);
+        assert!(frost.count > 1.0 && frost.rest_keep > REST_KEEP_PER_SEC);
+        // Arcane and holy float up; shadow drifts down slowly.
+        assert!(look_of(6, true).weight < 0.0 && look_of(1, true).weight < 0.0);
+        assert!((0.0..1.0).contains(&look_of(5, true).weight));
+        // Every element's palette key is its own.
+        let keys: std::collections::HashSet<u8> = (0..7)
+            .map(|s| look_of(s, true).key)
+            .chain([look_of(0, false).key])
+            .collect();
+        assert_eq!(keys.len(), 8);
     }
 }

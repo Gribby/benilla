@@ -35,13 +35,14 @@ use super::{
 /// scene it stands in). The scenes are the race stages of the create screen, chosen to suit each
 /// class rather than the race it is shown as: Paladin before Stormwind's gate (`UI_Human`), Mage
 /// in the Undercity's green gloom (`UI_Scourge`), Druid in the moonlit grove (`UI_NightElf`),
-/// Warlock at the burning Dark Portal of the login screen (`UI_MainMenu`), and Shaman on the
+/// Warlock before Orgrimmar's gate (`UI_Orc`; the login screen's Dark Portal has no seat for a
+/// character, which stood floating at its origin), and Shaman on the
 /// plains of Mulgore (`UI_Tauren`).
 pub(crate) const SHOWCASE: [(u8, GlueScene); SHOWCASE_SLOTS] = [
     (2, GlueScene::Race(1)),
     (8, GlueScene::Race(5)),
     (11, GlueScene::Race(4)),
-    (9, GlueScene::MainMenu),
+    (9, GlueScene::Race(2)),
     (7, GlueScene::Race(6)),
 ];
 
@@ -474,7 +475,7 @@ mod tests {
         );
         assert_eq!(
             SHOWCASE.map(|(_, scene)| scene_token(scene)),
-            ["Human", "Scourge", "NightElf", "MainMenu", "Tauren"],
+            ["Human", "Scourge", "NightElf", "Orc", "Tauren"],
         );
         for keys in [SHOWCASE_TOKENS, LIGHT_KEYS] {
             let mut sorted = keys.to_vec();
