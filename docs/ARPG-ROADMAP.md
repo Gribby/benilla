@@ -11,8 +11,9 @@ classes and items: `ARPG-CHARACTER.md`, `ARPG-UNIQUES.md`, `ARPG-ITEMISATION.md`
 
 - **Five classes** (Paladin, Mage, Druid, Warlock, Shaman), each with at least three builds that
   feel different and can clear the endgame.
-- **A journey from 1 to 60** through vanilla Azeroth that plays like an ARPG campaign: dense
-  packs, events and bounties in every zone, no dead stretches, at 1.3-1.5x vanilla's pace.
+- **A journey from 1 to 60 in acts**: a route through vanilla Azeroth's zones, each act a band
+  of zones and dungeons ending in a boss, with dense packs, events and bounties, no dead
+  stretches, at 1.3-1.5x vanilla's pace.
 - **Every vanilla dungeon** an ARPG dungeon with its Warden and Cache, on every difficulty tier.
 - **An endgame**: difficulty tiers up to Torment, the raids from Molten Core to Naxxramas as
   solo or small-group content behind attunements, and a paragon track past 60.
@@ -22,6 +23,8 @@ classes and items: `ARPG-CHARACTER.md`, `ARPG-UNIQUES.md`, `ARPG-ITEMISATION.md`
   art or text, hits and kills that feel weighty, readable danger.
 - **It runs**: no crash in a three-hour session, a one-click install and update, characters never
   lost.
+
+1.0 is for Jeff and friends, played solo: no co-op tuning, no public-server hardening.
 
 ## Where we are
 
@@ -69,8 +72,11 @@ Jeff wants to keep playing.
 
 **Exit:** all five classes reach 25 with three working builds each.
 
-### M3: the journey to 60
+### M3: the journey to 60, in acts
 
+- The acts: vanilla's zones grouped into five or six acts by level, each with a hub town, its
+  zones in order, its dungeons, and a closing boss; the act's route shown on the map and in a
+  journal (the story's next place, not quest markers).
 - A zone-by-zone pass: pack density, events and bounties, so no stretch of levelling is empty.
 - Every dungeon to Stratholme and Scholomance gets its Warden, Cache and tier scaling.
 - Item bands: sets and uniques for each ten levels to 60; affix pools by level.
@@ -108,7 +114,7 @@ holds in the densest fights.
   nothing, character backups.
 - One installer and updater for client and server.
 - A final balance pass from everyone's play statistics.
-- Co-op tested with friends (groups of 2-5).
+- Ready for friends: each runs the same installer and their own server, as Jeff does.
 
 **Exit:** the "What finished means" list above is all true, and the known issues hold no blocker.
 
@@ -120,12 +126,10 @@ holds in the densest fights.
 - **Every big change reviewed** before it is pushed; docs kept current.
 - **Jeff plays every milestone.** His sessions are the test, and his stats are the evidence.
 
-## Decisions for Jeff
+## Jeff's decisions
 
-1. Are five classes final for 1.0, or should a melee class without mana (Warrior or Rogue) join?
-2. Who is 1.0 for: Jeff and friends, or a public release? This sets how much goes into
-   installers, servers and protection.
-3. Co-op: is play with friends part of 1.0, or solo first?
-4. Hardcore mode or seasonal resets, now or never?
-5. The levelling route: vanilla's open world as it is, or a suggested route through the zones
-   like acts?
+1. Five classes are final for 1.0.
+2. 1.0 is for Jeff and friends, not a public release.
+3. Solo: no co-op in 1.0.
+4. Hardcore or seasons: probably never; not planned.
+5. Levelling in acts: a route through the zones, each act ending in a boss.
