@@ -622,11 +622,147 @@ local function refreshStreak(dt)
     if streak.wordLeft > 0 then streak.word:Show() else streak.word:Hide() end
 end
 
+-- ── Level up ──
+-- A banner under the top of the screen when the character levels: the level, what it gained (a
+-- passive point, two skill points to level 51, a skill slot at 10, 20, 30 and 40) and the spells
+-- the server taught with it, read off their "You have learned" lines (a few arrive just after).
+
+local LEVEL_HOLD, LEVEL_FADE, LEARN_WINDOW = 6.0, 1.0, 4.0
+local levelUp = CreateFrame("Frame", "ArpgHudLevelUp", UIParent)
+levelUp:SetWidth(560)
+levelUp:SetHeight(128)
+levelUp:SetPoint("TOP", UIParent, "TOP", 0, -140)
+levelUp:SetFrameStrata("HIGH")
+local levelBand = levelUp:CreateTexture(nil, "BACKGROUND")
+levelBand:SetAllPoints(levelUp)
+levelBand:SetTexture(0.03, 0.025, 0.02, 0.72)
+for _, edge in ipairs({ "TOP", "BOTTOM" }) do
+    local line = levelUp:CreateTexture(nil, "BORDER")
+    line:SetPoint(edge .. "LEFT", levelUp, edge .. "LEFT", 0, 0)
+    line:SetPoint(edge .. "RIGHT", levelUp, edge .. "RIGHT", 0, 0)
+    line:SetHeight(2)
+    line:SetTexture(0.85, 0.68, 0.25, 0.9)
+end
+levelUp.face = CreateFrame("Frame", nil, levelUp)
+levelUp.face:SetAllPoints(levelUp)
+levelUp.title = levelUp.face:CreateFontString(nil, "OVERLAY")
+levelUp.title:SetFont("Fonts\\FRIZQT__.TTF", 34, "OUTLINE")
+levelUp.title:SetTextColor(1.0, 0.82, 0.2)
+levelUp.title:SetPoint("TOP", levelUp.face, "TOP", 0, -12)
+levelUp.gains = levelUp.face:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+levelUp.gains:SetPoint("TOP", levelUp.title, "BOTTOM", 0, -6)
+levelUp.slot = levelUp.face:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+levelUp.slot:SetPoint("TOP", levelUp.gains, "BOTTOM", 0, -4)
+levelUp.learned = levelUp.face:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+levelUp.learned:SetPoint("TOP", levelUp.slot, "BOTTOM", 0, -4)
+levelUp.learned:SetWidth(520)
+levelUp.left, levelUp.pop, levelUp.since = 0, 0, 999
+levelUp.new, levelUp.stronger = {}, {}
+levelUp:Hide()
+
+-- A Lua pattern for a "%s" GlobalString, capturing what %s stands for.
+local function learnPattern(fmt)
+    local p = string.gsub(fmt, "([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
+    p = string.gsub(p, "%%%%s", "(.+)")
+    return "^" .. p .. "$"
+end
+local LEARN_PATTERNS = {
+    learnPattern(ERR_LEARN_SPELL_S or "You have learned a new spell: %s."),
+    learnPattern(ERR_LEARN_ABILITY_S or "You have learned a new ability: %s."),
+}
+
+local function levelLearnedText()
+    local lines = {}
+    if table.getn(levelUp.new) > 0 then
+        table.insert(lines, "|cffffd100New:|r " .. table.concat(levelUp.new, ", "))
+    end
+    if table.getn(levelUp.stronger) > 0 then
+        table.insert(lines, "|cffffd100Stronger:|r " .. table.concat(levelUp.stronger, ", "))
+    end
+    levelUp.learned:SetText(table.concat(lines, "\n"))
+end
+
+local function levelLearn(name)
+    local base = string.gsub(name, " %(stronger%)$", "")
+    local into = (base ~= name) and levelUp.stronger or levelUp.new
+    for i = 1, table.getn(into) do
+        if into[i] == base then return end
+    end
+    table.insert(into, base)
+    levelLearnedText()
+    -- Held a little longer for what arrives late.
+    levelUp.left = math.max(levelUp.left, 3.0)
+end
+
+local function showLevelUp(level)
+    levelUp.title:SetText("Level " .. level)
+    local gains = "+1 passive point"
+    if level >= 2 and level <= 51 then gains = gains .. "     +2 skill points" end
+    levelUp.gains:SetText(gains)
+    if level == 10 or level == 20 or level == 30 or level == 40 then
+        levelUp.slot:SetText("A new skill slot opens")
+    else
+        levelUp.slot:SetText("")
+    end
+    levelUp.left, levelUp.pop = LEVEL_HOLD, 1
+    -- Spells taught a moment before the level's own line still count.
+    if levelUp.since > LEARN_WINDOW then
+        levelUp.new, levelUp.stronger = {}, {}
+    end
+    levelUp.since = 0
+    levelLearnedText()
+    levelUp:Show()
+end
+
+local levelWatch = CreateFrame("Frame")
+levelWatch:RegisterEvent("PLAYER_LEVEL_UP")
+levelWatch:RegisterEvent("CHAT_MSG_SYSTEM")
+levelWatch:SetScript("OnEvent", function()
+    if event == "PLAYER_LEVEL_UP" then
+        local level = tonumber(arg1)
+        if level and level > 1 and level > (levelUp.lastLevel or 0) then
+            levelUp.lastLevel = level
+            showLevelUp(level)
+        end
+        return
+    end
+    -- A spell learned: kept for the banner on screen, or for one about to be.
+    for i = 1, table.getn(LEARN_PATTERNS) do
+        local _, _, name = string.find(arg1 or "", LEARN_PATTERNS[i])
+        if name then
+            if levelUp:IsShown() or levelUp.since <= LEARN_WINDOW then
+                levelLearn(name)
+            else
+                -- Before the level line: start a fresh list the banner picks up.
+                levelUp.new, levelUp.stronger, levelUp.since = {}, {}, 0
+                levelLearn(name)
+                levelUp.left = 0
+            end
+            return
+        end
+    end
+end)
+
+local function refreshLevelUp(dt)
+    levelUp.since = levelUp.since + dt
+    if not levelUp:IsShown() then return end
+    levelUp.left = levelUp.left - dt
+    levelUp.pop = math.max(0, levelUp.pop - dt * 4)
+    if levelUp.left <= 0 then
+        levelUp:Hide()
+        return
+    end
+    levelUp.face:SetScale(1 + 0.25 * levelUp.pop * levelUp.pop)
+    local fadeIn = math.min(1, (LEVEL_HOLD - levelUp.left) / 0.25 + 0.01)
+    levelUp:SetAlpha(math.min(fadeIn, levelUp.left / LEVEL_FADE))
+end
+
 local feelDriver = CreateFrame("Frame")
 feelDriver:SetScript("OnUpdate", function()
     local dt = math.min(arg1 or 0, 0.1)
     refreshEdges(dt)
     refreshStreak(dt)
+    refreshLevelUp(dt)
 end)
 
 -- ── The bottom of the screen ──

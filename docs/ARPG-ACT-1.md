@@ -12,14 +12,18 @@ Caches). The act adds what an ARPG campaign has and vanilla lacks:
 - **A direction.** A chain of story quests ("Act I: ...") given and taken by vanilla's own NPCs.
   The quest log is the journal: its text names the place and why, as the story would tell it. No
   markers, no arrows, no glows (Jeff's rule).
-- **A road.** Each story quest runs from its giver to where it sends the character; the way there
-  fills with packs as the character walks it, so the route is always a fight and never empty space.
+- **Packs ahead.** Out in the open world, packs of the creatures that live where the character is
+  heading appear ahead of it, just out of sight, so the way is always a fight and never empty
+  space.
 - **Chapters**, each a band of zones around a hub town, ending in a named fight that closes it.
 - **A finale**: the act's boss, whose fall ends the act and opens the next.
 - **Pacing**: an act is tuned to a time. Act I's target is about 8 hours from level 1 to its
   finale, read from the play statistics (`levels`, `zoneSec`).
 
-Vanilla's quests stay, as side quests. Those an act quest tells again (Hogger's wanted poster,
+The act's givers (McBride, Dughan, Gornek, Gar'Thok and the rest) give only the act: their vanilla
+quests are taken off them (vanilla quests still hand in to them), except a step of a chain that
+starts with a giver outside the act, which keeps its place so the chain still ends somewhere. Vanilla's other quests stay, as
+side quests. Those an act quest tells again (Hogger's wanted poster,
 Goldtooth...) are taken off their givers so the story is not told twice, unless another quest
 follows on from one (the kobold camps lead to Echo Ridge): those stay, and the start-up log names
 them.
@@ -73,18 +77,18 @@ found by name; a name the database lacks drops that objective and is logged at s
 
 Each quest is gated on the one before; its XP and money are sized for its level.
 
-### The road
+### Packs ahead
 
-While a story quest is under way (a "report" quest too, until it is handed in), the server draws
-its road from the giver to the leader's spawn (or the middle of the quest's creatures, or the next
-giver). It is drawn in legs of about 150 yards, each with the map's pathfinding as the character
-comes near it (a leg the map cannot path yet is tried again, and after two minutes becomes a
-straight line). Every 45 yards along it is a corridor point, given the creatures that live within
-60 yards of it and are within three levels of it (never an act's leader). As the character walks,
-points 110-170 yards ahead (just out of sight) with nothing standing on them fill with a pack of
-those creatures, on the usual pack rules (champions, events). Packs the character leaves 260 yards
-behind, out of combat, go, as do all of them when it logs out; an untouched pack goes after ten
-minutes.
+The first build drew each quest's road with pathfinding and filled points along it; in play it did
+not read as a road (Jeff), so it was replaced. Now, out in the open world (on foot or mounted, not
+flying, not on a boat, not swimming, not resting in a town or inn), each time the character
+travels 50 yards a pack is placed 110-160 yards ahead of it, within about 40 degrees of the way it
+is heading: the creature that lives nearest that spot within three levels of the character (never
+an act's leader), on the usual pack rules (champions, events). A spot is skipped if a creature
+stands within 15 yards, an NPC, guard, friendly creature or player within 60 yards (a town, a
+camp), or the character could not walk there (water, a cliff). At most four are out at once;
+packs left 260 yards behind, out of combat, go, as do all of them at logout, and an untouched pack
+goes after ten minutes. Not tied to a quest: it is how the whole open world plays.
 
 ### Leaders and finales
 
@@ -125,7 +129,6 @@ or too crowded while walking it.
 
 | Step | What |
 |---|---|
-| Dev route view | The corridor drawn in the client, to see the road while tuning it |
 | Hubs and waypoints | Reaching a hub saves it; the town portal goes to any reached hub |
 | Run speed out of combat | Faster travel between fights |
 | Travel time stat | Out-of-combat time per zone, to find the empty stretches |

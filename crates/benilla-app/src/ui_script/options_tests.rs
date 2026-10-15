@@ -4577,6 +4577,43 @@ fn the_arpg_skills_tab_takes_a_rank() {
     assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
 }
 
+/// Fork-only: a level-up shows the banner with the level's gains and the spells taught with it,
+/// those announced just before the level's own event included.
+#[test]
+fn the_arpg_level_up_banner_lists_what_was_gained() {
+    benilla_formats::wow_data_or_skip!();
+    use benilla_ui::script::ScriptValue;
+    let mut s = harness();
+    s.register_cvars(crate::cvars::registered_pairs());
+    s.run(include_str!("../player/arpg_hud.lua")).unwrap();
+    let said = |text: &str| vec![ScriptValue::Str(text.to_string())];
+    s.fire_event(
+        "CHAT_MSG_SYSTEM",
+        said("You have learned a new spell: Frost Nova."),
+    );
+    s.fire_event("PLAYER_LEVEL_UP", vec![ScriptValue::Int(10)]);
+    s.fire_event(
+        "CHAT_MSG_SYSTEM",
+        said("You have learned a new spell: Fireball (stronger)."),
+    );
+    assert!(s.frame_visible("ArpgHudLevelUp"));
+    let text = |field: &str| {
+        s.eval::<String>(&format!("return ArpgHudLevelUp.{field}:GetText() or \"\""))
+            .unwrap()
+    };
+    assert_eq!(text("title"), "Level 10");
+    assert!(
+        text("gains").contains("+2 skill points"),
+        "{}",
+        text("gains")
+    );
+    assert_eq!(text("slot"), "A new skill slot opens");
+    let learned = text("learned");
+    assert!(learned.contains("Frost Nova"), "{learned}");
+    assert!(learned.contains("Stronger:|r Fireball"), "{learned}");
+    assert!(s.errors().is_empty(), "script errors: {:?}", s.errors());
+}
+
 /// Fork-only: the ARPG HUD addon adds an "ARPG View" page whose sliders write their settings at
 /// once, read back on a refresh, and reset to the table's defaults.
 #[test]

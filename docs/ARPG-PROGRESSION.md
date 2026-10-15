@@ -90,8 +90,15 @@ Known gaps: a follower that evades walks back to where it appeared rather than t
 **Built (step 2):** champions and rares, from level 8, in `Arpg/ArpgPacks.cpp`. About 1 pack in 8
 brings two or three champions sharing one affix (two from level 30); about 1 in 40 brings a rare
 with a name of its own and two affixes (three from level 30). Both are extra summons of the
-leader's kind. A champion has 3x health, +30% damage, 3x XP, extra gold and a green or blue; a
-rare 4x health, +50% damage, 5x XP, a blue and a 15% chance at a purple. Nine affixes: Extra
+leader's kind. A champion has 3x health, +30% damage, 3x XP, extra gold and a 40% chance at a green
+or blue; a rare 4x health, +50% damage, 5x XP, a green or blue and a 3% chance at a purple.
+
+**Loot rates** (Jeff, after play: about one purple and one unique every other dungeon run, all
+sources together): rolled drops are purple 0.3% from trash, 1% from champions and 3% from rares
+and bosses; a vanilla blue (a named dungeon drop) stays a unique 12% of the time and otherwise
+drops as a rolled blue of its level (an authored unique, with a mechanic of its own, always drops
+as itself); a Warden's purple is 12% and unique 10%, a Cache's 15% and
+12%. Raid epics are untouched. Nine affixes: Extra
 Strong, Extra Fast, Stone Skin, Fire Enchanted, Cold Enchanted, Vampiric, Thorns, Teleporter,
 Healer; Molten waits for a ground visual. The server sends `SMSG_ARPG_CHAMPIONS` (0x341) for the
 champions within 100 yards; the client (`player/arpg/champions.rs`) colours the hover bar's name
@@ -194,9 +201,14 @@ boss, so the character's damage has to keep up with the dungeon tier.
   Depths; nineteen in all). One trash spawn per instance, among those that load (each eligible
   one at 1 in 12 as it settles, the 25th surely, so it stands in the wing the group is in), is
   crowned a named rare; a chat line announces it and its fall. It drops
-  two blues and a 30% chance at a purple. Its own unique and the Codex page come with step 5.
+  two blues, a 12% chance at a purple and 10% at a unique. Its own unique and the Codex page come with step 5.
 - *Caches:* each final boss (`Arpg::Bosses`) drops gold, and per player there a blue, a green and
-  a 25% chance at a purple, announced in chat.
+  a 15% chance at a purple and 12% at a unique, announced in chat.
+- *Escorts:* dungeons are spaced for five slow players, so each trash creature (never a boss, a
+  scripted creature or a formation's member) leads one or two lesser copies of itself at
+  `Arpg.Packs.Dungeon`'s chance (0.6). Not in Stratholme, Scholomance or Blackrock Depths, whose
+  scripts count their trash's deaths; an escort whose leader falls stays to be killed. Pack and
+  champion records are kept per map copy, as a dungeon's guids repeat in every copy.
 - *Tiers:* the ARPG View page's **Dungeon Tier** slider (`arpgDungeonTier`, sent at each world
   entry and on a change, `CMSG_ARPG_ACTION` kind 19). An instance takes its first ARPG player's
   tier, as far as that player has it open there, and says so in chat; a final boss's kill opens
