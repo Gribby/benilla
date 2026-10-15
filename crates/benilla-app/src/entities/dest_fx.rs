@@ -178,6 +178,13 @@ pub(super) fn arm_ground_effects(
     }
 }
 
+/// Fork-only, not 1.12.1: a looping ground-effect model at a point of the caller's choosing (an
+/// ARPG telegraph's area), drawn as a DynamicObject's area model is: the caller gives the
+/// `Transform` and despawns it.
+pub(crate) fn looping_ground_model(path: &str) -> impl Bundle {
+    (GroundFx::new(path.to_string(), true), Visibility::default())
+}
+
 /// Spawn the GO dest one-shots at once, never waiting on the DynamicObject create that follows.
 pub(super) fn spawn_ground_bursts(
     mut commands: Commands,

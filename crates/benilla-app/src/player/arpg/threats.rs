@@ -12,6 +12,11 @@
 //! selected unit), laid over the mark so a circle is the whole ring and a cone a slice of it; a
 //! line has no ring.
 //!
+//! A circle also burns with the game's own ground art under it: Consecration's burning disc
+//! (`Spells\Consecration_Impact_Base.m2`, the area model a Consecration on the ground loops),
+//! scaled to the mark's radius, so the danger reads as a spell on the ground and not as a plain
+//! decal; the mark's own fill over it still times the wind-up.
+//!
 //! A mark lies over the ground, not flat at the caster's height: it is a polar grid of rings and
 //! spokes, each point set down on the ground under it (a ray to the world's floors and terrain)
 //! when the mark arrives, so it follows a hillside or a stair.
@@ -32,6 +37,10 @@ use crate::net::{GuidIndex, NetHandlerApp, ObjectStore, SelfPlayer};
 
 use super::juice::CameraShake;
 use super::*;
+
+/// The ground art under a circle, and the radius it is authored at (Consecration's), in yards.
+const GROUND_ART: &str = "Spells\\Consecration_Impact_Base.m2";
+const GROUND_ART_RADIUS: f32 = 8.0;
 
 /// The selection circle under a unit, the ring at a mark's rim.
 const MARK_TEXTURE: &str = "mpq://textures/unitselecttexture.blp";
@@ -553,6 +562,19 @@ fn take_telegraphs(
                             part,
                             material: mat,
                         },
+                    ))
+                    .id(),
+            );
+        }
+        // A circle's burning ground, at the centre's ground height.
+        if !line && !cone {
+            let floor = drape.point(0.0, 0, 0.0)[1];
+            parts.push(
+                commands
+                    .spawn((
+                        crate::entities::dest_fx::looping_ground_model(GROUND_ART),
+                        Transform::from_translation(Vec3::new(centre.x, floor, centre.z))
+                            .with_scale(Vec3::splat(t.radius / GROUND_ART_RADIUS)),
                     ))
                     .id(),
             );

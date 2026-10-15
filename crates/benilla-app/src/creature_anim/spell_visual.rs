@@ -294,6 +294,19 @@ fn resolve_kit(
         .flatten()
 }
 
+/// Fork-only, not 1.12.1: the effects of `spell_id`'s state kit (the visual an aura of it wears
+/// while it lasts), for the ARPG view to dress a unit in an aura it does not hold: a champion's
+/// affixes. Empty for a spell with no state kit or no effect models.
+pub(crate) fn state_kit_effects(
+    spells: &crate::ui_action::Spells,
+    visuals: &SpellVisuals,
+    spell_id: u32,
+) -> Vec<FxSlot> {
+    resolve_kit(spells, &visuals.0, spell_id, |s| s.state, || None)
+        .map(|kit| resolve_kit_effects(&visuals.0, &kit))
+        .unwrap_or_default()
+}
+
 /// Fork-only, not 1.12.1: `spell_id`'s impact kit, for the ARPG server's share hits (an arc, a
 /// burst, a cleave) that land with no missile of their own.
 pub(crate) fn impact_kit_id(

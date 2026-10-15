@@ -95,7 +95,11 @@ rare 4x health, +50% damage, 5x XP, a blue and a 15% chance at a purple. Nine af
 Strong, Extra Fast, Stone Skin, Fire Enchanted, Cold Enchanted, Vampiric, Thorns, Teleporter,
 Healer; Molten waits for a ground visual. The server sends `SMSG_ARPG_CHAMPIONS` (0x341) for the
 champions within 100 yards; the client (`player/arpg/champions.rs`) colours the hover bar's name
-blue or yellow, lists the affixes under it, and lays a ring of that colour under each one. The
+blue or yellow, lists the affixes under it, lays the game's selection ring under each one in that
+colour, slowly turning, and dresses it in a 1.12 spell's aura per affix (Fire Shield for Fire
+Enchanted, Frost Armor for Cold Enchanted, Stoneform for Stone Skin, Enrage for Extra Strong,
+Sprint for Extra Fast, Demon Armor for Vampiric, Thorns, Mana Shield for Teleporter, Renew for
+Healer; drawing only, logged at first use as "champions' X wears spell N's aura"). The
 ARPG View page gains **Champion Pack** and **Rare Pack** dev buttons.
 
 ## Scaling for one to five players
@@ -270,6 +274,8 @@ roll out of, so the monsters' dangerous attacks are ones a player can see coming
   health (a 10 yard ring round it, 1 second, then the nova). Rolling dodges both.
 - The marks lie over the ground under them (each point set down on the floor or terrain), so a
   hillside or a stair shows the whole shape.
+- A circle also burns with Consecration's ground model (`Spells\Consecration_Impact_Base.m2`)
+  scaled to its radius, so it reads as a spell on the ground; the fill still times the wind-up.
 - **Every creature has a move** (amber marks, lighter than an elite's): short wind-ups of 0.6 to
   1 second, about a tenth of the player's health, every 8 to 13 seconds, so a pack keeps the
   player moving. By what it is:
