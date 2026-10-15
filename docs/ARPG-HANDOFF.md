@@ -161,7 +161,9 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 
 The server records how play goes (cmangos `Arpg/ArpgStats.{h,cpp}`, `Arpg.Stats`, on by default)
 as JSON lines in `arpg-stats/YYYY-MM-DD.jsonl` beside mangosd: deaths with their killer and the
-last 10 seconds of blows, pack fight times, and every 5 minutes a session summary (levels and the
+last 10 seconds of blows, each fight (seconds, kills and foes, damage dealt and per second,
+damage taken, lowest health and mana, flasks, rolls, top spells), the times of packs players
+killed, and every 5 minutes a session summary (levels and the
 minutes each took, kills by kind, damage by spell, damage taken by source, seconds in combat, low
 on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone).
 `update-arpg-server.bat` runs `send-arpg-stats.bat`, which commits them to the server repo's
