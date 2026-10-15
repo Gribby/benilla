@@ -41,9 +41,12 @@ regeneration of 1.5% a second with no five-second rule, globes giving 8% mana, a
 `SMSG_ARPG_COSTS` (0x350) so the client shows and checks the same costs. The play statistics count
 overdraws and read low mana at 20% and low health at 35%.
 
-**Not yet:** the mana flask, the orb's low-mana pulse and sound, a cast at nothing left trying the
-filler, bear rage on entering the form, the cat's free fallback, the cost and mana-on-hit affixes,
-Chill.
+Since: the flask gives back mana as it heals (15% at once, 25% over three seconds; one key, no
+second flask), a bear comes in with 20 rage, and the power orb's rim pulses blue below 25% mana
+(faster below 10%) with a sound at each line (`arpg_hud.lua`, `pulseRim`). Chill is Thermal
+Shock (phase 3). The cat needs no fallback: its auto-attack costs nothing.
+
+**Not yet:** a cast at nothing left trying the filler, the cost and mana-on-hit affixes.
 
 **All classes**
 

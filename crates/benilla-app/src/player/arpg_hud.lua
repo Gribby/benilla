@@ -162,7 +162,7 @@ local function makeOrb(frameName, corner, x)
         foam:SetHeight(1.5)
         liquid:Hide()
         foam:Hide()
-        orb.cols[i] = { x = cx, half = half, liquid = liquid, foam = foam, wet = false, foamy = false,
+        orb.cols[i] = { x = cx, half = half, liquid = liquid, foam = foam, wet = false, foamy = false, rim = rim,
             -- Lighter left of centre, darker at the rim: a lit sphere.
             shade = 0.45 + 0.55 * math.cos((cx + ORB_RADIUS * 0.25) / ORB_RADIUS * 1.25) }
     end
@@ -194,6 +194,7 @@ local function makeOrb(frameName, corner, x)
     orb.shown, orb.target = 0, 0
     orb.r, orb.g, orb.b = 0.5, 0.5, 0.5
     orb.phase = math.random() * 6.28
+    orb.warn, orb.rimLit = 0, false
     return orb
 end
 
@@ -228,6 +229,34 @@ function ArpgHud_Combo(points)
             pip:Hide()
         end
     end
+end
+
+-- Low mana: the power orb's rim pulses blue below a quarter, faster and brighter below a tenth,
+-- with a sound as each line is crossed going down. Mana costs are shares of the pool and any cast
+-- with half its cost left goes through (the server's Arpg/ArpgResources.h), so this is the
+-- warning to weave the free filler or drink, not a lock.
+local LOW_MANA, VERY_LOW_MANA = 0.25, 0.10
+local RIM_R, RIM_G, RIM_B = 0.36, 0.27, 0.12
+
+local function paintRim(orb, k)
+    for i = 1, ORB_COLS do
+        orb.cols[i].rim:SetTexture(RIM_R + (0.25 - RIM_R) * k, RIM_G + (0.6 - RIM_G) * k, RIM_B + (1 - RIM_B) * k, 1)
+    end
+end
+
+-- One frame of the rim's pulse: `warn` 0 none, 1 low, 2 very low.
+local function pulseRim(orb, t)
+    if orb.warn == 0 then
+        if orb.rimLit then
+            paintRim(orb, 0)
+            orb.rimLit = false
+        end
+        return
+    end
+    local speed, peak = 3, 0.55
+    if orb.warn == 2 then speed, peak = 7, 1 end
+    paintRim(orb, peak * (0.5 + 0.5 * math.sin(t * speed)))
+    orb.rimLit = true
 end
 
 -- The orb is to stand `fraction` full in this colour; animateOrb carries it there.
@@ -311,6 +340,16 @@ local function refreshOrbs()
     local power, top = UnitMana("player") or 0, UnitManaMax("player") or 0
     local color = POWER_COLORS[UnitPowerType("player") or 0] or POWER_COLORS[0]
     paintOrb(powerOrb, top > 0 and power / top or 0, color, power)
+    -- Low mana's warning, mana only (rage and energy run dry by design).
+    local warn = 0
+    if (UnitPowerType("player") or 0) == 0 and top > 0 and not UnitIsDeadOrGhost("player") then
+        local f = power / top
+        if f < VERY_LOW_MANA then warn = 2 elseif f < LOW_MANA then warn = 1 end
+    end
+    if warn > (powerOrb.warn or 0) then
+        if warn == 2 then PlaySound("igQuestFailed") else PlaySound("igQuestLogAbandonQuest") end
+    end
+    powerOrb.warn = warn
 end
 
 -- The flask (Q) and the dodge roll (Space): the server's charges and cooldown, which the client
@@ -410,7 +449,10 @@ orbDriver:SetScript("OnUpdate", function()
     local dt = math.min(arg1 or 0, 0.1)
     orbClock = orbClock + dt
     if healthOrb:IsVisible() then animateOrb(healthOrb, dt, orbClock) end
-    if powerOrb:IsVisible() then animateOrb(powerOrb, dt, orbClock) end
+    if powerOrb:IsVisible() then
+        animateOrb(powerOrb, dt, orbClock)
+        pulseRim(powerOrb, orbClock)
+    end
     orbSince = orbSince + (arg1 or 0)
     if orbSince >= 0.05 then
         orbSince = 0
