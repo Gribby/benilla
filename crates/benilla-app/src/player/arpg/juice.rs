@@ -42,6 +42,10 @@ const SHAKE_HIT: f32 = 0.22;
 const SHAKE_CRIT: f32 = 0.55;
 const SHAKE_KILL: f32 = 0.5;
 const SHAKE_CHAMPION: f32 = 0.9;
+/// A blow taken of a tenth of the health or more kicks the camera, harder up to a third.
+const TAKEN_SHARE: f32 = 0.1;
+const TAKEN_SHARE_MAX: f32 = 1.0 / 3.0;
+const SHAKE_TAKEN_MAX: f32 = 0.6;
 /// Trauma lost per second, and the camera's offset at full trauma, in yards. The offset goes as
 /// trauma squared, so a small kick stays small.
 const SHAKE_DECAY: f32 = 2.6;
@@ -131,20 +135,27 @@ pub(super) fn plugin(app: &mut App) {
         );
 }
 
-/// Note each unit the player struck, and kick the camera at a crit.
+/// Note each unit the player struck, and kick the camera at a crit, and at a big blow taken: the
+/// screen never flashes for one (`arpg_hud.lua`), the view jolts.
 fn note_hits(
     mut spawns: MessageReader<CombatTextSpawn>,
-    me: Query<(), With<SelfPlayer>>,
+    me: Query<&ObjectStore, With<SelfPlayer>>,
     time: Res<Time>,
     mut struck: ResMut<StruckUnits>,
     mut shake: ResMut<CameraShake>,
 ) {
     let now = time.elapsed_secs_f64();
     for spawn in spawns.read() {
-        if me.contains(spawn.anchor)
-            || !super::fx::is_damage_number(&spawn.text)
-            || struck.burst.contains(&spawn.anchor)
-        {
+        if let Ok(store) = me.get(spawn.anchor) {
+            let most = store.0.unit_max_health().unwrap_or(0);
+            if super::fx::is_damage_number(&spawn.text)
+                && taken_kick(text_damage(&spawn.text), most) > 0.0
+            {
+                shake.kick(taken_kick(text_damage(&spawn.text), most));
+            }
+            continue;
+        }
+        if !super::fx::is_damage_number(&spawn.text) || struck.burst.contains(&spawn.anchor) {
             continue;
         }
         shake.kick(if spawn.category == CATEGORY_CRIT {
@@ -163,6 +174,19 @@ fn note_hits(
     struck
         .live
         .retain(|(_, at, ..)| now - at < KILL_WINDOW_SECS);
+}
+
+/// The kick a blow of `damage` against `most` health gives: none under a tenth, then growing
+/// with the share, to [`SHAKE_TAKEN_MAX`] at a third.
+fn taken_kick(damage: u32, most: u32) -> f32 {
+    if most == 0 {
+        return 0.0;
+    }
+    let share = damage as f32 / most as f32;
+    if share < TAKEN_SHARE {
+        return 0.0;
+    }
+    (SHAKE_TAKEN_MAX * share / TAKEN_SHARE_MAX).min(SHAKE_TAKEN_MAX)
 }
 
 /// The burst's colour and size for a kill of a unit of champion tier `tier` (0 for none).

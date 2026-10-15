@@ -420,10 +420,9 @@ orbDriver:SetScript("OnUpdate", function()
 end)
 
 -- ── Feel: the screen's edges and the kill streak ──
--- The edges glow red as health runs low, beating like a heart below a third, flash red when a
--- big blow lands (a tenth of the health at once), and flash in a champion's or a rare's colour
--- at its kill (ArpgHud_Flash). The UI draws a texture in one colour, so the fade from the edge is
--- built of bands, each fainter than the one outside it.
+-- The edges glow red as health runs low, beating like a heart below a third. They never flash:
+-- a big blow kicks the camera instead (juice.rs). The UI draws a texture in one colour, so the
+-- fade from the edge is built of bands, each fainter than the one outside it.
 local EDGE_BANDS, EDGE_DEPTH = 8, 120
 local LOW_HEALTH, LOW_ALPHA = 0.35, 0.5
 local BEAT_SECS = 1.1
@@ -458,9 +457,7 @@ for i = 1, EDGE_BANDS do
     table.insert(edges.tex, { left, weight })
     table.insert(edges.tex, { right, weight })
 end
-edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0, 1, 0, 0
 edges.shown = -1
-edges.lastHealth = nil
 edges:Hide()
 
 local function edgesPaint(r, g, b, a)
@@ -489,23 +486,11 @@ local function heartbeat(t)
     return math.max(bump(0.1, 0.08), 0.6 * bump(0.28, 0.08))
 end
 
-function ArpgHud_Flash(r, g, b)
-    edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0.9, r, g, b
-end
-
 local edgeClock = 0
 local function refreshEdges(dt)
     edgeClock = edgeClock + dt
     local health, most = UnitHealth("player") or 0, UnitHealthMax("player") or 0
     local dead = UnitIsDeadOrGhost("player")
-    -- A big blow: a tenth of the health gone since the last look.
-    if edges.lastHealth and most > 0 and not dead and edges.lastHealth - health >= most * 0.1 then
-        if edges.flashA < 0.6 then
-            edges.flashA, edges.flashR, edges.flashG, edges.flashB = 0.6, 0.9, 0.05, 0.05
-        end
-    end
-    edges.lastHealth = health
-    edges.flashA = math.max(0, edges.flashA - dt * 2.4)
     local low = 0
     if most > 0 and not dead then
         local f = health / most
@@ -516,11 +501,7 @@ local function refreshEdges(dt)
             end
         end
     end
-    if edges.flashA > low then
-        edgesPaint(edges.flashR, edges.flashG, edges.flashB, edges.flashA)
-    else
-        edgesPaint(0.75, 0.02, 0.02, low)
-    end
+    edgesPaint(0.75, 0.02, 0.02, low)
 end
 
 -- The kill streak: kills in a row (each within a few seconds of the last), from three up, above

@@ -37,6 +37,7 @@ mod actions;
 mod champions;
 mod feel;
 mod fx;
+mod gibs;
 mod globes;
 mod impact;
 mod juice;
@@ -287,8 +288,10 @@ pub(super) fn plugin(app: &mut App) {
     juice::plugin(app);
     // Telegraphed attacks on the ground.
     threats::plugin(app);
-    // Hit-stop, stagger, corpse flings and blood on the ground.
+    // Hit-stop, stagger, a heavy kill's corpse collapsing, and blood on the ground.
     impact::plugin(app);
+    // A heavy kill's chunks.
+    gibs::plugin(app);
     // Health globes.
     globes::plugin(app);
     // Procs in the combat log, and the character sheet for the HUD.

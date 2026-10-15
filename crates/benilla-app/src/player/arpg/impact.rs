@@ -1,10 +1,10 @@
 //! Fork-only, not 1.12.1: the ARPG view's weight of a blow. A crit or a heavy hit (a sixth of the
 //! victim's health) by the player stops both models' animations for a few frames (hit-stop); any
 //! hit pushes the struck model back along the blow for a moment (stagger); a kill by a heavy blow
-//! flings the corpse a couple of yards on a short arc; and a kill leaves the creature's blood on
+//! bursts the corpse (its body collapses away as its chunks fly, `super::gibs`); and a kill leaves the creature's blood on
 //! the ground, the splat textures 1.12 ships and never draws, fading over half a minute.
 //!
-//! All of it is drawing only: the server's positions never move. The push and the fling offset
+//! All of it is drawing only: the server's positions never move. The push and the gib work
 //! the rig's root bones in [`benilla_world::rig_anim::PosePost`], the window the strafe twist
 //! uses (`crate::creature_anim::twist`), so held items, emitters and picking follow the model.
 //! The blows are the player's floating combat text, as the hit flash's are (`super::fx`); the
@@ -40,10 +40,12 @@ const ELITE_STOP_REACH: f32 = 18.0;
 const PUSH_CRIT: f32 = 0.7;
 const PUSH_HIT: f32 = 0.32;
 const PUSH_SECS: f32 = 0.16;
-/// The fling: how far, how high its arc, and how long it flies.
-const FLING_REACH: f32 = 2.4;
-const FLING_HEIGHT: f32 = 0.7;
-const FLING_SECS: f32 = 0.35;
+/// The gib: the body swells to this for the first stretch, then is gone (its chunks fly,
+/// `super::gibs`), held gone while the unit is dead.
+const GIB_SWELL: f32 = 1.25;
+const GIB_SWELL_SECS: f32 = 0.04;
+const GIB_GONE_SECS: f32 = 0.09;
+const GIB_GONE: f32 = 0.001;
 /// The splats: their size in yards (a unit of scale 1), how long they lie, and the last share of
 /// that over which they fade; at most this many at once.
 const SPLAT_SIZE: f32 = 2.2;
@@ -74,8 +76,8 @@ struct Recoil {
 enum RecoilKind {
     /// A push of this many yards, settling.
     Stagger(f32),
-    /// A corpse flung, held where it lands while it is dead.
-    Fling,
+    /// A corpse burst apart, held gone while it is dead.
+    Gib,
 }
 
 #[derive(Resource, Default)]
@@ -190,7 +192,7 @@ fn feel_hits(
         if recoils
             .0
             .get(&spawn.anchor)
-            .is_some_and(|r| r.kind == RecoilKind::Fling)
+            .is_some_and(|r| r.kind == RecoilKind::Gib)
         {
             continue;
         }
@@ -212,7 +214,7 @@ fn feel_hits(
     }
 }
 
-/// Each kill: the corpse's splat, and a heavy blow's fling.
+/// Each kill: the corpse's splat, and a heavy blow's gib (its chunks are `super::gibs`').
 #[allow(clippy::too_many_arguments)]
 fn feel_kills(
     mut kills: MessageReader<ArpgKill>,
@@ -255,18 +257,14 @@ fn feel_kills(
                 Recoil {
                     dir,
                     born: now,
-                    kind: RecoilKind::Fling,
+                    kind: RecoilKind::Gib,
                     bones,
                 },
             );
         }
-        let centre = kill.at
-            + if kill.overkill {
-                dir * FLING_REACH * 0.6
-            } else {
-                Vec3::ZERO
-            };
-        lays.push((kill.unit, centre, 1.0, kill.unit.to_bits()));
+        // A gibbed corpse's blood lies wider: it went everywhere.
+        let size = if kill.overkill { 1.4 } else { 1.0 };
+        lays.push((kill.unit, kill.at, size, kill.unit.to_bits()));
     }
     lays.append(&mut crit_splats.0);
     for (unit, centre, size, seed) in lays {
@@ -374,15 +372,20 @@ fn stagger_at(age: f32, push: f32) -> f32 {
     }
 }
 
-/// The fling's offset at `age` seconds along `dir`: out and over, then held where it lands.
-fn fling_at(age: f32, dir: Vec3) -> Vec3 {
-    let t = (age / FLING_SECS).clamp(0.0, 1.0);
-    let out = 1.0 - (1.0 - t).powi(2);
-    dir * FLING_REACH * out + Vec3::Y * (FLING_HEIGHT * 4.0 * t * (1.0 - t))
+/// The gibbed body's scale `age` seconds after the blow: a swell, then nothing.
+fn gib_scale_at(age: f32) -> f32 {
+    if age < GIB_SWELL_SECS {
+        return 1.0 + (GIB_SWELL - 1.0) * age / GIB_SWELL_SECS;
+    }
+    if age < GIB_GONE_SECS {
+        let t = (age - GIB_SWELL_SECS) / (GIB_GONE_SECS - GIB_SWELL_SECS);
+        return GIB_SWELL + (GIB_GONE - GIB_SWELL) * t;
+    }
+    GIB_GONE
 }
 
-/// Lay each push or fling on its rig's root bones, in model space; a settled push restores the
-/// bones and goes, a fling holds while the unit is dead.
+/// Lay each push on its rig's root bones, in model space, and a gib's collapse on their scale; a
+/// settled push restores the bones and goes, a gib holds while the unit is dead.
 fn apply_recoil(
     time: Res<Time>,
     mut recoils: ResMut<Recoils>,
@@ -405,10 +408,16 @@ fn apply_recoil(
                 let d = stagger_at(age, push);
                 (recoil.dir * d, d == 0.0 && age >= PUSH_SECS)
             }
-            // A fling ends when the unit lives again (a respawn reusing the entity).
-            RecoilKind::Fling => (fling_at(age, recoil.dir), alive),
+            // A gib ends when the unit lives again (a respawn reusing the entity).
+            RecoilKind::Gib => (Vec3::ZERO, alive),
         };
         let world = if done { Vec3::ZERO } else { world };
+        // The gib's scale on the root bones; whole again when it ends.
+        let scale = match recoil.kind {
+            RecoilKind::Gib if !done => Some(gib_scale_at(age)),
+            RecoilKind::Gib => Some(1.0),
+            RecoilKind::Stagger(_) => None,
+        };
         // Into the model's space: the rig root's inverse, which carries the unit's facing and
         // scale (and a slope's tilt or a seat's frame).
         let Ok(root) = globals.get(rig.joints_root) else {
@@ -435,10 +444,17 @@ fn apply_recoil(
             }
             let out = *base + local;
             *last = out;
-            if out != cur {
-                if let Some(t) = rig.locals.get_mut(*bone) {
+            if let Some(t) = rig.locals.get_mut(*bone) {
+                if out != cur {
                     t.translation = out;
                     dirty = true;
+                }
+                if let Some(f) = scale {
+                    let want = Vec3::splat(f);
+                    if t.scale != want {
+                        t.scale = want;
+                        dirty = true;
+                    }
                 }
             }
         }
@@ -515,13 +531,11 @@ mod tests {
     }
 
     #[test]
-    fn a_fling_arcs_out_and_lands_where_it_holds() {
-        let dir = Vec3::X;
-        let mid = fling_at(FLING_SECS * 0.5, dir);
-        assert!(mid.y > 0.5 * FLING_HEIGHT && mid.x > 0.0);
-        let end = fling_at(FLING_SECS, dir);
-        assert!((end - dir * FLING_REACH).length() < 1e-5);
-        assert_eq!(fling_at(FLING_SECS * 3.0, dir), end);
+    fn a_gibbed_body_swells_then_is_gone_and_stays_gone() {
+        assert_eq!(gib_scale_at(0.0), 1.0);
+        assert!((gib_scale_at(GIB_SWELL_SECS) - GIB_SWELL).abs() < 1e-5);
+        assert_eq!(gib_scale_at(GIB_GONE_SECS), GIB_GONE);
+        assert_eq!(gib_scale_at(10.0), GIB_GONE);
     }
 
     #[test]

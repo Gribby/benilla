@@ -6,7 +6,7 @@
 //!
 //! Gore, from the same `UnitBlood` models the melee spurt plays: a crit by the player sprays
 //! blood from the front of the struck unit whatever struck it, and a kill by a heavy blow bursts
-//! the large pair, front and back, as the corpse is flung (`super::impact`).
+//! the large pair as the corpse bursts (`super::impact`, `super::gibs`).
 
 use bevy::prelude::*;
 

@@ -184,14 +184,15 @@ which skills carry a build.
   - `globes.rs`;
   - `champions.rs`;
   - `actions.rs` flask/roll status;
-  - `impact.rs`;
-  - `juice.rs`;
+  - `impact.rs`: hit recoil, and a heavy kill's corpse swelling then collapsing (`RecoilKind::Gib`);
+  - `gibs.rs`: a heavy kill's chunks (flesh, or stone for bloodless units) that bounce, lie and fade;
+  - `juice.rs`: hitstop and camera shake, including a kick when the player takes a big blow;
   - `fx.rs`;
   - `feel.rs`: proc labels and their kits, kills bursting in the killing blow's damage type, the
     kill streak, the bloom, the player's wounds in red;
   - `world.rs`: event tracker and beam, bounties, purse, the `arpgCraft` CVar.
-- `arpg_hud.lua`: everything drawn with the UI (the kill streak and the screen's red edges at
-  low health and on big blows are `ArpgHud_Streak` / `ArpgHud_Flash` and the edges block).
+- `arpg_hud.lua`: everything drawn with the UI (the kill streak is `ArpgHud_Streak`; the only
+  screen-edge red is the low-health heartbeat vignette — no full-screen flashes, by request).
 - `combat_text/arpg.rs`: the ARPG look of the floating numbers (damage type colours, big
   outlined crits, small merged ticks, labels, thousands separators), under `ArpgNumbers`.
 - `benilla-world/src/ffx_glow.rs`: `FfxBloom`, a thresholded bloom on the stock full-screen

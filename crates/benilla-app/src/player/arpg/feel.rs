@@ -11,8 +11,8 @@
 //! - A heavy kill (a crit, or a big share of the health) bursts in the killing blow's damage type:
 //!   its type's impact kit on the corpse (fire, ice, holy light...), beside `strikes`' gore.
 //! - Kills in a row count up on the HUD (`ArpgHud_Streak`), with a flourish at 10, 25, 50, 100.
-//! - A champion's or a rare's kill holds every model near it for a beat (`super::impact`) and
-//!   flashes the screen's edges (`ArpgHud_Flash`).
+//! - A champion's or a rare's kill holds every model near it for a beat (`super::impact`). No
+//!   screen flash: the beat, the burst and the shake carry it.
 //! - The world view blooms: bright light bleeds ([`benilla_world::ffx_glow::FfxBloom`]).
 
 use std::collections::HashMap;
@@ -108,9 +108,8 @@ struct Streak {
     /// The highest milestone crossed since the HUD was last told: several kills can land at
     /// once and step over one.
     word: Option<&'static str>,
-    /// The count and flash the HUD has not yet been told of.
+    /// The count the HUD has not yet been told of.
     dirty: bool,
-    flash: Option<[f32; 3]>,
 }
 
 pub(super) fn plugin(app: &mut App) {
@@ -277,7 +276,7 @@ struct KilledBy {
     school: u8,
 }
 
-/// A heavy kill's burst in its type, the streak, and a champion's flash.
+/// A heavy kill's burst in its type, and the streak.
 #[allow(clippy::too_many_arguments)]
 fn burst_kills(
     mut killed: MessageReader<KilledBy>,
@@ -311,17 +310,10 @@ fn burst_kills(
         }
         streak.last = now;
         streak.dirty = true;
-        if kill.tier > 0 {
-            streak.flash = Some(if kill.tier == 1 {
-                [0.35, 0.6, 1.0]
-            } else {
-                [1.0, 0.85, 0.25]
-            });
-        }
     }
 }
 
-/// Tell the HUD of the streak and any flash.
+/// Tell the HUD of the streak.
 fn push_streak(script: Option<NonSendMut<UiScript>>, mut streak: ResMut<Streak>) {
     let Some(script) = script else {
         return;
@@ -334,15 +326,10 @@ fn push_streak(script: Option<NonSendMut<UiScript>>, mut streak: ResMut<Streak>)
         .word
         .take()
         .map_or("nil".to_string(), |w| format!("{w:?}"));
-    let mut chunk = format!(
+    let chunk = format!(
         "if ArpgHud_Streak then ArpgHud_Streak({}, {word}) end\n",
         streak.count
     );
-    if let Some([r, g, b]) = streak.flash.take() {
-        chunk.push_str(&format!(
-            "if ArpgHud_Flash then ArpgHud_Flash({r}, {g}, {b}) end\n"
-        ));
-    }
     if let Err(e) = script.eval::<()>(&chunk) {
         warn!("arpg: the HUD refused the kill streak: {e}");
     }
