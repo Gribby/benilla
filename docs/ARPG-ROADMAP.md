@@ -133,3 +133,6 @@ holds in the densest fights.
 3. Solo: no co-op in 1.0.
 4. Hardcore or seasons: probably never; not planned.
 5. Levelling in acts: a route through the zones, each act ending in a boss.
+6. Big stacking is welcome: builds may multiply into enormous damage (kit products, stacked "more",
+   pack-squared bursts, kill resets, spread chains). Don't cap power for its own sake; fix only
+   what breaks the game (crashes, hangs, a loop that never ends).
