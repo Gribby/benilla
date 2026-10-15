@@ -826,6 +826,71 @@ pub fn read_arpg_bolt_stop(r: &mut impl io::Read) -> io::Result<ArpgBoltStop> {
     })
 }
 
+/// A scene (cmangos `Arpg/ArpgScenes.h`): a camera track over the world and its subtitles, played
+/// letterboxed like a cinematic. The client ends it with `CMSG_COMPLETE_CINEMATIC`, at its end or on
+/// a skip.
+pub const SMSG_ARPG_SCENE: u16 = 0x0352;
+
+/// One camera key: at `ms` into the scene, the eye and what it looks at, in WoW coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ArpgSceneKey {
+    pub ms: u32,
+    pub eye: [f32; 3],
+    pub target: [f32; 3],
+}
+
+/// One subtitle: shown from `from_ms` to `to_ms`, `speaker` above `text` (an empty speaker is
+/// narration).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgSceneLine {
+    pub from_ms: u32,
+    pub to_ms: u32,
+    pub speaker: String,
+    pub text: String,
+}
+
+/// One [`SMSG_ARPG_SCENE`].
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgScene {
+    pub id: u32,
+    pub duration_ms: u32,
+    pub keys: Vec<ArpgSceneKey>,
+    pub lines: Vec<ArpgSceneLine>,
+}
+
+/// `SMSG_ARPG_SCENE`: `u32` id, `u32` duration, `u8` key count, per key `u32` ms and `f32` eye
+/// x y z and target x y z; `u8` line count, per line `u32` from, `u32` to, speaker and text as
+/// C strings.
+pub fn read_arpg_scene(r: &mut impl io::Read) -> io::Result<ArpgScene> {
+    let id = read_u32_le(r)?;
+    let duration_ms = read_u32_le(r)?;
+    let n = read_u8(r)?;
+    let mut keys = Vec::with_capacity(usize::from(n));
+    for _ in 0..n {
+        keys.push(ArpgSceneKey {
+            ms: read_u32_le(r)?,
+            eye: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+            target: [read_f32_le(r)?, read_f32_le(r)?, read_f32_le(r)?],
+        });
+    }
+    let n = read_u8(r)?;
+    let mut lines = Vec::with_capacity(usize::from(n));
+    for _ in 0..n {
+        lines.push(ArpgSceneLine {
+            from_ms: read_u32_le(r)?,
+            to_ms: read_u32_le(r)?,
+            speaker: read_cstring(r)?,
+            text: read_cstring(r)?,
+        });
+    }
+    Ok(ArpgScene {
+        id,
+        duration_ms,
+        keys,
+        lines,
+    })
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -1382,5 +1447,32 @@ mod tests {
             }
         );
         assert_eq!(items[0].border, 3);
+    }
+
+    #[test]
+    fn a_scene_reads_its_keys_and_lines() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&7u32.to_le_bytes());
+        body.extend_from_slice(&9000u32.to_le_bytes());
+        body.push(2);
+        for (ms, x) in [(0u32, 1.0f32), (9000, 2.0)] {
+            body.extend_from_slice(&ms.to_le_bytes());
+            for v in [x, 3.0, 4.0, 5.0, 6.0, 7.0] {
+                body.extend_from_slice(&v.to_le_bytes());
+            }
+        }
+        body.push(1);
+        body.extend_from_slice(&500u32.to_le_bytes());
+        body.extend_from_slice(&4000u32.to_le_bytes());
+        body.extend_from_slice(b"Hogger\0Grr.\0");
+        let scene = read_arpg_scene(&mut body.as_slice()).unwrap();
+        assert_eq!(scene.id, 7);
+        assert_eq!(scene.duration_ms, 9000);
+        assert_eq!(scene.keys.len(), 2);
+        assert_eq!(scene.keys[1].eye, [2.0, 3.0, 4.0]);
+        assert_eq!(scene.keys[1].target, [5.0, 6.0, 7.0]);
+        assert_eq!(scene.lines[0].speaker, "Hogger");
+        assert_eq!(scene.lines[0].text, "Grr.");
+        assert_eq!((scene.lines[0].from_ms, scene.lines[0].to_ms), (500, 4000));
     }
 }

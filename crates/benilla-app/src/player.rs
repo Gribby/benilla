@@ -80,7 +80,7 @@ use camera_zoom::{apply_zoom_scroll, CAM_DIST_DEFAULT};
 // `/follow`: chat sends the request, `crate::target` resolves the subject into the state, and
 // `follow` owns the motion.
 pub(crate) use arpg::{
-    arpg_session, ArpgAttackKey, ArpgMode, ArpgUniques, ARPG_KNOBS, CVAR_DEV_LOOT_DROP,
+    arpg_session, scene_view, ArpgAttackKey, ArpgMode, ArpgUniques, ARPG_KNOBS, CVAR_DEV_LOOT_DROP,
     CVAR_TREE_ACTION,
 };
 pub(crate) use follow::{FollowRequest, FollowState};

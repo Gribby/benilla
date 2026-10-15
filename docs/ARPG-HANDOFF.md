@@ -130,6 +130,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgMage` | The mage's keystone hooks (on hit, periodic tick, kill, blow taken); its web is in `ArpgTree`, its trees in `ArpgSkills` |
 | `ArpgSets` | The twelve item sets (20/30/40/50 per class): pieces written into item_template with vanilla looks, bonuses into the item totals, whole-set powers as kit rows, drops, `SMSG_ARPG_SETS` |
 | `ArpgActs` | The acts: story quests written into `quest_template` (59000 up) on vanilla's NPCs by name, the vanilla quests they retell taken off their givers, each quest's road (pathfinding) filled with packs ahead of the character, act leaders as champions and finales as rares with a guaranteed blue, `#note` dev notes (`ARPG-ACT-1.md`) |
+| `ArpgScenes` | Short cutscenes: camera tracks authored around an anchor NPC, subtitles and emote cues, `SMSG_ARPG_SCENE`, played by the client's cinematic player and closed by `CMSG_COMPLETE_CINEMATIC`; once per character (`character_arpg_scene`) |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:
@@ -318,6 +319,9 @@ which skills carry a build.
 - **Act I, chapter 1** (`ARPG-ACT-1.md`): a new character starts in Northshire or the Valley of
   Trials and follows the "Act I:" quests. Check the start-up log for names it could not find, the
   road's pack density and spacing, the leaders' champions, and Hogger's and Zalazane's blue.
+- **Scenes**: the act openings (McBride, Gornek) and the Hogger and Zalazane reveals. Check the
+  camera framing (keys in `ArpgScenes.cpp`), the subtitles' place in the lower bar, and that ESC
+  skips and gives control back.
 - **The damage rework** (`ARPG-CHARACTER.md`, "Damage"): ARPG-sized numbers and creature health,
   increased and more, critical multiplier, added damage, ailments, the new affixes, gear skill
   levels, item comparisons, the 20-yard pack pull. Tuning knobs: `Arpg.Power.PerLevel` (0.1) and

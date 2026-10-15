@@ -42,6 +42,7 @@ mod globes;
 mod impact;
 mod juice;
 mod loot;
+mod scene;
 mod sheet;
 mod strikes;
 mod threats;
@@ -49,6 +50,7 @@ mod tree;
 mod uniques;
 mod world;
 
+pub(crate) use scene::scene_view;
 pub(crate) use tree::CVAR_TREE_ACTION;
 pub(crate) use uniques::ArpgUniques;
 
@@ -309,6 +311,8 @@ pub(super) fn plugin(app: &mut App) {
     champions::plugin(app);
     // Space rolls, Q drinks the flask.
     actions::plugin(app);
+    // The server's scenes: camera tracks and subtitles, played as cinematics.
+    scene::plugin(app);
     app.add_systems(Startup, install_hud);
     // The options page's Drop Test Loot button.
     app.add_observer(drop_dev_loot);

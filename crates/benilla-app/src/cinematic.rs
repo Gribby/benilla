@@ -28,6 +28,7 @@ use std::time::Duration;
 
 use benilla_assets::{AssetSet, LockRecover, WorldAssets};
 use benilla_formats::{CinematicCatalog, CinematicPath};
+use benilla_protocol::messages::arpg::ArpgScene;
 use benilla_ui::script::UiScript;
 use benilla_world::schedule::WorldStage;
 use benilla_world::view::WorldCamera;
@@ -47,6 +48,9 @@ pub(crate) struct Cinematics(pub(crate) CinematicCatalog);
 pub(crate) struct Cinematic {
     /// The reference's single-slot latch (`0xc4d75c`): a sequence the world was not ready to show.
     pending: Option<u32>,
+    /// Fork-only, not 1.12.1: an ARPG scene (`SMSG_ARPG_SCENE`) waiting for the world, latched as
+    /// a trigger is.
+    pending_scene: Option<ArpgScene>,
     playing: Option<Playing>,
     /// Seconds of black left while the world comes back after the end. The reference's
     /// EndCinematic (`0x48f080`) blocks on a terrain load at full black and raises no loading cover
@@ -56,6 +60,8 @@ pub(crate) struct Cinematic {
     /// A skip not yet paid: `StopCinematic` runs EndCinematic as its fade-out's completion
     /// (`0x48f067`, `0x48f080`), so [`stop`] sets this and [`drive`] pays it at full black.
     skip: bool,
+    /// Scenes displaced before they started, each owed its `CMSG_COMPLETE_CINEMATIC`.
+    displaced_scenes: u32,
 }
 
 /// One cinematic in flight.
@@ -66,7 +72,7 @@ struct Playing {
     /// The `CinematicSequences.dbc` id, for logging.
     sequence_id: u32,
     /// The row's shots in order, never empty.
-    shots: Vec<CinematicPath>,
+    shots: Vec<Shot>,
     /// Which shot is on screen.
     index: usize,
     /// Time inside the current shot.
@@ -74,10 +80,52 @@ struct Playing {
 }
 
 impl Playing {
-    fn shot(&self) -> &CinematicPath {
+    fn shot(&self) -> &Shot {
         &self.shots[self.index]
     }
 }
+
+/// What a shot flies: a `Cameras\*.m2` path, or (fork-only) an ARPG scene's camera track.
+/// A cinematic holds a handful of shots, so the path's size is no cost worth a box.
+#[allow(clippy::large_enum_variant)]
+enum Shot {
+    Path(CinematicPath),
+    Scene(ArpgScene),
+}
+
+impl Shot {
+    fn duration_ms(&self) -> u32 {
+        match self {
+            Shot::Path(p) => p.duration_ms,
+            Shot::Scene(s) => s.duration_ms,
+        }
+    }
+
+    fn sound_id(&self) -> u32 {
+        match self {
+            Shot::Path(p) => p.sound_id,
+            Shot::Scene(_) => 0,
+        }
+    }
+
+    /// The eye, the target (WoW coordinates) and the roll at `ms`.
+    fn sample(&self, ms: u32) -> ([f32; 3], [f32; 3], f32) {
+        match self {
+            Shot::Path(p) => {
+                let view = p.sample(ms);
+                (view.eye, view.target, view.roll)
+            }
+            Shot::Scene(s) => {
+                let (eye, target) = crate::player::scene_view(s, ms);
+                (eye, target, 0.0)
+            }
+        }
+    }
+}
+
+/// The cinematic player's systems, for those that read a shot after it is seated.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct CinematicSet;
 
 impl Cinematic {
     /// Is a cinematic on screen right now? The engine half of `InCinematic()`.
@@ -89,7 +137,25 @@ impl Cinematic {
     /// re-trigger counts as a new shot.
     pub(crate) fn playing_shot(&self) -> Option<(u64, usize, u32)> {
         let play = self.playing.as_ref()?;
-        Some((play.run, play.index, play.shot().sound_id))
+        Some((play.run, play.index, play.shot().sound_id()))
+    }
+
+    /// Fork-only: the ARPG scene on screen and how far into it, for its subtitles.
+    pub(crate) fn scene_at(&self) -> Option<(&ArpgScene, u32)> {
+        let play = self.playing.as_ref()?;
+        match play.shot() {
+            Shot::Scene(s) => Some((s, play.elapsed.as_millis() as u32)),
+            Shot::Path(_) => None,
+        }
+    }
+
+    /// Fork-only: latch an ARPG scene to play once the world is up. A scene displaced before it
+    /// started is acked by [`take_trigger`]'s rule, so the server hears it is over.
+    pub(crate) fn queue_scene(&mut self, scene: ArpgScene) {
+        if let Some(old) = self.pending_scene.replace(scene) {
+            warn!("scene: {} displaced before it started", old.id);
+            self.displaced_scenes += 1;
+        }
     }
 }
 
@@ -100,6 +166,7 @@ impl Cinematic {
     pub(crate) fn playing_for_test() -> Self {
         Self {
             pending: None,
+            pending_scene: None,
             playing: Some(Playing {
                 run: 0,
                 sequence_id: 0,
@@ -109,6 +176,7 @@ impl Cinematic {
             }),
             settling: None,
             skip: false,
+            displaced_scenes: 0,
         }
     }
 }
@@ -140,6 +208,7 @@ impl Plugin for CinematicPlugin {
                 // camera: no follow-camera frame shows, and this pose is the last word on it.
                 (take_trigger, start_pending, drive)
                     .chain()
+                    .in_set(CinematicSet)
                     .in_set(WorldStage::Input)
                     .after(PlayerControlSet),
             )
@@ -187,7 +256,7 @@ fn spawn_letterbox(mut commands: Commands) {
 }
 
 /// The height of one letterbox bar, in the screen's units ([`drive_letterbox`] has the law).
-fn letterbox_bar(width: f32, screen: f32) -> f32 {
+pub(crate) fn letterbox_bar(width: f32, screen: f32) -> f32 {
     let two_to_one = (screen - (width / 2.0).min(screen)) / 2.0;
     two_to_one.min(screen / 6.0).max(0.0)
 }
@@ -279,6 +348,9 @@ fn take_trigger(
     catalog: Option<Res<Cinematics>>,
     net: Option<Res<NetCommands>>,
 ) {
+    for _ in 0..std::mem::take(&mut cine.displaced_scenes) {
+        ack(net.as_deref());
+    }
     for msg in triggered.read() {
         let id = msg.cinematic_id;
         let playable = catalog
@@ -309,6 +381,10 @@ fn relinquish(cine: &mut Cinematic, net: Option<&NetCommands>, why: &str) {
         info!("cinematic: {id} {why} before it started");
         ack(net);
     }
+    if let Some(scene) = cine.pending_scene.take() {
+        info!("scene: {} {why} before it started", scene.id);
+        ack(net);
+    }
 }
 
 /// Start a latched cinematic once the world is actually up.
@@ -321,15 +397,19 @@ fn start_pending(
     state: Res<State<ClientState>>,
     mut fade: ResMut<crate::screen_fade::ScreenFade>,
 ) {
-    let Some(id) = cine.pending else { return };
+    if cine.pending.is_none() && cine.pending_scene.is_none() {
+        return;
+    }
     // The world-load gate: in the world, where `CinematicFrame` (the only ESC route) exists, and
     // not under the loading cover, which would hide the opening seconds.
     if *state.get() != ClientState::InWorld || screen.is_some_and(|s| s.covering()) {
         return;
     }
-    let (Some(catalog), Some(assets)) = (catalog, assets) else {
+    // A scene needs no tables: only the triggers wait for them.
+    let tables = catalog.zip(assets);
+    if cine.pending_scene.is_none() && tables.is_none() {
         return;
-    };
+    }
     // The shot is armed as the fade-out's completion (`0x48edc5` arms `0x4c0d10(0x48edd0, 0,
     // 0.25)`), so all below runs at full black. Gated after every can't-play return, so a failed
     // start never darkens the screen.
@@ -337,18 +417,28 @@ fn start_pending(
         fade.fade_out(crate::screen_fade::CINEMATIC);
         return;
     }
-    cine.pending = None;
-
-    let rows: Vec<_> = catalog.0.shots(id).into_iter().cloned().collect();
-    let mut chain = assets.chain.lock_recover();
-    let mut shots = Vec::with_capacity(rows.len());
-    for row in &rows {
-        match CinematicPath::load(&mut chain, row) {
-            Ok(p) => shots.push(p),
-            // One unreadable shot does not sink the cinematic: play what parses.
-            Err(e) => warn!("cinematic: camera {} failed to load: {e:#}", row.id),
+    let (id, shots) = if let Some(scene) = cine.pending_scene.take() {
+        // Fork-only: a scene is one shot, its own camera track.
+        (scene.id, vec![Shot::Scene(scene)])
+    } else {
+        let Some(id) = cine.pending.take() else {
+            return;
+        };
+        let Some((catalog, assets)) = tables else {
+            return;
+        };
+        let rows: Vec<_> = catalog.0.shots(id).into_iter().cloned().collect();
+        let mut chain = assets.chain.lock_recover();
+        let mut shots = Vec::with_capacity(rows.len());
+        for row in &rows {
+            match CinematicPath::load(&mut chain, row) {
+                Ok(p) => shots.push(Shot::Path(p)),
+                // One unreadable shot does not sink the cinematic: play what parses.
+                Err(e) => warn!("cinematic: camera {} failed to load: {e:#}", row.id),
+            }
         }
-    }
+        (id, shots)
+    };
     if shots.is_empty() {
         warn!("cinematic: {id} had no loadable shot — acking it");
         ack(net.as_deref());
@@ -359,7 +449,7 @@ fn start_pending(
     info!(
         "cinematic: playing {id} — {} shot(s), {} ms",
         shots.len(),
-        shots.iter().map(|s| s.duration_ms).sum::<u32>()
+        shots.iter().map(Shot::duration_ms).sum::<u32>()
     );
     // A trigger on top of a running cinematic replaces it and acks the old one; a GM
     // `.debug play cinematic` during an intro does this.
@@ -443,7 +533,7 @@ fn drive(
     // --- Every boundary cuts through black: a run-out shot or a skip fades out and steps at full
     // black, as the fade's completion (`0x48efd7` to `0x48efe0` to advance, `0x48f067` to
     // `0x48f080` to stop), which keeps the cut invisible under a hitch.
-    if skip || play.elapsed.as_millis() as u32 >= play.shot().duration_ms {
+    if skip || play.elapsed.as_millis() as u32 >= play.shot().duration_ms() {
         if !fade.is_black() {
             fade.fade_out(crate::screen_fade::CINEMATIC);
             // Fall through to seat the camera: what darkens is the shot's own last pose.
@@ -453,10 +543,11 @@ fn drive(
             let mut ended = skip;
             while !ended {
                 let play = cine.playing.as_mut().expect("checked above");
-                if (play.elapsed.as_millis() as u32) < play.shot().duration_ms {
+                if (play.elapsed.as_millis() as u32) < play.shot().duration_ms() {
                     break;
                 }
-                let over = play.elapsed - Duration::from_millis(u64::from(play.shot().duration_ms));
+                let over =
+                    play.elapsed - Duration::from_millis(u64::from(play.shot().duration_ms()));
                 if play.index + 1 >= play.shots.len() {
                     ended = true;
                     break;
@@ -494,9 +585,10 @@ fn drive(
     let play = cine.playing.as_ref().expect("checked above");
     let shot = play.shot();
     // Clamped: under a boundary's fade the pose holds at the shot's last authored one.
-    let view = shot.sample((play.elapsed.as_millis() as u32).min(shot.duration_ms));
-    let eye = benilla_assets::coords::wow_to_bevy(view.eye);
-    let target = benilla_assets::coords::wow_to_bevy(view.target);
+    let (eye, target, roll) =
+        shot.sample((play.elapsed.as_millis() as u32).min(shot.duration_ms()));
+    let eye = benilla_assets::coords::wow_to_bevy(eye);
+    let target = benilla_assets::coords::wow_to_bevy(target);
 
     // The roll is about the view axis and authored around whole turns (`FlyByDwarf` holds 2π), so
     // it is applied as an angle, never tested for zero. The WoW-to-Bevy basis is a proper rotation,
@@ -506,9 +598,9 @@ fn drive(
         Vec3::Y
     } else if forward.cross(Vec3::Y).length_squared() < 1e-6 {
         // Looking straight up or down, rolling `Y` about `Y` is the identity: roll `Z` instead.
-        Quat::from_axis_angle(forward, view.roll) * Vec3::Z
+        Quat::from_axis_angle(forward, roll) * Vec3::Z
     } else {
-        Quat::from_axis_angle(forward, view.roll) * Vec3::Y
+        Quat::from_axis_angle(forward, roll) * Vec3::Y
     };
     cam.translation = eye;
     if forward != Vec3::ZERO {
@@ -538,6 +630,8 @@ fn abandon_on_leaving_world(
         info!("cinematic: {} abandoned (left the world)", play.sequence_id);
     }
     cine.pending = None;
+    cine.pending_scene = None;
+    cine.displaced_scenes = 0;
     cine.skip = false;
     cine.settling = None;
     // Clear any fade: the glue comes up next and must not sit behind our black.

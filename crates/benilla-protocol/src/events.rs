@@ -483,6 +483,10 @@ pub enum SessionEvent {
     ArpgBoltStop {
         stop: crate::messages::arpg::ArpgBoltStop,
     },
+    /// Fork-only, not 1.12.1: a scene to play (`SMSG_ARPG_SCENE`).
+    ArpgScene {
+        scene: crate::messages::arpg::ArpgScene,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

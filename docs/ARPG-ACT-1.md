@@ -93,6 +93,28 @@ Each quest's named leader, at its own spawn, is a champion with a set affix and 
 joins a pack, so there is only ever one. The chapter's finale (Hogger, Zalazane) is a rare with a
 guaranteed blue two levels above it.
 
+### Scenes
+
+Short cutscenes over the live world (cmangos `Arpg/ArpgScenes.{h,cpp}`, client
+`player/arpg/scene.rs` on `cinematic.rs`). A scene is a camera track and subtitles around an
+anchor (an NPC or creature, found by name near the character), sent as `SMSG_ARPG_SCENE` (0x352)
+and played by the cinematic player: letterboxed, the UI and cursor hidden, ESC skips. The camera
+keys are authored in the anchor's frame (forward toward the character, left, up, in yards), so a
+scene fits wherever the anchor stands. While it plays the character is rooted, creatures leave it
+alone and its actions are refused; the anchor turns to it and acts its cues (talk, point, roar).
+The client closes it with `CMSG_COMPLETE_CINEMATIC`, as a cinematic, at its end or on a skip; the
+server ends it anyway five seconds past its length. Each plays once per character
+(`character_arpg_scene`).
+
+| Scene | When | Around |
+|---|---|---|
+| Act I opens (Alliance) | Taking The Northshire Watch | Marshal McBride, 16 s |
+| Act I opens (Horde) | Taking The Trial of the Valley | Gornek, 16 s |
+| Hogger | First coming within 40 yards of him on his quest | Hogger, 9.5 s |
+| Zalazane | First coming within 40 yards of him on his quest | Zalazane, 9.5 s |
+
+Subtitles only for now; the voice can ride the same message later.
+
 ### Dev notes
 
 With `Arpg.DevTools = 1`, saying `#note <text>` writes a note line to the play statistics with
@@ -111,6 +133,7 @@ or too crowded while walking it.
 | Chapter 2 | Westfall and the Deadmines; the Barrens, Ragefire Chasm and the Wailing Caverns |
 | Chapter 3 | Redridge, Duskwood; Stonetalon, Ashenvale; both ending in Silverpine |
 | Finale | Arugal in Shadowfang Keep as an act boss: telegraphs, worgen waves, an enrage; the act's Cache |
+| More scenes | Chapter hand-offs (into Westfall, the Barrens), Arugal; a dev tool to record camera keys while flying |
 | Voice | Deferred |
 
 ## The plan for chapters 2 and 3
