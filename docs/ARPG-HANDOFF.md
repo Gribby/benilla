@@ -129,13 +129,17 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgTags` | Spell tags (Holy, Area, Projectile, Seal, Channel...) |
 | `ArpgMage` | The mage's keystone hooks (on hit, periodic tick, kill, blow taken); its web is in `ArpgTree`, its trees in `ArpgSkills` |
 | `ArpgSets` | The twelve item sets (20/30/40/50 per class): pieces written into item_template with vanilla looks, bonuses into the item totals, whole-set powers as kit rows, drops, `SMSG_ARPG_SETS` |
+| `ArpgActs` | The acts: story quests written into `quest_template` (59000 up) on vanilla's NPCs by name, the vanilla quests they retell taken off their givers, each quest's road (pathfinding) filled with packs ahead of the character, act leaders as champions and finales as rares with a guaranteed blue, `#note` dev notes (`ARPG-ACT-1.md`) |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:
 - `Entities/Unit.cpp`: kill flow, loot preparation, damage taken, miss chances;
 - `Spells/Spell.cpp`: cast, finish, hit, heal and landed;
 - `Loot/LootMgr.cpp`: pickups into the Codex or purse;
-- `World/World.cpp`: generated `item_template` rows, written before item templates load;
+- `World/World.cpp`: generated `item_template` rows, written before item templates load; the act
+  quests, written before quests load;
+- `Chat/ChatHandler.cpp`: `#note` dev notes;
+- `Globals/ObjectMgr.cpp`: one start per faction (`ArpgOneStartPerFaction`) with `Arpg.Acts`;
 - `Entities/Player.cpp`, `Entities/Creature.cpp`, `SpellAuras.cpp`.
 
 **Generated `item_template` entries** (the server writes them at start):
@@ -211,6 +215,8 @@ which skills carry a build.
 - `ARPG-PROGRESSION.md`: packs, camps, champions, dungeons and tiers, survival, threats, raids,
   zone events and bounties, build order.
 - `ARPG-UNIQUES.md`, `ARPG-ITEMISATION.md`, `ARPG-SKILL-TREES.md`.
+- `ARPG-ROADMAP.md`, `ARPG-ROADMAP-RESOURCES.md`: the road to 1.0, resources and difficulty.
+- `ARPG-ACT-1.md`: Act I, its built chapter 1 and the plan for the rest.
 
 **Keep these current with every change:** they are the spec Jeff reads.
 
@@ -309,6 +315,9 @@ which skills carry a build.
 
 ### Untested in game
 
+- **Act I, chapter 1** (`ARPG-ACT-1.md`): a new character starts in Northshire or the Valley of
+  Trials and follows the "Act I:" quests. Check the start-up log for names it could not find, the
+  road's pack density and spacing, the leaders' champions, and Hogger's and Zalazane's blue.
 - **The damage rework** (`ARPG-CHARACTER.md`, "Damage"): ARPG-sized numbers and creature health,
   increased and more, critical multiplier, added damage, ailments, the new affixes, gear skill
   levels, item comparisons, the 20-yard pack pull. Tuning knobs: `Arpg.Power.PerLevel` (0.1) and
