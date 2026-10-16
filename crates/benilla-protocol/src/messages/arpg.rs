@@ -891,6 +891,49 @@ pub fn read_arpg_scene(r: &mut impl io::Read) -> io::Result<ArpgScene> {
     })
 }
 
+/// Nearby enemies' states (cmangos `Arpg/ArpgStates.h`), sent as they change: each unit's state
+/// bits and its Daze build-up. A unit whose states ended comes with no bits and no Daze.
+pub const SMSG_ARPG_STATES: u16 = 0x0353;
+
+/// The state bits, in the server's order (`Arpg::State`).
+pub const ARPG_STATE_NAMES: [&str; 11] = [
+    "Chilled",
+    "Frozen",
+    "Ignited",
+    "Bleeding",
+    "Poisoned",
+    "Withered",
+    "Overloaded",
+    "Judged",
+    "Dazed",
+    "Stunned",
+    "Consecrated",
+];
+
+/// One unit's states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ArpgUnitStates {
+    pub guid: u64,
+    /// `1 << state` for each state it is in.
+    pub mask: u16,
+    /// Daze build-up, 0-100.
+    pub daze: u8,
+}
+
+/// `SMSG_ARPG_STATES`: `u8` count, per unit `u64` guid, `u16` state bits, `u8` Daze build-up.
+pub fn read_arpg_states(r: &mut impl io::Read) -> io::Result<Vec<ArpgUnitStates>> {
+    let n = read_u8(r)?;
+    let mut out = Vec::with_capacity(usize::from(n));
+    for _ in 0..n {
+        out.push(ArpgUnitStates {
+            guid: read_u64_le(r)?,
+            mask: read_u16_le(r)?,
+            daze: read_u8(r)?,
+        });
+    }
+    Ok(out)
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -1474,5 +1517,20 @@ mod tests {
         assert_eq!(scene.lines[0].speaker, "Hogger");
         assert_eq!(scene.lines[0].text, "Grr.");
         assert_eq!((scene.lines[0].from_ms, scene.lines[0].to_ms), (500, 4000));
+    }
+
+    #[test]
+    fn states_read_each_unit() {
+        let mut body = vec![2u8];
+        for (guid, mask, daze) in [(0xF130_0000_0000_0001u64, 1u16 << 8, 0u8), (7, 0, 60)] {
+            body.extend_from_slice(&guid.to_le_bytes());
+            body.extend_from_slice(&mask.to_le_bytes());
+            body.push(daze);
+        }
+        let states = read_arpg_states(&mut body.as_slice()).unwrap();
+        assert_eq!(states.len(), 2);
+        assert_eq!(states[0].mask, 1 << 8);
+        assert_eq!(ARPG_STATE_NAMES[8], "Dazed");
+        assert_eq!(states[1].daze, 60);
     }
 }

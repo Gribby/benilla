@@ -1,0 +1,107 @@
+# ARPG synergy
+
+How skills, passives and items combine. The aim (Jeff): not designed builds, but possibilities, so
+a character grows powerful through what it connects rather than through bigger numbers. Modelled
+on Path of Exile 2's combos (one skill sets up a state, another pays it off) and its meta gems,
+and on Last Epoch's skill trees (triggers, conversions, skills scaling off states). No charges.
+
+## The parts
+
+### 1. Enemy states
+
+A small fixed vocabulary of things an enemy can be in. Any source can put an enemy in one, any
+source can read it, and some can consume it. Skills never name each other: they meet through the
+state. cmangos `Arpg/ArpgStates.{h,cpp}`.
+
+| State | Comes from | Its own effect | Consumed for |
+|---|---|---|---|
+| Chilled | Frost hits (chance), Frostbolt | slowed | its end |
+| Frozen | a critical Frost hit on a Chilled enemy | rooted | its end |
+| Ignited | Fire hits (chance) | burns | the burn left |
+| Bleeding | Physical hits (chance) | bleeds, more while it moves | the bleed left |
+| Poisoned | Nature hits (chance) | poison stacks | the poison left |
+| Withered | Shadow hits (chance) | takes more of your damage | its stacks |
+| Overloaded | Arcane hits (chance) | stores damage, bursts | the stored damage |
+| Judged | Holy hits (chance) | stores damage, bursts at 5 stacks | the stored damage |
+| **Dazed** | **Daze build-up** (below) | slowed, its cast broken, takes 10% more damage, 4 sec | its end |
+| Stunned | any stun | can't act | (read only) |
+| Consecrated | standing in a Consecration | (read only) | (read only) |
+
+**Daze** is the physical and holy state. Every physical or holy hit builds it by twice its share of
+the enemy's health (a hit for a tenth of its health builds a fifth); a Consecration's tick builds
+8%. Champions, rares, elites and bosses build it slower (bosses at a quarter), and anything that
+Dazes outright (Stagger, Aftershock) only builds it on them, so a boss is never stun-locked; nor
+is a boss's, a rare's or a champion's cast broken. It ebbs when the hits stop for three seconds.
+At 100% the enemy is Dazed. A hit pays off a state set up before it, never one it completes
+itself (its triggers run before its own Daze). The hover bar shows each enemy's states
+and its Daze as it builds (`SMSG_ARPG_STATES`, 0x353).
+
+### 2. Triggers
+
+"When X happens, do Y", as rows of data. cmangos `Arpg/ArpgSynergy.{h,cpp}`.
+
+- **Events:** a hit, a critical hit, a kill, a state applied, a state consumed.
+- **Conditions:** the spell (by name), the skill, the hit's tags, a state the enemy must be in, the
+  state the event is about.
+- **Effects:** *apply* a state; *strike* (consume a state for an extra hit: a share of the hit plus
+  what the state held); *burst* (consume a state for a hit on every enemy within 8 yards);
+  *spread* a state to nearby enemies; *daze* (build Daze).
+- **Owners:** a class (its own rules), a skill-tree node (its rank scales the effect), or a worn
+  unique (by name). Each row has its own cooldown. Trigger damage never sets off another hit's
+  triggers; state events nest at most three deep.
+
+### 3. Modifiers by state and tag, not by skill
+
+New affixes, so an item opens a pairing instead of adding a number:
+- +% increased damage against Dazed, Judged, Chilled, Ignited, Bleeding, Poisoned or Stunned
+  enemies, or enemies on Consecrated ground;
+- +% increased Daze build-up.
+
+They roll from a new affix pool: items rolled before keep their affixes (each pool is frozen at its
+size, as an item re-rolls from its seed).
+
+They join the existing tag modifiers ("+% Holy damage", "+% Area damage").
+
+### 4. Conversions
+
+A skill-tree node that makes a skill count as another damage type, for its ailments, its Daze and
+the triggers: the skill moves into that type's pairings.
+
+### 5. Flat damage cut
+
+Added damage affixes were eight times vanilla's size (a fifth of the hit) and carried builds by
+numbers. They are three times now (about a fifteenth).
+
+## The paladin, first
+
+**Its own rules** (every paladin): Daze is its currency, built by its swings, Seals (holy) and
+Consecration's ticks.
+- *Shattering Blow:* Hammer of Wrath consumes Daze for an extra hit of 100% of the hit.
+- *Verdict:* Judgement consumes Daze to burst onto every enemy within 8 yards for 60% of the hit.
+- *Sentence* and *Sentence Passed* count a Dazed enemy as stunned. *Stagger* (passive web) Dazes.
+
+**New tree nodes:**
+
+| Skill | Node | What it opens |
+|---|---|---|
+| Crusader | Concussive Blows (3 ranks) | critical physical or holy Crusader hits add 15% of the way to a Daze per rank |
+| Crusader | Sun Seal (conversion) | swings and Seals count as Fire: they Ignite instead of Judge, and build no Daze |
+| Judgement | Frozen Verdict (conversion) | Judgement counts as Frost: it Chills, and a critical one on a Chilled enemy Freezes |
+| Hammers | Aftershock | consuming Daze Dazes the two nearest enemies (every 2 sec) |
+| Wrath | Cleansing Fire | Exorcism and Holy Wrath consume Ignite to burst for 80% of the hit and the burn left |
+
+Some pairings these make, none of them designed as a build:
+- **Daze loop:** swings and Consecration build Daze, Hammer of Wrath cashes it in, Aftershock
+  passes it on to the next two, and items against Dazed enemies scale all of it.
+- **Sun paladin:** Sun Seal makes the swings ignite, Cleansing Fire bursts the burns with Exorcism,
+  and "against Ignited" items scale it.
+- **Frost judge:** Frozen Verdict chills, a frost mage's items and Shatter-style payoffs apply.
+
+## Next
+
+- Triggers on uniques: rows owned by named items (the hook is built: a row with `item`).
+- Block and dodge events.
+- The mage's and the druid's state rows and nodes (the druid's bear and cat already build Daze
+  through physical hits).
+- Ground states beyond Consecration (chilled ground, burning ground).
+- Visuals for Daze build-up and the states on the enemies themselves.

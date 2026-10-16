@@ -424,6 +424,8 @@ pub enum ServerPacket {
     ArpgBoltStop(crate::messages::arpg::ArpgBoltStop),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_SCENE`, a scene's camera track and subtitles.
     ArpgScene(crate::messages::arpg::ArpgScene),
+    /// Fork-only, not 1.12.1: `SMSG_ARPG_STATES`, nearby enemies' states.
+    ArpgStates(Vec<crate::messages::arpg::ArpgUnitStates>),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1415,6 +1417,7 @@ impl ServerPacket {
             ServerPacket::ArpgCosts(_) => "SMSG_ARPG_COSTS".into(),
             ServerPacket::ArpgBoltStop(_) => "SMSG_ARPG_BOLT_STOP".into(),
             ServerPacket::ArpgScene(_) => "SMSG_ARPG_SCENE".into(),
+            ServerPacket::ArpgStates(_) => "SMSG_ARPG_STATES".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

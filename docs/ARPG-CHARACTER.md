@@ -136,10 +136,11 @@ bonuses with the main hit's delivery (Melee, Spell, Area) and the skill's more b
 critical when the main hit was, and it can inflict its own ailment. Swings take the attack
 affixes, spells the spell ones; a Seal's proc takes none, as the swing it rides on has them
 already; at most the two biggest types land beside one hit. The
-affix shows and deals its numbers at the ARPG's size for the item's level, eight times vanilla's
-stat growth, so an affix lands near a fifth of the hit it rides on (at vanilla's size it was about
-2%, noise beside a skill). This is what makes an
-off-type affix worth having: a Holy paladin with Fire added to attacks ignites.
+affix shows and deals its numbers at the ARPG's size for the item's level, three times vanilla's
+stat growth, so an affix lands near a fifteenth of the hit it rides on (at vanilla's size it was
+about 2%, noise beside a skill). It was eight times, a fifth of the hit, and carried builds by
+brute numbers; Jeff wants power from synergy instead (`ARPG-SYNERGY.md`). An off-type affix is
+still worth having for what its type opens: a Holy paladin with Fire added to attacks ignites.
 
 ### Ailments
 
@@ -240,7 +241,7 @@ makes the attack skills hit harder, so five attack skills is the weaker build. P
 - **Auras:** Sanctity Aura gives +10% Holy damage; Wide Aura spreads it to the whole pack you're
   fighting.
 - **Divine:** when Divine Shield ends, your next three Judgements are critical strikes.
-- **Hammer of Justice:** your damage is 15% more on stunned enemies (Sentence Passed).
+- **Hammer of Justice:** your damage is 15% more on stunned or Dazed enemies (Sentence Passed).
 - **Seals:** they are the swing's damage, and one skill with it (Crusader). A swing build without
   Seals is half a build.
 
@@ -783,7 +784,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Burst | Hammer of Light [A] | 3 | Bursts 4/6/8 yd round its target, 40% |
 | Burst | Radiance [H] | 4 | 8% more Judgement damage per rank |
 | Burst | Severity [M] | 3 | Critical strikes' bonus 20% more per rank |
-| Burst | **Sentence** [H] | 1 | 100% more on stunned enemies |
+| Burst | **Sentence** [H] | 1 | 100% more on stunned or Dazed enemies |
 | Verdict | Avenger [H] | 1 | Judgement keeps the Seal; its cooldown doubles |
 | Verdict | Swift Judgement [M] | 3 | -1 sec cooldown per rank |
 | Verdict | **Crusader's Verdict** [Syn] | 1 | A critical swing makes the next Judgement deal 50% more |
@@ -816,7 +817,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Stun | Shockwave Hammer [A] | 2 | Stuns 1/2 more within 8 yd |
 | Stun | Long Stun [M] | 3 | +0.5 sec stun per rank |
 | Stun | Quick Hammer [M] | 3 | -10 sec Hammer of Justice cooldown per rank |
-| Stun | **Sentence Passed** [H] | 1 | 15% more damage on stunned enemies |
+| Stun | **Sentence Passed** [H] | 1 | 15% more damage on stunned or Dazed enemies |
 | Execute | Hammer Volley [A] | 2 | Hammer of Wrath throws 1/2 more, 60% |
 | Execute | Weighted Hammer [M] | 4 | 8% more Hammer of Wrath damage per rank |
 | Execute | **Wrath of the Light** [Syn] | 1 | A critical Judgement or Exorcism makes the next Hammer of Wrath deal 60% more and pierce every enemy for 60% |

@@ -30,6 +30,14 @@ local affix = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 affix:SetPoint("TOP", bar, "BOTTOM", 0, -3)
 affix:SetTextColor(0.85, 0.85, 0.85)
 
+-- The enemy's states (Arpg/ArpgStates.h on the server): "Judged · Daze 60%", under the affixes.
+local states = bar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+states:SetTextColor(0.75, 0.85, 1.0)
+local statesText = ""
+function ArpgHud_States(text)
+    statesText = text or ""
+end
+
 bar:Hide()
 
 -- The champion or rare under the cursor, which the client sets as the hover moves:
@@ -50,6 +58,22 @@ local RANKS = {
     rareelite = { "Rare Elite", 0.8, 0.8, 1.0 },
     rare = { "Rare", 0.8, 0.8, 1.0 },
 }
+
+-- The states line, under the affixes when there are some, else under the bar.
+local function showStates(underAffixes)
+    if statesText == "" then
+        states:Hide()
+        return
+    end
+    states:ClearAllPoints()
+    if underAffixes then
+        states:SetPoint("TOP", affix, "BOTTOM", 0, -2)
+    else
+        states:SetPoint("TOP", bar, "BOTTOM", 0, -3)
+    end
+    states:SetText(statesText)
+    states:Show()
+end
 
 local function refresh()
     if not UnitExists("mouseover") or not UnitCanAttack("player", "mouseover")
@@ -80,12 +104,14 @@ local function refresh()
         rank:SetTextColor(r, g, b)
         affix:SetText(champ.affixes)
         affix:Show()
+        showStates(true)
         bar:Show()
         return
     end
     name:SetText(UnitName("mouseover"))
     name:SetTextColor(1.0, 1.0, 1.0)
     affix:Hide()
+    showStates(false)
     if special then
         rank:SetText(label .. "  " .. special[1])
         rank:SetTextColor(special[2], special[3], special[4])

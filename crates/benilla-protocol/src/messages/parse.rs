@@ -543,6 +543,9 @@ fn parse_server_body(
             ServerPacket::ArpgPurse(super::arpg::read_arpg_purse(&mut r)?)
         }
         super::arpg::SMSG_ARPG_SETS => ServerPacket::ArpgSets(super::arpg::read_arpg_sets(&mut r)?),
+        super::arpg::SMSG_ARPG_STATES => {
+            ServerPacket::ArpgStates(super::arpg::read_arpg_states(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_SCENE => {
             ServerPacket::ArpgScene(super::arpg::read_arpg_scene(&mut r)?)
         }

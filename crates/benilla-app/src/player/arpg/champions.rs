@@ -58,10 +58,79 @@ pub(crate) struct ArpgChampions {
     generation: u64,
 }
 
+/// Every nearby enemy's states the server has told of (`SMSG_ARPG_STATES`, cmangos
+/// `Arpg/ArpgStates.h`): its state bits and Daze build-up, by guid. A unit whose states ended is
+/// dropped.
+#[derive(Resource, Default)]
+pub(crate) struct ArpgEnemyStates {
+    by_guid: HashMap<u64, (u16, u8)>,
+}
+
 /// Registered whatever the view, so every session event kind has its owner.
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgChampions>()
-        .net_handler(SessionEventKind::ArpgChampions, on_champions);
+        .init_resource::<ArpgEnemyStates>()
+        .net_handler(SessionEventKind::ArpgChampions, on_champions)
+        .net_handler(SessionEventKind::ArpgStates, on_states);
+}
+
+fn on_states(In(ev): In<SessionEvent>, mut states: ResMut<ArpgEnemyStates>) {
+    if let SessionEvent::ArpgStates { states: changes } = ev {
+        for unit in changes {
+            if unit.mask == 0 && unit.daze == 0 {
+                states.by_guid.remove(&unit.guid);
+            } else {
+                states.by_guid.insert(unit.guid, (unit.mask, unit.daze));
+            }
+        }
+    }
+}
+
+/// The hover bar's states line: the states by name, and the Daze building ("Judged · Daze 60%").
+fn states_text(mask: u16, daze: u8) -> String {
+    use benilla_protocol::messages::arpg::ARPG_STATE_NAMES;
+    let mut parts: Vec<String> = ARPG_STATE_NAMES
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| mask & (1 << i) != 0)
+        .map(|(_, name)| (*name).to_string())
+        .collect();
+    if daze > 0 {
+        parts.push(format!("Daze {daze}%"));
+    }
+    parts.join(" \u{b7} ")
+}
+
+/// Tell the hover bar the states of the enemy under the cursor, when they change.
+fn push_hover_states(
+    script: Option<NonSendMut<UiScript>>,
+    hover: Option<Res<ArpgEnemyHover>>,
+    states: Res<ArpgEnemyStates>,
+    mut pushed: Local<Option<(u64, String)>>,
+) {
+    let Some(script) = script else {
+        return;
+    };
+    let text = hover
+        .and_then(|h| h.0.map(|(_, guid)| guid))
+        .and_then(|guid| states.by_guid.get(&guid))
+        .map_or_else(String::new, |&(mask, daze)| states_text(mask, daze));
+    let mark = (script.session(), text);
+    if pushed.as_ref() == Some(&mark) {
+        return;
+    }
+    let chunk = format!(
+        "if not ArpgHud_States then return false end\nArpgHud_States({})\nreturn true",
+        super::tree::lua_str(&mark.1)
+    );
+    match script.eval::<bool>(&chunk) {
+        Ok(true) => *pushed = Some(mark),
+        Ok(false) => {}
+        Err(e) => {
+            warn!("arpg: the hover bar refused the states: {e}");
+            *pushed = Some(mark);
+        }
+    }
 }
 
 impl ArpgChampions {
@@ -82,7 +151,10 @@ fn on_champions(In(ev): In<SessionEvent>, mut state: ResMut<ArpgChampions>) {
 
 /// The view's half: the hover bar's champion line and the rings.
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, (push_hover, place_rings, wear_affix_auras));
+    app.add_systems(
+        Update,
+        (push_hover, push_hover_states, place_rings, wear_affix_auras),
+    );
 }
 
 /// The Lua chunk that tells the hover bar about `champion` (`None`: an ordinary enemy, or none).
@@ -314,6 +386,13 @@ fn place_rings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_states_line_names_each_state_and_the_daze() {
+        assert_eq!(states_text((1 << 7) | (1 << 0), 0), "Chilled \u{b7} Judged");
+        assert_eq!(states_text(0, 45), "Daze 45%");
+        assert_eq!(states_text(1 << 8, 0), "Dazed");
+    }
 
     #[test]
     fn the_hover_chunk_names_the_champion_and_its_affixes() {

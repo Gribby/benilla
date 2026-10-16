@@ -487,6 +487,10 @@ pub enum SessionEvent {
     ArpgScene {
         scene: crate::messages::arpg::ArpgScene,
     },
+    /// Fork-only, not 1.12.1: nearby enemies' states, as they change (`SMSG_ARPG_STATES`).
+    ArpgStates {
+        states: Vec<crate::messages::arpg::ArpgUnitStates>,
+    },
     /// The zone's weather (`SMSG_WEATHER`); `sound_id` is a SoundEntries loop, 8533..8558, 0 clear.
     Weather {
         weather_type: u32,

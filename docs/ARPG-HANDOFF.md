@@ -130,6 +130,8 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgMage` | The mage's keystone hooks (on hit, periodic tick, kill, blow taken); its web is in `ArpgTree`, its trees in `ArpgSkills` |
 | `ArpgSets` | The twelve item sets (20/30/40/50 per class): pieces written into item_template with vanilla looks, bonuses into the item totals, whole-set powers as kit rows, drops, `SMSG_ARPG_SETS` |
 | `ArpgActs` | The acts: story quests written into `quest_template` (59000 up) on vanilla's NPCs by name, the vanilla quests they retell taken off their givers, packs placed ahead of the character in the open world, act leaders as champions and finales as rares with a guaranteed blue, `#note` dev notes (`ARPG-ACT-1.md`) |
+| `ArpgStates` | Enemy states, the shared language of synergy: the ailments read as states, Daze build-up to Dazed, Stunned, Consecrated; apply, consume (what a state held comes back for the payoff), `SMSG_ARPG_STATES` (0x353) for the hover bar (`ARPG-SYNERGY.md`) |
+| `ArpgSynergy` | Trigger rows over the states: on a hit, crit, kill, state applied or consumed, apply / strike / burst / spread / daze; owned by a class, a skill-tree node or a worn unique, with cooldowns |
 | `ArpgScenes` | Short cutscenes: camera tracks authored around an anchor NPC, subtitles and emote cues, `SMSG_ARPG_SCENE`, played by the client's cinematic player and closed by `CMSG_COMPLETE_CINEMATIC`; once per character (`character_arpg_scene`) |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
@@ -218,6 +220,7 @@ which skills carry a build.
 - `ARPG-UNIQUES.md`, `ARPG-ITEMISATION.md`, `ARPG-SKILL-TREES.md`.
 - `ARPG-ROADMAP.md`, `ARPG-ROADMAP-RESOURCES.md`: the road to 1.0, resources and difficulty.
 - `ARPG-ACT-1.md`: Act I, its built chapter 1 and the plan for the rest.
+- `ARPG-SYNERGY.md`: how skills, passives and items combine: enemy states, triggers, conversions.
 
 **Keep these current with every change:** they are the spec Jeff reads.
 
