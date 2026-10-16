@@ -51,7 +51,7 @@ Shock (phase 3). The cat needs no fallback: its auto-attack costs nothing.
 **All classes**
 
 - Overdraw for mana and rage. Cat energy keeps its hard cap (it refills fast).
-- Mana regen 1.5% of max a second in combat, 5% out of it.
+- Mana regen 1% of max a second in combat (1.5% until the October stats showed no pressure), 5% out of it.
 - Globes give 8% mana (10% from an elite); the mana flask 40% over 3 s, its charges from kills
   weighted by the foe (normal 1, champion 2, rare 5, boss 20, after PoE's "Power").
 - New affixes: "mana on hit", "skill cost -X%" (capped at 25%).
@@ -63,7 +63,7 @@ Shock (phase 3). The cat needs no fallback: its auto-attack costs nothing.
 | Skill | Role | Cost | Notes |
 |---|---|---|---|
 | Frostbolt | Free filler | 0 | Restores 3% a hit; slows; stacks Chill |
-| Fireball | Main spender | 9% | Consumes Chill for bonus damage |
+| Fireball | Main spender | 11% | Consumes Chill for bonus damage |
 | Arcane Missiles | Expensive burst | 18% per channel | Best damage per second |
 | Blizzard | Area | 25% | Consumes Chill |
 | Fire Blast | Cooldown | 0, 6 s | Reset by a Fireball crit (already a synergy) |

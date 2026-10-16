@@ -195,8 +195,8 @@ making the stat mandatory:
 | **Spirit** | Regeneration | Cooldown recovery; increased damage over time and with ailments | +1% per 10 Spirit; +1% damage per 5 | +30% cooldown |
 
 Pacing (built, `Arpg/ArpgCharacter.cpp`): mana returns from fighting, slowly enough that spells
-and drains show (0.5% of the maximum per swing that lands, 0.5% for a skill hit at most once a
-second, 2% per kill, and each swing and skill hit adds the mana on
+and drains show (0.3% of the maximum per swing that lands, 0.5% for a skill hit at most once a
+second, 1% per kill, and each swing and skill hit adds the mana on
 hit of the web's Bloodthirst and Devotion nodes and the "+N mana on hit" item affix), and five seconds out of a fight (out of combat, no hit dealt or
 taken) health flows back at 5% a second and mana at 2%, so nobody sits down to drink, but a run
 between packs is not a refill.

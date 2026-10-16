@@ -28,6 +28,7 @@ state. cmangos `Arpg/ArpgStates.{h,cpp}`.
 | Consecrated | standing in a Consecration | (read only) | (read only) |
 | Scorched Ground | standing in a Flamestrike or Rain of Fire | (read only) | (read only) |
 | Frozen Ground | standing in a Blizzard | (read only) | (read only) |
+| Storm Ground | standing in a Hurricane | (read only) | (read only) |
 
 **Daze** is the physical and holy state. Every physical or holy hit builds it by twice its share of
 the enemy's health (a hit for a tenth of its health builds a fifth); a Consecration's tick builds
@@ -51,7 +52,9 @@ Freeze, Daze and stuns are real auras, drawn as they always were).
   state the event is about.
 - **Effects:** *apply* a state; *strike* (consume a state for an extra hit: a share of the hit plus
   what the state held); *burst* (consume a state for a hit on every enemy within 8 yards);
-  *spread* a state to nearby enemies; *daze* (build Daze).
+  *spread* a state to nearby enemies; *daze* (build Daze); *nova* (a share of the hit on every
+  other enemy within 8 yards, consuming nothing: a ground's payoff, as grounds are read, not
+  spent).
 - **Owners:** a class (its own rules), a skill-tree node (its rank scales the effect), or a worn
   unique (by name). Each row has its own cooldown. Trigger damage never sets off another hit's
   triggers; state events nest at most three deep.
@@ -109,6 +112,7 @@ Some pairings these make, none of them designed as a build:
 - *Shatter Point:* Fire Blast consumes Freeze for an extra hit of 120%.
 - *Detonating Spark:* Arcane Explosion consumes Ignite to burst for 50% and the burn left.
 - *Frost Step:* dodging a blow Chills its attacker.
+- *Kindling Ground:* Fire hits Ignite an enemy standing in a Flamestrike (once a second).
 
 **New tree nodes:**
 
@@ -126,6 +130,8 @@ Some pairings these make, none of them designed as a build:
 **Its own rules:**
 - *Feeding Bite:* Ferocious Bite consumes Bleeding for an extra hit of 100% and the bleed left.
 - *Blooming Star:* Starfire consumes Poison to burst for 60% and the poison left.
+- *Eye of the Storm:* Wrath on an enemy in a Hurricane also strikes every enemy within 8 yards of
+  it for 40% (once a second). The Hurricane is the druid's ground (Storm Ground).
 - Bear and cat hits are physical, so they build Daze like the paladin's.
 
 **New tree nodes:**
@@ -160,6 +166,20 @@ A worn unique can own a trigger row (its tooltip shows it):
 | Emberstone Staff (Deadmines) | a critical Fireball on an Ignited enemy Ignites the 2 nearest |
 | Illusionary Rod (Scarlet Monastery) | Arcane Missiles Overload a Chilled enemy |
 | Rod of the Sleepwalker (Blackfathom Deeps) | Wrath consumes Poison for an extra hit of 80% and the poison left |
+| Ravager (Scarlet Monastery) | a critical swing on a Bleeding enemy spreads Bleeding to 2 |
+| Mirah's Song (Scarlet Monastery) | a critical swing on a Dazed enemy Judges it |
+| Aegis of the Scarlet Commander (Scarlet Monastery) | blocking takes the attacker 35% of the way to a Daze |
+| Hypnotic Blade (Scarlet Monastery) | Arcane Explosion Chills an Overloaded enemy |
+| The Rockpounder (Uldaman) | swings consume Daze to burst for 80% of the hit |
+| Galgann's Firehammer (Uldaman) | swings Ignite a Dazed enemy (the bridge from Daze to the Sun paladin) |
+| Archaedic Stone (Uldaman) | Flamestrike consumes Chill to burst for 60% |
+| Gahz'rilla Fang (Zul'Farrak) | a Frozen enemy's death Freezes the 2 nearest |
+| Witch Doctor's Cane (Zul'Farrak) | Moonfire on a Poisoned enemy spreads Poison to 2 |
+| Rotgrip Mantle (Maraudon) | Nature and Arcane hits Poison an enemy in a Hurricane |
+| Ironfoe (Blackrock Depths) | a critical swing consumes Judged for 100% of the hit and the stored damage |
+
+The swing rows fit any class that swings. A row whose item name is not in the item templates
+never fires, and the server log says so at the first tooltip request.
 
 **Generated unique powers** (every unique without an authored power has one, `ARPG-UNIQUES.md`)
 feed on their element's state: a damaging power deals 50% more to an enemy already in it (fire
@@ -178,5 +198,6 @@ A spread on a kill is sized as a hit of a tenth of the fallen's health.
 
 ## Next
 
-- Ground states of the player's own (Consecration-like grounds for the mage and druid).
-- More uniques' rows as the act's later dungeons come in.
+- The warlock and the shaman (`ARPG-DECISIONS.md`): their own states' rules from the start
+  (Withered and Poisoned for the warlock, Overloaded and the totems' grounds for the shaman).
+- Unique rows for Dire Maul, Scholomance, Stratholme and the raids as the later acts come in.

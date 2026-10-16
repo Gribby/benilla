@@ -214,6 +214,8 @@ which skills carry a build.
 
 ## Design docs (client repo, `docs/`)
 
+Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tuning from play.
+
 - `ARPG-CHARACTER.md`: skills, runes, Codex, passive web, items, affixes, crafting,
   cross-skill procs, generated unique powers, the base bank, no hit.
 - `ARPG-PROGRESSION.md`: packs, camps, champions, dungeons and tiers, survival, threats, raids,
