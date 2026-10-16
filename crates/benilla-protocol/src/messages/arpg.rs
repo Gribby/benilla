@@ -896,7 +896,7 @@ pub fn read_arpg_scene(r: &mut impl io::Read) -> io::Result<ArpgScene> {
 pub const SMSG_ARPG_STATES: u16 = 0x0353;
 
 /// The state bits, in the server's order (`Arpg::State`).
-pub const ARPG_STATE_NAMES: [&str; 11] = [
+pub const ARPG_STATE_NAMES: [&str; 13] = [
     "Chilled",
     "Frozen",
     "Ignited",
@@ -908,6 +908,8 @@ pub const ARPG_STATE_NAMES: [&str; 11] = [
     "Dazed",
     "Stunned",
     "Consecrated",
+    "Scorched Ground",
+    "Frozen Ground",
 ];
 
 /// One unit's states.

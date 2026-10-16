@@ -26,6 +26,8 @@ state. cmangos `Arpg/ArpgStates.{h,cpp}`.
 | **Dazed** | **Daze build-up** (below) | slowed, its cast broken, takes 10% more damage, 4 sec | its end |
 | Stunned | any stun | can't act | (read only) |
 | Consecrated | standing in a Consecration | (read only) | (read only) |
+| Scorched Ground | standing in a Flamestrike or Rain of Fire | (read only) | (read only) |
+| Frozen Ground | standing in a Blizzard | (read only) | (read only) |
 
 **Daze** is the physical and holy state. Every physical or holy hit builds it by twice its share of
 the enemy's health (a hit for a tenth of its health builds a fifth); a Consecration's tick builds
@@ -34,13 +36,17 @@ Dazes outright (Stagger, Aftershock) only builds it on them, so a boss is never 
 is a boss's, a rare's or a champion's cast broken. It ebbs when the hits stop for three seconds.
 At 100% the enemy is Dazed. A hit pays off a state set up before it, never one it completes
 itself (its triggers run before its own Daze). The hover bar shows each enemy's states
-and its Daze as it builds (`SMSG_ARPG_STATES`, 0x353).
+and its Daze as it builds (`SMSG_ARPG_STATES`, 0x353), and each enemy wears the look of the
+states the server keeps to itself: Judged a Judgement's debuff, Ignited Immolate's, Bleeding
+Rend's, Poisoned Deadly Poison's, Withered Shadow Word: Pain's, Overloaded Detect Magic's (Chill,
+Freeze, Daze and stuns are real auras, drawn as they always were).
 
 ### 2. Triggers
 
 "When X happens, do Y", as rows of data. cmangos `Arpg/ArpgSynergy.{h,cpp}`.
 
-- **Events:** a hit, a critical hit, a kill, a state applied, a state consumed.
+- **Events:** a hit, a critical hit, a kill, a state applied, a state consumed, a block, a dodge
+  (the enemy is the one whose blow it was).
 - **Conditions:** the spell (by name), the skill, the hit's tags, a state the enemy must be in, the
   state the event is about.
 - **Effects:** *apply* a state; *strike* (consume a state for an extra hit: a share of the hit plus
@@ -97,11 +103,59 @@ Some pairings these make, none of them designed as a build:
   and "against Ignited" items scale it.
 - **Frost judge:** Frozen Verdict chills, a frost mage's items and Shatter-style payoffs apply.
 
+## The mage
+
+**Its own rules:**
+- *Shatter Point:* Fire Blast consumes Freeze for an extra hit of 120%.
+- *Detonating Spark:* Arcane Explosion consumes Ignite to burst for 50% and the burn left.
+- *Frost Step:* dodging a blow Chills its attacker.
+
+**New tree nodes:**
+
+| Skill | Node | What it opens |
+|---|---|---|
+| Fireball | Frostfire Bolt (conversion) | Fireball and Pyroblast count as Frost |
+| Frostbolt | Cold Snap | consuming a Freeze Chills the 2 nearest enemies |
+| Arcane Missiles | Arcane Detonation | Arcane Missiles consume Overload to burst |
+| Arcane Explosion | Glacial Explosion (conversion) | Arcane Explosion counts as Frost |
+| Storms | Rime Field | Frost hits Freeze an enemy standing in a Blizzard |
+| Fire Blast | Combustion Point | a critical Fire Blast on an Ignited enemy spreads Ignite to 2 |
+
+## The druid
+
+**Its own rules:**
+- *Feeding Bite:* Ferocious Bite consumes Bleeding for an extra hit of 100% and the bleed left.
+- *Blooming Star:* Starfire consumes Poison to burst for 60% and the poison left.
+- Bear and cat hits are physical, so they build Daze like the paladin's.
+
+**New tree nodes:**
+
+| Skill | Node | What it opens |
+|---|---|---|
+| Wrath | Thorns of Cenarius | a critical Wrath on a Poisoned enemy spreads Poison to 2 |
+| Moonfire | Solar Flare (conversion) | Moonfire's hit counts as Fire |
+| Bear | Crushing Maul | Maul consumes Daze for an extra hit of 80% |
+| Cat | Blood Frenzy | consuming Bleeding spreads it to 2, at the size it had |
+
+## The paladin's block
+
+*Retribution:* blocking a blow takes its attacker a quarter of the way to a Daze.
+
+## Uniques
+
+A worn unique can own a trigger row (its tooltip shows it):
+
+| Unique | What it opens |
+|---|---|
+| Kresh's Back (Wailing Caverns) | Hammer of Justice also Dazes the 3 nearest enemies (on its landing: a stun deals no damage) |
+| Hammer of the Grand Crusader (Stratholme) | Hammer of Wrath consumes Judged to burst for the hit and the stored damage |
+| Spinal Reaper (Molten Core) | a critical Seal of Command takes its target 30% of the way to a Daze |
+| Azuresong Mageblade (Molten Core) | a critical Frostbolt on a Chilled enemy Freezes the 2 nearest |
+| Staff of Dominance (Molten Core) | Fireball consumes Chill for an extra hit of 80% |
+| Wolfshead Helm | Shred on a Bleeding enemy takes it 20% of the way to a Daze |
+
 ## Next
 
-- Triggers on uniques: rows owned by named items (the hook is built: a row with `item`).
-- Block and dodge events.
-- The mage's and the druid's state rows and nodes (the druid's bear and cat already build Daze
-  through physical hits).
-- Ground states beyond Consecration (chilled ground, burning ground).
-- Visuals for Daze build-up and the states on the enemies themselves.
+- More uniques' rows, and generated unique powers that read states.
+- Ground states of the player's own (Consecration-like grounds for the mage and druid).
+- Kill events' rows (spread a state on a kill).

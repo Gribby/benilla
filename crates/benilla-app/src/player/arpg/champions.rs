@@ -50,6 +50,20 @@ const AFFIX_AURAS: [(&str, &[u32]); 9] = [
 /// The affix auras' keys among a unit's kits: past any spell id, so they never meet a real aura.
 const AURA_KEY: u32 = 0xA400_0000;
 
+/// The states' looks, for those the server keeps to itself (Chill, Freeze, Daze and stuns are real
+/// auras the client draws already): by state bit, the spells whose aura each wears, the first with
+/// a state kit in the client's data.
+const STATE_AURAS: [(u16, &[u32]); 6] = [
+    (1 << 2, &[348, 2120, 133]),   // Ignited: Immolate, Flamestrike, Fireball
+    (1 << 3, &[772, 703, 1822]),   // Bleeding: Rend, Garrote, Rake
+    (1 << 4, &[2818, 1978, 5570]), // Poisoned: Deadly Poison, Serpent Sting, Insect Swarm
+    (1 << 5, &[589, 172, 980]),    // Withered: Shadow Word: Pain, Corruption, Curse of Agony
+    (1 << 6, &[2855, 12042]),      // Overloaded: Detect Magic, Arcane Power
+    (1 << 7, &[21183, 20185, 20184]), // Judged: the Judgements' debuffs
+];
+/// The state auras' keys, apart from the affixes'.
+const STATE_KEY: u32 = 0xA500_0000;
+
 /// Every champion the server has told of, by guid.
 #[derive(Resource, Default)]
 pub(crate) struct ArpgChampions {
@@ -153,7 +167,13 @@ fn on_champions(In(ev): In<SessionEvent>, mut state: ResMut<ArpgChampions>) {
 pub(super) fn plugin(app: &mut App) {
     app.add_systems(
         Update,
-        (push_hover, push_hover_states, place_rings, wear_affix_auras),
+        (
+            push_hover,
+            push_hover_states,
+            place_rings,
+            wear_affix_auras,
+            wear_state_auras,
+        ),
     );
 }
 
@@ -380,6 +400,91 @@ fn place_rings(
             Transform::from_translation(at.translation + Vec3::Y * RING_LIFT).with_rotation(turn),
             ChampionRing(*guid),
         ));
+    }
+}
+
+/// The look `state`'s bit wears, if the client's data has one of its spells' auras.
+fn state_aura(
+    bit: u16,
+    spells: &crate::ui_action::Spells,
+    visuals: &crate::creature_anim::SpellVisuals,
+) -> Option<(u32, Vec<crate::creature_anim::spell_visual::FxSlot>)> {
+    let (_, candidates) = STATE_AURAS.iter().find(|(b, _)| *b == bit)?;
+    candidates.iter().find_map(|&spell| {
+        let effects = crate::creature_anim::state_kit_effects(spells, visuals, spell);
+        (!effects.is_empty()).then_some((spell, effects))
+    })
+}
+
+/// Each enemy wears the looks of the states the server keeps to itself (Judged, Ignited,
+/// Bleeding...), as they come and go.
+#[allow(clippy::too_many_arguments)]
+fn wear_state_auras(
+    states: Res<ArpgEnemyStates>,
+    index: Res<GuidIndex>,
+    units: Query<&ObjectStore>,
+    spells: Option<Res<crate::ui_action::Spells>>,
+    visuals: Option<Res<crate::creature_anim::SpellVisuals>>,
+    mut fx: MessageWriter<crate::creature_anim::SpellKitFx>,
+    mut worn: Local<HashMap<Entity, Vec<(u16, u32)>>>,
+) {
+    use crate::creature_anim::{FxClass, FxStage, SpellKitFx};
+    let (Some(spells), Some(visuals)) = (spells.as_deref(), visuals.as_deref()) else {
+        return;
+    };
+    // What each living, streamed enemy should wear: its state bits that have a look.
+    let mut want: HashMap<Entity, u16> = HashMap::new();
+    for (guid, &(mask, _)) in &states.by_guid {
+        let Some(&entity) = index.0.get(guid) else {
+            continue;
+        };
+        let alive = units
+            .get(entity)
+            .is_ok_and(|s| s.0.unit_health().unwrap_or(1) > 0);
+        let shown = STATE_AURAS
+            .iter()
+            .fold(0u16, |m, (bit, _)| m | (mask & bit));
+        if alive && shown != 0 {
+            want.insert(entity, shown);
+        }
+    }
+    // Off what no longer holds.
+    worn.retain(|entity, keys| {
+        let keep = want.get(entity).copied().unwrap_or(0);
+        keys.retain(|&(bit, key)| {
+            if keep & bit != 0 {
+                return true;
+            }
+            fx.write(SpellKitFx::Reap {
+                entity: *entity,
+                spell_id: key,
+                class: FxClass::Hold,
+            });
+            false
+        });
+        !keys.is_empty()
+    });
+    // On what is new.
+    for (entity, mask) in want {
+        let keys = worn.entry(entity).or_default();
+        for (bit, _) in STATE_AURAS {
+            if mask & bit == 0 || keys.iter().any(|&(b, _)| b == bit) {
+                continue;
+            }
+            let Some((spell, effects)) = state_aura(bit, spells, visuals) else {
+                continue;
+            };
+            let key = STATE_KEY | spell;
+            fx.write(SpellKitFx::Begin {
+                entity,
+                spell_id: key,
+                persistent: true,
+                class: FxClass::Hold,
+                stage: FxStage::State,
+                effects,
+            });
+            keys.push((bit, key));
+        }
     }
 }
 
