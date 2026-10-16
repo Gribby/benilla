@@ -468,6 +468,14 @@ impl Objects<'_, '_> {
         self.me.single().ok()
     }
 
+    /// Our own player's level, 0 before the world.
+    pub(crate) fn player_level(&self) -> u32 {
+        self.player()
+            .and_then(|e| self.stores.get(e).ok())
+            .and_then(|s| s.0.unit_level())
+            .unwrap_or(0)
+    }
+
     /// An item object's countdown cells.
     pub(crate) fn countdowns(&self, guid: u64) -> Option<&crate::items::Countdowns> {
         self.index

@@ -293,11 +293,27 @@ impl Cooldowns {
         now: Instant,
         mods: &SpellModifiers,
     ) {
+        self.start_gcd_recovering(spell_id, spell, now, mods, 0);
+    }
+
+    /// [`Self::start_gcd`] lasting at least `recovery_ms`: fork-only, not 1.12.1, an ARPG spell
+    /// that cast at once recovers for its cast time (`Spells::arpg_recovery_ms`, cmangos
+    /// `Player::AddGCD`).
+    pub(crate) fn start_gcd_recovering(
+        &mut self,
+        spell_id: u32,
+        spell: &SpellDisplay,
+        now: Instant,
+        mods: &SpellModifiers,
+        recovery_ms: u32,
+    ) {
         if spell.start_recovery_category == 0 && spell.start_recovery_ms == 0 {
             return;
         }
         // `StartGlobalCooldown 0x6e2de0`: op 21 before the zero-duration exit (`0x6e2e2c`).
-        let duration_ms = mods.apply(spell, OP_GCD, spell.start_recovery_ms as i32);
+        let duration_ms = mods
+            .apply(spell, OP_GCD, spell.start_recovery_ms as i32)
+            .max(i32::try_from(recovery_ms).unwrap_or(i32::MAX));
         if duration_ms <= 0 {
             return;
         }

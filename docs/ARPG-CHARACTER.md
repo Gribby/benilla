@@ -199,8 +199,7 @@ and drains show (0.5% of the maximum per swing that lands, 0.5% for a skill hit 
 second, 2% per kill, and each swing and skill hit adds the mana on
 hit of the web's Bloodthirst and Devotion nodes and the "+N mana on hit" item affix), and five seconds out of a fight (out of combat, no hit dealt or
 taken) health flows back at 5% a second and mana at 2%, so nobody sits down to drink, but a run
-between packs is not a refill. Every class spell's global cooldown is a
-third of vanilla's (0.5 sec) and its cast time half.
+between packs is not a refill.
 
 Other ARPG stats exist only on items and tree nodes, never as base attributes: area size,
 cooldown recovery, movement speed, life on kill, mana on hit, damage per tag, extra projectiles,
@@ -209,6 +208,36 @@ extra chain jumps, and skill levels.
 **Why these five:** each is something ARPG builds chase, each maps to a vanilla stat's flavour
 (Strength is big swings, Intellect is big spells, Spirit is staying in the fight), and none
 replaces a vanilla effect. The rates are a starting point, to tune in play.
+
+### Casting: no cast times, a recovery instead
+
+Every class spell casts at once, on the move (`Arpg::CastsAtOnce`, `Spell::Prepare`): what was
+its cast time is now its recovery, the global cooldown it starts, so you are never stuck rooted
+in a cast bar but a big spell still costs its time. The recovery is half the vanilla cast time
+(Fireball's 3.5 sec is 1.75), and at least the global cooldown, a third of vanilla's (0.5 sec).
+Cooldown reduction cuts both, and cast speed the recovery too; they multiply, so no stack of
+them reaches zero (`SetPacing`). The cast time nodes ("-0.15 sec Fireball recovery") and talents
+shorten the recovery, and the "next spell instant" procs now let it skip its recovery (only
+the global cooldown is left). Channels (Blizzard, Arcane Missiles), and anything that took over
+6 sec to cast (resurrections, teleports, portals), cast as before, and so do the generic-family
+spells a class uses (Holy Wrath; Exorcism is instant anyway), which the client cannot tell apart. The client mirrors the rule
+(`Spells::arpg_recovery_ms`): no moving refusal, the GCD sweep lasts the recovery, and the
+tooltip reads "Instant" with "N sec recovery".
+
+### Melee
+
+What a melee character has that a caster does not, for standing in the pack (the PoE / Last
+Epoch / Diablo IV pattern: melee pays in risk, so it gets area, sustain and a defence layer of
+its own):
+
+- **Pace.** A swing comes twice as often as the weapon's own speed (never faster than 1 sec), and
+  each white swing and Seal of Righteousness hit is half: the same damage in twice the hits, so a
+  two-hander swings every ~1.8 sec, not 3.6. Procs a minute (Seal of Command, weapon enchants,
+  item procs) stay at the weapon's own rate.
+- **Cleave.** Every swing strikes the other enemies in front of it for 40% of the hit; Wide
+  Swing's ranks make it 55/70/85%.
+- **Fortify.** A swing that lands means 15% less damage taken for 4 sec.
+- **Life on hit.** A swing heals 1% of maximum health for each enemy it strikes, the first five.
 
 ## Skills and skill trees
 
@@ -740,7 +769,7 @@ the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled i
 
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Reach | Wide Swing [H] | 3 | Swings strike every other enemy in front, 20/35/50% |
+| Reach | Wide Swing [H] | 3 | Swings strike every other enemy in front for 55/70/85%, not the base 40% |
 | Reach | Long Arm [H] | 2 | +1 yd melee reach per rank |
 | Reach | Heavy Hand [H] | 4 | 5% more Physical damage per rank with a two-hander |
 | Reach | Rending Strikes [Ail] | 3 | 8% per rank to cause Bleeding |
@@ -762,7 +791,7 @@ the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled i
 |---|---|---|---|
 | Radiance | Healing Light [M] | 4 | 6% more healing per rank |
 | Radiance | Light's Grace [M] | 3 | +4% critical strike chance per rank |
-| Radiance | Swift Light [M] | 3 | -0.2 sec cast time per rank |
+| Radiance | Swift Light [M] | 3 | -0.2 sec recovery per rank |
 | Radiance | **Crusader's Grace** [Syn] | 1 | A critical Judgement, Exorcism or Hammer of Wrath makes the next Holy Light or Flash of Light instant |
 | Radiance | **Dawnbringer** [H] | 1 | Heals on yourself also send half their amount as a Holy bolt |
 | Retribution | Searing Radiance [H] | 3 | Heals strike the nearest enemy within 20 yd for 15% per rank |
@@ -839,7 +868,7 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Zeal | Swift Exorcism [M] | 3 | -2 sec Exorcism cooldown per rank |
 | Zeal | **Righteous Thunder** [Syn] | 1 | A Hammer of Justice stun makes the next Holy Wrath instant |
 | Zeal | Exorcist [M] | 3 | +5% critical strike chance per rank, both |
-| Zeal | Quick Wrath [M] | 3 | -0.4 sec Holy Wrath cast time per rank |
+| Zeal | Quick Wrath [M] | 3 | -0.4 sec Holy Wrath cast time per rank (Holy Wrath, a generic-family spell, keeps its cast) |
 | Zeal | **Twin Exorcism** [A] | 1 | A second bolt beside the first, 70% |
 
 #### Paladin Codex pages
@@ -1009,14 +1038,14 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
 | Volley | Twin Fireball [A] | 3 | 1/1/2 extra fireballs, at 45/60/60% |
-| Volley | Quick Fireball [M] | 3 | -0.15 sec cast time per rank |
+| Volley | Quick Fireball [M] | 3 | -0.15 sec recovery per rank |
 | Volley | Piercing Flame [A] | 3 | Flies through 1/2/4 enemies, at 60% |
 | Volley | **Flame Echo** [A] | 1 | Every 3rd Fireball echoes, at 70% |
 | Inferno | Searing Bolt [M] | 4 | 6% more damage per rank |
 | Inferno | Kindle [Ail] | 3 | 8% per rank to Ignite |
 | Inferno | Lingering Flame [M] | 3 | 15% more burn per rank |
 | Inferno | **Pyroclasm** [H] | 1 | Critical hits explode for 60% within 8 yd |
-| Pyre | Quick Pyre [M] | 3 | -0.5 sec Pyroblast cast time per rank |
+| Pyre | Quick Pyre [M] | 3 | -0.5 sec Pyroblast recovery per rank |
 | Pyre | **Hot Streak** [Syn] | 1 | A critical Fire Blast or Scorch makes the next Pyroblast instant |
 | Pyre | Pyre [M] | 3 | Pyroblast's critical strikes 20% more of their bonus per rank |
 | Pyre | **Cataclysm** [A] | 1 | Pyroblast bursts within 10 yd, at 60% |
@@ -1085,7 +1114,7 @@ ailment of its own; Glacial Storm is the hook on its ticks (`OnPeriodicHit`, cal
 | Storm | Storm Surge [M] | 3 | +8% radius per rank |
 | Storm | Raging Storm [M] | 3 | Blizzard's strikes and Flamestrike's burn 6% more per rank |
 | Storm | **Eye of the Storm** [M] | 1 | 30% wider |
-| Flamestrike | Quick Flamestrike [M] | 3 | -0.3 sec cast time per rank |
+| Flamestrike | Quick Flamestrike [M] | 3 | -0.3 sec recovery per rank |
 | Flamestrike | Searing Ground [M] | 3 | 15% more burn per rank |
 | Flamestrike | Kindling Strike [Ail] | 3 | 10% per rank to Ignite |
 | Flamestrike | **Meteor** [M] | 1 | Flamestrike is instant |
@@ -1098,7 +1127,7 @@ ailment of its own; Glacial Storm is the hook on its ticks (`OnPeriodicHit`, cal
 | Blast | Explosive Blast [A] | 3 | Bursts within 4/6/8 yd, at 40% |
 | Blast | Incineration [M] | 3 | +5% Fire Blast critical strike chance per rank |
 | Blast | **Chain Blast** [H] | 1 | A kill with Fire Blast readies it again |
-| Scorch | Quick Scorch [M] | 3 | -0.2 sec Scorch cast time per rank |
+| Scorch | Quick Scorch [M] | 3 | -0.2 sec Scorch recovery per rank |
 | Scorch | Arcing Scorch [A] | 2 | Chains to 1/2 more within 10 yd, at 60% |
 | Scorch | Scorching [Ail] | 3 | 10% per rank to Ignite |
 | Scorch | **Searing Brand** [H] | 1 | Scorch brands with Fire Vulnerability (3% more Fire taken per stack, 5 at most) |
@@ -1143,7 +1172,7 @@ the mage's talents at the rank given.
 | Kind | Name | Effect |
 |---|---|---|
 | Arm (×5) | Kindling | +4% Fire damage |
-| Notable | Improved Fireball | Talent, rank 5: -0.5 sec Fireball cast time |
+| Notable | Improved Fireball | Talent, rank 5: -0.5 sec Fireball recovery |
 | **Keystone** | **Pyromancer** | 40% more Fire damage; Frost and Arcane damage 30% less |
 | Arm (×5) | Insight | +5 Intellect |
 | Notable | Critical Mass | Talent, rank 3: +6% Fire critical strike chance |
@@ -1173,7 +1202,7 @@ the mage's talents at the rank given.
 | Kind | Name | Effect |
 |---|---|---|
 | Arm (×5) | Rime | +4% Frost damage |
-| Notable | Improved Frostbolt | Talent, rank 5: -0.5 sec Frostbolt cast time |
+| Notable | Improved Frostbolt | Talent, rank 5: -0.5 sec Frostbolt recovery |
 | **Keystone** | **Shatter** | 40% more against frozen enemies (frozen, or rooted as by Frost Nova); 15% less against the rest |
 | Arm (×5) | Fortitude | +6 Stamina |
 | Notable | Ice Shards | Talent, rank 5: Frost critical strikes 100% more of their bonus |
@@ -1239,11 +1268,11 @@ Six skills for five slots. The hooks are in `ArpgDruid.cpp`.
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
 | Volley | Splitting Wrath [A] | 3 | 1/1/2 extra bolts, at 45/60/60% |
-| Volley | Quick Wrath [M] | 3 | -0.1 sec Wrath cast time per rank |
+| Volley | Quick Wrath [M] | 3 | -0.1 sec Wrath recovery per rank |
 | Volley | Thorned Wrath [Ail] | 3 | 8% per rank to Poison |
 | Volley | **Wrath of Cenarius** [A] | 1 | Wrath chains to 3 more within 10 yd, at 60% |
 | Starfall | Lunar Fury [M] | 4 | 6% more Starfire damage per rank |
-| Starfall | Quick Starfire [M] | 3 | -0.2 sec Starfire cast time per rank |
+| Starfall | Quick Starfire [M] | 3 | -0.2 sec Starfire recovery per rank |
 | Starfall | Moonstruck [Ail] | 3 | 10% per rank to Overload |
 | Starfall | **Starfall** [A] | 1 | Starfire bursts within 10 yd, at 60% |
 | Grace | Nature's Grace [M] | 3 | +3% critical strike chance per rank |
@@ -1370,7 +1399,7 @@ The same layout as the others, with the druid's nodes. Notables teach the druid'
 | Kind | Name | Effect |
 |---|---|---|
 | Arm (×5) | Starlight | +4% Arcane damage |
-| Notable | Improved Wrath | Talent, rank 5: -0.5 sec Wrath cast time |
+| Notable | Improved Wrath | Talent, rank 5: -0.5 sec Wrath recovery |
 | **Keystone** | **Celestial Focus** | 30% more Arcane and Nature spell damage; your attacks 40% less |
 | Arm (×5) | Insight | +5 Intellect |
 | Notable | Moonglow | Talent, rank 3: 9% less mana cost for Moonfire, Starfire, Wrath and the heals |
@@ -1404,7 +1433,7 @@ The same layout as the others, with the druid's nodes. Notables teach the druid'
 | **Keystone** | **Tree of Life** | Your heals 50% more; your damage 20% less |
 | Arm (×5) | Spirit | +4 Spirit |
 | Notable | Furor | Talent, rank 5: rage or energy on shifting |
-| Notable | Improved Healing Touch | Talent, rank 5: -0.5 sec Healing Touch cast time |
+| Notable | Improved Healing Touch | Talent, rank 5: -0.5 sec Healing Touch recovery |
 | Arm (×5) | Bark | +4% armour and +2 Stamina |
 | Notable | Improved Thorns | Talent, rank 3: 75% more Thorns damage |
 | **Keystone** | **Living Thorns** | Thorns on you strikes every enemy within 8 yd each second for its damage; your heals 30% less |

@@ -172,7 +172,8 @@ last 10 seconds of blows, each fight (seconds, kills and foes, damage dealt and 
 damage taken, lowest health and mana, flasks, rolls, top spells), the times of packs players
 killed, and every 5 minutes a session summary (levels and the
 minutes each took, kills by kind, damage by spell, damage taken by source, seconds in combat, low
-on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone).
+on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone, and the
+build: weapon and swing time, health, armour, block, dodge, each slotted skill's nodes).
 `update-arpg-server.bat` runs `send-arpg-stats.bat`, which commits them to the server repo's
 `arpg-stats` branch (its own clone in `.arpg-stats`). To read them: `git fetch origin arpg-stats`
 in the server repo, then `git show origin/arpg-stats:stats/<date>.jsonl`. Use them before tuning:
@@ -319,6 +320,13 @@ which skills carry a build.
 
 ### Untested in game
 
+- **Instant casting and the melee pass** (`ARPG-CHARACTER.md`, "Casting" and "Melee"): spells
+  cast on the move and recover for their old cast time, which cooldown reduction cuts; melee
+  swings twice as fast at half each, cleaves 40% in front, Fortifies (15% less damage taken) and
+  heals 1% a struck enemy. Check that the client never shows "not ready" spam (its GCD must match
+  the server's), that the paladin can stand in a pack, and that procs a minute did not double.
+  The session line in the statistics now carries the build (weapon, swing time, health, armour,
+  block, dodge, and every slotted skill's nodes).
 - **Act I, chapter 1** (`ARPG-ACT-1.md`): a new character starts in Northshire or the Valley of
   Trials and follows the "Act I:" quests. Check the start-up log for names it could not find, the
   pack density and spacing ahead, the leaders' champions, and Hogger's and Zalazane's blue.

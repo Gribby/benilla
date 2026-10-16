@@ -189,8 +189,18 @@ impl CastLadder<'_, '_> {
                 .is_none_or(|d| !d.ranged_attack() && !d.on_next_swing());
             self.pending.arm(spell_id, now, guards);
         }
-        if let Some(d) = self.spells.as_ref().and_then(|s| s.catalog.get(spell_id)) {
-            self.cooldowns.start_gcd(spell_id, d, now, &self.spell_mods);
+        if let Some(spells) = self.spells.as_ref() {
+            if let Some(d) = spells.catalog.get(spell_id) {
+                let level = self.objects.player_level();
+                let recovery = spells.arpg_recovery_ms(d, level, &self.spell_mods);
+                self.cooldowns.start_gcd_recovering(
+                    spell_id,
+                    d,
+                    now,
+                    &self.spell_mods,
+                    recovery.unwrap_or(0),
+                );
+            }
         }
         self.ground.clear();
     }
@@ -637,7 +647,14 @@ fn send_spell_cast(
             .self_store
             .and_then(|s| s.0.unit_level())
             .unwrap_or(0);
-        let cast_time_ms = spells.map_or(0, |s| s.cast_time_ms(d, caster_level, spell_mods));
+        // Fork-only, not 1.12.1: an ARPG spell that casts at once casts on the move.
+        let cast_time_ms = spells.map_or(0, |s| {
+            if s.arpg_recovery_ms(d, caster_level, spell_mods).is_some() {
+                0
+            } else {
+                s.cast_time_ms(d, caster_level, spell_mods)
+            }
+        });
         if validator::cast_moving_refusal(ctx.self_move_flags, cast_time_ms, def) {
             debug!("ui_action: cast {spell_id} refused locally — moving (0x2e)");
             cast_errors.push_local(spell_id, 0x2e);
@@ -792,8 +809,11 @@ fn send_spell_cast(
     }
     // The GCD arms at send (`0x6e2de0` from `0x6e58fb`); a failed cast result clears it
     // (`0x6e1630`).
+    // Fork-only, not 1.12.1: an ARPG spell that casts at once recovers for its cast time.
     if let Some(d) = def {
-        cooldowns.start_gcd(spell_id, d, now, spell_mods);
+        let recovery =
+            spells.and_then(|s| s.arpg_recovery_ms(d, objects.player_level(), spell_mods));
+        cooldowns.start_gcd_recovering(spell_id, d, now, spell_mods, recovery.unwrap_or(0));
     }
 }
 

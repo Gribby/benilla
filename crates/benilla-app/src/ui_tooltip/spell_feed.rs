@@ -224,6 +224,9 @@ pub(super) fn build_view(
     // the ladder `0x52eb45`-`0x52ec90` over `GetCastTime(1)` (`52eb4d`), unclamped, where a
     // negative time is "Instant cast" (`0x52ebce`) and a zero one is "Instant cast" only for a
     // mana spell with a cost (`0x52ec4b`).
+    // Fork-only, not 1.12.1: an ARPG spell that casts at once reads "Instant", and its cast
+    // time shows as its recovery where it has no cooldown of its own.
+    let mut arpg_recovery = None;
     let cast_time = if d.tooltip_omits_cast_line() {
         None
     } else {
@@ -241,7 +244,13 @@ pub(super) fn build_view(
             ViewCaster::Player => vctx.store.and_then(|s| s.0.unit_level()).unwrap_or(0),
             ViewCaster::Pet(pet) => pet_level(pet),
         };
-        let base = spells.cast_time_unclamped_ms(d, level, vctx.spell_mods);
+        let mut base = spells.cast_time_unclamped_ms(d, level, vctx.spell_mods);
+        if matches!(caster, ViewCaster::Player) {
+            arpg_recovery = spells.arpg_recovery_ms(d, level, vctx.spell_mods);
+            if arpg_recovery.is_some() {
+                base = 0;
+            }
+        }
         // `%.3g` templates: the seconds go over as a real.
         if base > 0 {
             let (key, v) = if base >= 60_000 {
@@ -289,7 +298,12 @@ pub(super) fn build_view(
             };
             keyed(vctx.get, key, &[Arg::F(v)])
         })
-        .flatten();
+        .flatten()
+        .or_else(|| {
+            arpg_recovery
+                .filter(|&ms| ms > 0)
+                .map(|ms| format!("{} sec recovery", seconds_text(ms)))
+        });
     // The required-form line (`0x52f10a`-`0x52f2ae`). With `AttributesEx2` bit 19 set the mask is
     // permissive (Inner Fire in Shadowform), and the line is skipped (`0x52f115`).
     let requires_form = (d.stances != 0 && !d.form_mask_is_permissive())
@@ -761,4 +775,10 @@ fn build_views(
         pushed.insert(id, deps);
     }
     built
+}
+
+/// Fork-only: `ms` as seconds, to two places at most ("1.75", "0.5", "2").
+fn seconds_text(ms: u32) -> String {
+    let text = format!("{:.2}", f64::from(ms) / 1000.0);
+    text.trim_end_matches('0').trim_end_matches('.').to_owned()
 }

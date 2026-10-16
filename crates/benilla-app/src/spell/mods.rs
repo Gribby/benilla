@@ -37,6 +37,8 @@ const CELLS: usize = BITS * OPS;
 pub(crate) const OP_COST: u8 = 14;
 /// `SPELLMOD_CASTING_TIME`, applied by `GetCastTime 0x6e3340` at `0x6e33b7`.
 pub(crate) const OP_CAST_TIME: u8 = 10;
+/// Fork-only: the longest cast an ARPG spell casts at once in (cmangos `INSTANT_CAST_MAX_MS`).
+pub(crate) const ARPG_INSTANT_CAST_MAX_MS: i32 = 6000;
 /// `GetMinMaxRange 0x6e3480` applies op 5 to its maximum at `0x6e3744`.
 pub(crate) const OP_RANGE: u8 = 5;
 /// `GetCurrentCastRadius 0x6e6350` applies op 6 before the reticle's 20-yard cap.
@@ -157,6 +159,16 @@ impl SpellModifiers {
         d.spell_family != 0
             && d.spell_family == self.class_family
             && d.attributes_ex3 & ATTR_EX3_IGNORE_CASTER_MODIFIERS == 0
+    }
+
+    /// Fork-only, not 1.12.1: whether an ARPG player's spell casts at once, its cast time becoming
+    /// its recovery (cmangos `Arpg::CastsAtOnce`): an own-class spell, not a channel, with a GCD
+    /// category and a `base_cast_ms` cast time of at most [`ARPG_INSTANT_CAST_MAX_MS`].
+    pub(crate) fn casts_at_once(&self, d: &SpellDisplay, base_cast_ms: i32) -> bool {
+        self.gates_pass(d)
+            && !d.tooltip_channeled()
+            && d.start_recovery_category != 0
+            && (1..=ARPG_INSTANT_CAST_MAX_MS).contains(&base_cast_ms)
     }
 
     /// The `SpellFamilyFlags` bits whose cells any read for `d` can sum, whatever the op: its

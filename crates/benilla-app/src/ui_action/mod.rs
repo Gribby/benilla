@@ -118,6 +118,23 @@ impl Spells {
             })
     }
 
+    /// Fork-only, not 1.12.1: in the ARPG session, the recovery of a spell that casts at once
+    /// ([`crate::spell::SpellModifiers::casts_at_once`]): the cast time it would have had, which
+    /// the GCD it starts lasts at least. `None` for a spell that casts as usual.
+    pub(crate) fn arpg_recovery_ms(
+        &self,
+        def: &benilla_formats::SpellDisplay,
+        caster_level: u32,
+        mods: &crate::spell::SpellModifiers,
+    ) -> Option<u32> {
+        if !crate::player::arpg_session() {
+            return None;
+        }
+        let row = self.cast_times.get(def.casting_time_index)?;
+        mods.casts_at_once(def, row.base_ms)
+            .then(|| self.cast_time_ms(def, caster_level, mods))
+    }
+
     /// [`Self::cast_time_unclamped_ms`] for argument 0, the cast validator's (`0x609e16`): a
     /// result at or below zero reads 0 (`0x6e3461`-`0x6e3470`).
     pub(crate) fn cast_time_ms(
