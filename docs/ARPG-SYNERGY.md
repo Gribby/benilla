@@ -153,9 +153,30 @@ A worn unique can own a trigger row (its tooltip shows it):
 | Azuresong Mageblade (Molten Core) | a critical Frostbolt on a Chilled enemy Freezes the 2 nearest |
 | Staff of Dominance (Molten Core) | Fireball consumes Chill for an extra hit of 80% |
 | Wolfshead Helm | Shred on a Bleeding enemy takes it 20% of the way to a Daze |
+| Smite's Mighty Hammer (Deadmines) | Seal of Righteousness Judges a Dazed enemy |
+| Taskmaster Axe (Deadmines) | Judgement consumes Bleeding for an extra hit of 100% and the bleed left |
+| Mograine's Might (Scarlet Monastery) | Judgement on a stunned enemy Dazes it |
+| Hand of Righteousness (Scarlet Monastery) | a critical Seal of Righteousness on a Judged enemy Judges the 2 nearest |
+| Emberstone Staff (Deadmines) | a critical Fireball on an Ignited enemy Ignites the 2 nearest |
+| Illusionary Rod (Scarlet Monastery) | Arcane Missiles Overload a Chilled enemy |
+| Rod of the Sleepwalker (Blackfathom Deeps) | Wrath consumes Poison for an extra hit of 80% and the poison left |
+
+**Generated unique powers** (every unique without an authored power has one, `ARPG-UNIQUES.md`)
+feed on their element's state: a damaging power deals 50% more to an enemy already in it (fire
+on Ignited, frost on Chilled, holy on Judged, physical on Bleeding, nature on Poisoned, arcane on
+Overloaded, shadow on Withered), and its tooltip says so. The powers themselves are dealt as
+before, so no unique's power changed.
+
+## Kills
+
+A kill reads the fallen enemy's ailments (its auras are gone with it):
+- *Contagious Verdict* (paladin): a Judged enemy's death Judges the 2 nearest.
+- *Pyre* (mage): an Ignited enemy's death Ignites the 2 nearest.
+- *Plague Bearer* (druid): a Poisoned enemy's death Poisons the 2 nearest.
+
+A spread on a kill is sized as a hit of a tenth of the fallen's health.
 
 ## Next
 
-- More uniques' rows, and generated unique powers that read states.
 - Ground states of the player's own (Consecration-like grounds for the mage and druid).
-- Kill events' rows (spread a state on a kill).
+- More uniques' rows as the act's later dungeons come in.

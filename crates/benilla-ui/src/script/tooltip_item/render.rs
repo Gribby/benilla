@@ -423,7 +423,11 @@ pub(super) fn render_view(
             if let Some(charges) = charges_phrase(e.charges, &get) {
                 text.push_str(&format!(" ({charges})"));
             }
-            add((text, color))?;
+            if e.wrap {
+                addw((text, color))?;
+            } else {
+                add((text, color))?;
+            }
         }
     }
     if let Some((cur, max)) = inst.and_then(|i| i.durability).filter(|&(_, max)| max > 0) {

@@ -281,3 +281,9 @@ make testing a unique quicker than the GM command; it's a small addition.
 - Should a few **new** uniques exist alongside these: items that don't exist in vanilla,
   as world drops from champion packs?
 - Two uniques on one spell (two Fireball items) stack as above.
+
+## Synergy (`ARPG-SYNERGY.md`)
+
+Some uniques own a synergy trigger, shown in their tooltip under "Unique:"; every damaging
+generated power deals 50% more to an enemy in its element's state. Long unique and affix lines
+wrap at the tooltip's width.

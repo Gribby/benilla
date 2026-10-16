@@ -78,6 +78,10 @@ pub struct EnchantView {
     /// Ms left on a temporary enchant, from `SMSG_ITEM_ENCHANT_TIME_UPDATE`, never the item's own
     /// duration field; `Some` prints the countdown form.
     pub remaining_ms: Option<u64>,
+    /// Fork-only, not 1.12.1: wrap the line at the tooltip's width, as the trigger lines do. An
+    /// ARPG affix line (a unique's power, a crafted mechanic) can run long; a 1.12 enchant's name
+    /// never does.
+    pub wrap: bool,
 }
 
 /// One `ItemRandomProperties` row, an item's random-suffix roll. The app pushes the whole table at

@@ -266,6 +266,7 @@ fn enchant_lines_quiet(
                 negative: id < 0,
                 charges,
                 remaining_ms,
+                wrap: false,
             })
         })
         .collect();
@@ -1104,6 +1105,8 @@ pub(crate) mod arpg_affixes {
                 .map(|l| benilla_ui::script::EnchantView {
                     slot: 0,
                     name: l.to_string(),
+                    // A unique's power or a long affix wraps at the tooltip's width.
+                    wrap: true,
                     ..Default::default()
                 })
                 .collect()
@@ -1138,6 +1141,7 @@ pub(crate) mod arpg_affixes {
             let lines = views(0x4000_0000_0000_0042);
             assert_eq!(lines.len(), 2);
             assert_eq!(lines[1].name, "+5% Holy damage");
+            assert!(lines.iter().all(|l| l.wrap), "ARPG lines wrap at the tooltip's width");
             assert_eq!(lines[0].slot, 0);
             assert!(views(7).is_empty());
         }
