@@ -21,6 +21,9 @@ Settled; don't re-ask.
     always chains".
   - Their class-screen models are set in `ARPG-CHARACTER.md`: the warlock is an orc male in
     Nemesis, the shaman a tauren male in The Ten Storms.
+- **The warlock must allow a full minion build (2026-10-17).** The demons do most of the damage
+  while the warlock commands, curses and feeds them (`ARPG-CHARACTER.md`, "The warlock, in
+  full").
 - Hardcore and seasons: probably never.
 - **Levelling is in acts:** a route through the zones, each act ending in a boss. Quests are
   optional; bounties and kills carry the levelling, at about 1.3–1.5× vanilla's pace.
@@ -91,6 +94,27 @@ What makes their builds feel built rather than bought:
 
 Built as the synergy layer: `ARPG-SYNERGY.md`. Daze is our Heavy Stun. Consecration, Flamestrike,
 Blizzard and Hurricane are our grounds.
+
+### Minions (2026-10-17)
+
+How ARPGs make a minion build a build and not a pet (PoE/PoE2, Last Epoch's Necromancer and
+Beastmaster, Diablo IV's Necromancer):
+- **A scaling channel of their own.** "Minion damage", "minion life", "minion attack speed" and
+  horde size on gear and passives. Gear must change what the minions do, or a minion player finds
+  no upgrades. We also let the owner's tag bonuses reach a minion's hits by their tags (Minion
+  plus the damage type), so the elements still matter.
+- **Persistent versus temporary.** A few lasting minions (PoE's spirit-reserved ones, Last
+  Epoch's skeletons and golems) beside timed swarms from skills and kills (raise on kill,
+  summoned bursts). The ARPG warlock has one demon plus a horde capped at 10.
+- **The player stays active.** Command skills (PoE2), Dread Shade and sacrifice (Last Epoch),
+  Corpse Explosion and Book of the Dead's sacrifice option (Diablo IV). Watching minions fight
+  is the failure mode; giving orders, cursing and detonating is the play.
+- **An opt-out.** Diablo IV's Book of the Dead lets a necromancer sacrifice minions for personal
+  power. Ours is Demonic Sacrifice: no demon, and its power goes to you.
+- **AI that never embarrasses.** Minions attack what the player is fighting, stay leashed close,
+  and teleport back when lost. Bad pathing kills a minion build's feel faster than bad numbers.
+- **Minions carry the owner's states.** A minion's ailments are its owner's, so the synergy
+  layer works through them.
 
 ### Melee balance (2026-10-16)
 

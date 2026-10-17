@@ -1456,6 +1456,277 @@ Nature (Restoration–Balance: talent, rank 5, +10% healing).
   Thorned Hide and Living Thorns punish everything that touches you, Bloom turns each heal into
   a burst. Web: Living Thorns, Thick Hide, Tree of Life.
 
+## The warlock, in full
+
+Design, not yet built (`ARPG-ROADMAP.md`, M2). The research behind the minion design is in
+`ARPG-DECISIONS.md` ("Minions").
+
+### Identity
+
+The fourth class, and the one that gets others to do its killing. It has three ways to play:
+
+- **Affliction:** Corruption, Curse of Agony, Siphon Life and the drains. Shadow damage over time
+  that Withers and spreads from body to body.
+- **Destruction:** Shadow Bolt, Immolate, Conflagrate, Rain of Fire and Hellfire. Fire that
+  Ignites and pays it off, plus a bolt that pierces.
+- **Demonology:** a demon at your side and a horde of lesser ones around it. **A full minion build**
+  is possible here: the demons do most of the damage, and the warlock commands, curses and keeps
+  them fed.
+
+Like the other classes, every skill tree leans into a state:
+- Withered for Affliction;
+- Ignited and Scorched Ground for Destruction;
+- for Demonology, whatever its demons' hits inflict. Each demon carries its own element's state.
+
+**What an ARPG warlock gets beyond the stock class:**
+- **Summoning needs no Soul Shard, and casts at once.** In vanilla a demon takes 10 sec and a
+  shard to summon, so a demon lost in a pull would end a minion build's fight.
+  - Summon Imp, Voidwalker, Succubus and Felhunter fall under the instant-cast rule ("Casting")
+    with a fixed 1.5 sec recovery. Their 10 sec cast would otherwise keep them out of it.
+  - A demon that dies can be summoned again after 6 sec.
+- **Inferno at 20, free** (vanilla's is a level 50 spell needing an Infernal Stone), and the
+  Doomguard at 40 (Ritual of Doom without its party). Both are timed minions on cooldowns, the
+  build's big summons.
+- **Rain of Fire at 10 and Hellfire at 20,** free. As with the paladin's Consecration and the
+  druid's Hurricane, a class without area damage can't play an ARPG.
+- **Life Tap stays** as the warlock's resource trick: health into mana, never stuck. The Drain
+  nodes and the minions' life on hit give the health back.
+- **Soul Shards are dropped as a resource.** Kills raise imps instead (the Legion keystone), so
+  there is no bag to manage and no charges (Jeff's call).
+- Talent spells come free at their row's level, as for every class:
+  - Siphon Life, Conflagrate, Shadowburn;
+  - Fel Domination (in the ARPG, a demon's instant resummon);
+  - Soul Link (in the ARPG, a minion build's defence).
+
+### Minions: the rules
+
+These rules hold for every minion in the game: the warlock's demons, Book of the Dead's
+skeletons, and later the shaman's totems where they fit.
+
+- **Two kinds of minion.**
+  - **Your demon:** one at a time, as in vanilla. It persists, follows you, and has a skill
+    tree of its own.
+  - **The horde:** timed minions from skills, kills and items: imps from kills, the Infernal, the
+    Doomguard, uniques' summons. At most 10 at once, oldest first to go.
+- **Minions hit with your numbers.**
+  - A minion's hit is tagged **Minion** beside its damage type (an Imp's Firebolt is Minion,
+    Fire, Spell).
+  - The owner's increased and more bonuses apply wherever the tags match. A "+% Fire damage"
+    item helps a fire demon, and a "+% Minion damage" item helps them all.
+  - Its ailments and states are its owner's, so the synergy layer just works: a Succubus's Lash
+    of Pain Withers, and the warlock's Shadow Bolt consumes it.
+  - Today a pet only gets the owner's level scaling (`DamageModForTags`); this extends it.
+- **Their own stats, from new affixes** (a new pool, frozen like the others):
+  - +% Minion damage;
+  - +% Minion life;
+  - +% Minion attack and cast speed;
+  - +N to the horde's size;
+  - minions' life leech.
+  - They roll on warlock-leaning bases (staves, daggers, wands, cloth, off-hands). The passive
+    web's Demonology side carries the same stats.
+- **They fight where you look.**
+  - In the ARPG view there's no pet bar and no target.
+  - Minions attack the enemy under your cursor when you cast at one, and otherwise whatever is
+    nearest you.
+  - They never chase more than 25 yards from you, and teleport back past 40 (a dungeon's
+    corners).
+- **Commands keep the player busy.** A minion build is the warlock giving orders, not standing
+  and watching, as in PoE2's command skills and Last Epoch's Dread Shade. The Demon skill's
+  tree turns its stock abilities into orders:
+  - Sacrifice: detonate a horde minion;
+  - Torment: every minion piles onto one enemy;
+  - Soul Link: share the damage you take with them.
+- **Visible and countable.** The HUD shows the demon's health under the warlock's, and the horde
+  as a number beside it.
+- **The statistics** report minion damage as its own line ("Imp (minion)"), so a build's minion
+  share can be read and tuned.
+
+### Warlock skills that can be specialised
+
+Six skills for five slots. The hooks will live in `ArpgWarlock.cpp`.
+
+| Skill | Covers | Branches | Role |
+|---|---|---|---|
+| **Shadow Bolt** | Shadow Bolt, Searing Pain, Shadowburn | Volley, Nightfall, Ruin | The bolt: pierce, split, crits |
+| **Corruption** | Corruption, Curse of Agony, Siphon Life | Plague, Agony, Siphon | Shadow over time that spreads |
+| **Immolate** | Immolate, Conflagrate, Rain of Fire, Hellfire | Pyre, Cataclysm, Hellfire | Fire: Ignite, its payoff, the ground |
+| **Drain** | Drain Life, Drain Soul, Death Coil, Life Tap | Siphon, Reaping, Pact | Sustain and execute |
+| **Demon** | your demon and its abilities | Brute, Seduction, Command | The one at your side |
+| **Legion** | Inferno, Ritual of Doom, the horde | Imps, Infernal, Doom | The many |
+
+#### Shadow Bolt
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Volley | Splitting Bolt [A] | 3 | 1/1/2 extra bolts, at 45/60/60% |
+| Volley | Piercing Shadow [A] | 3 | Shadow Bolt flies through 1/2/4 enemies, at 60% |
+| Volley | Withering Bolt [Ail] | 3 | 8% per rank to Wither |
+| Volley | **Shadowstorm** [A] | 1 | Every 3rd Shadow Bolt bursts within 6 yd of its target, at 70% |
+| Nightfall | Nightfall [Syn] | 3 | Corruption and Agony ticks have 2% per rank to make the next Shadow Bolt skip its recovery |
+| Nightfall | Quick Bolt [M] | 3 | -0.15 sec Shadow Bolt recovery per rank |
+| Nightfall | **Shadow Trance** [Syn] | 1 | Shadow Bolt consumes Withered for an extra hit of 100% of the hit and the stacks |
+| Ruin | Devastation [M] | 3 | +3% critical strike chance per rank |
+| Ruin | Ruin [M] | 3 | Critical strikes deal 20% more of their bonus per rank |
+| Ruin | Searing Pain [M] | 3 | 10% more Searing Pain damage per rank, and it Ignites on a crit |
+| Ruin | **Shadowburn** [H] | 1 | A kill with Shadowburn resets its cooldown and refunds its cost |
+
+#### Corruption
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Plague | Spreading Corruption [F] | 3 | Corruption also lands on 1/2/3 more within 8 yd |
+| Plague | Rot [M] | 3 | 15% more Corruption damage per rank |
+| Plague | **Pandemic** [F] | 1 | A Corrupted enemy's death spreads Corruption to every enemy within 10 yd |
+| Agony | Lingering Curse [F] | 2 | Curse of Agony also lands on 1/2 more within 8 yd |
+| Agony | Torment [Ail] | 3 | Agony's ticks have 10% per rank to Wither |
+| Agony | **Haunting Agony** [H] | 1 | Agony's damage grows 10% each tick, not front-loaded |
+| Siphon | Siphon Life [M] | 3 | 10% more Siphon Life damage per rank, and it heals your demon too |
+| Siphon | Grim Reach [M] | 2 | +3 sec duration per rank on all three |
+| Siphon | **Soul Feast** [H] | 1 | Every damage over time tick of yours heals you 0.3% of maximum health (3% a second at most) |
+
+#### Immolate
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Pyre | Spreading Flame [F] | 2 | Immolate also lands on 1/2 more within 8 yd |
+| Pyre | Emberstorm [M] | 4 | 6% more Fire damage per rank |
+| Pyre | **Conflagration** [Syn] | 1 | Conflagrate consumes Ignite (vanilla's Immolate) to burst within 8 yd for the hit and the burn left |
+| Cataclysm | Wide Rain [M] | 3 | +12% Rain of Fire radius per rank |
+| Cataclysm | Burning Rain [Ail] | 3 | Rain of Fire's waves have 10% per rank to Ignite |
+| Cataclysm | **Firestorm** [H] | 1 | Rain of Fire follows you, as Walking Consecration |
+| Hellfire | Hellfire [M] | 3 | 25% less self-damage from Hellfire per rank |
+| Hellfire | Infernal Heat [H] | 3 | Hellfire's ticks give your minions 5% more damage per rank for 4 sec |
+| Hellfire | **Backlash** [H] | 1 | While you channel Hellfire, you take 20% less damage |
+
+#### Drain
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Siphon | Grim Drain [M] | 4 | 10% more Drain Life damage per rank |
+| Siphon | Chained Drain [F] | 2 | Drain Life also drains 1/2 more within 10 yd, at 50% |
+| Siphon | **Life Link** [H] | 1 | Drain Life heals your minions for its whole heal too |
+| Reaping | Drain Soul [M] | 3 | Drain Soul deals 30% more per rank to enemies below 25% health |
+| Reaping | **Reaping** [H] | 1 | A kill under Drain Soul raises an imp (as Legion) and restores 5% of your mana |
+| Pact | Dark Pact [M] | 3 | Life Tap gives 10% more mana per rank |
+| Pact | Death Coil [M] | 2 | -10 sec Death Coil cooldown per rank |
+| Pact | **Demonic Pact** [H] | 1 | Life Tap takes the health from your demon instead, when it has more than you |
+
+#### Demon
+
+The demon's own tree: the stock demons, each a different job, and orders to give them. Which
+demon is out decides which nodes work, and the tooltips say so.
+
+| Demon | Job | Its state |
+|---|---|---|
+| Imp | ranged Firebolt, burns | Ignited |
+| Voidwalker | holds the pack, taunts, absorbs | Dazed (Torment builds Daze) |
+| Succubus | fast melee, Lash of Pain | Withered |
+| Felhunter | eats spells, strikes casters | Overloaded (Devour Magic stores the spell) |
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Brute | Fel Vitality [M] | 4 | Your demon has 10% more life per rank |
+| Brute | Demonic Embrace [M] | 3 | Your demon deals 8% more damage per rank |
+| Brute | Cleaving Demon [G] | 3 | Your demon's melee strikes every enemy in front, the extras at 30/45/60% |
+| Brute | **Fel Domination** [H] | 1 | A dead demon is summoned again at once (once every 30 sec) |
+| Seduction | Lash Arc [G] | 2 | Lash of Pain and Firebolt strike 1/2 more within 6 yd |
+| Seduction | Master Demonologist [H] | 3 | While your demon lives, you deal 4% more damage per rank, in its element |
+| Seduction | **Twin Pact** [K] | 1 | Two demons at once (two different ones) |
+| Command | Torment [K] | 1 | Your attack command: every minion strikes the enemy under your cursor for 4 sec, dealing 20% more |
+| Command | Sacrifice [K] | 1 | Detonates the oldest horde minion for Fire damage of 25% of its life within 8 yd |
+| Command | Soul Link [H] | 3 | 10% per rank of the damage you take is taken by your demon instead |
+| Command | **Demonic Sacrifice** [K] | 1 | No demon: its power is yours (30% more damage in its element), for a build without minions |
+
+#### Legion
+
+The horde's skill.
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Imps | Imp Swarm [H] | 3 | The horde holds 2/4/6 more imps |
+| Imps | Fiery Swarm [Ail] | 3 | Imps' Firebolts have 10% per rank to Ignite |
+| Imps | **Burning Legion** [H] | 1 | A horde minion's kill raises another imp |
+| Infernal | Infernal Fall [G] | 3 | Inferno's landing stuns and strikes within 8/10/12 yd |
+| Infernal | Immolation Aura [H] | 3 | The Infernal burns every enemy within 8 yd, 20% more per rank |
+| Infernal | **Lord of Flame** [H] | 1 | Two Infernals |
+| Doom | Ritual of Doom [M] | 2 | -60 sec Doomguard cooldown per rank |
+| Doom | Doombringer [H] | 3 | The Doomguard's Rain of Fire falls where you aim, 15% more per rank |
+| Doom | **Pit Lord** [H] | 1 | The Doomguard does not leave: it is your demon for its life, beside your own |
+
+### The warlock passive web
+
+The same shape as the others: the Affliction, Destruction and Demonology talents as notables,
+with a keystone at the heart of each side.
+
+| Keystone | Side | Effect |
+|---|---|---|
+| **Legion** | Demonology | Every kill raises an imp (the horde's cap applies), for 20 sec |
+| **Soul Siphon** | Affliction | Drains heal 2% more per damage over time on the target |
+| **Pyroclasm** | Destruction | Rain of Fire and Hellfire Stun on a crit (once every 4 sec per enemy) |
+| **Demonic Knowledge** | Demonology | Your Intellect and Stamina also count as your minions' |
+| **Nether Ward** | Any | Life Tap shields you for the health it takes |
+
+Notables carry the vanilla talents:
+- Affliction: Improved Corruption, Shadow Mastery, Nightfall;
+- Destruction: Bane, Devastation, Emberstorm, Ruin;
+- Demonology: Demonic Embrace, Fel Intellect, Master Summoner, Unholy Power, Master Demonologist.
+
+The minion affixes' small nodes fill the Demonology side.
+
+### The warlock's synergy (`ARPG-SYNERGY.md`)
+
+**Its own rules:**
+- *Feast of Souls:* Drain Life and Drain Soul consume Withered for an extra hit of 80% and the
+  stacks.
+- *Conflagrate* consumes Ignite (vanilla's own consume, now the general one).
+- *Fel Bond:* a minion's kill of a Withered enemy heals its owner 2% of maximum health.
+
+**Pairings these open, none of them designed as a build:**
+- the Succubus Withers, and Shadow Bolt's Shadow Trance cashes it;
+- the Imp Ignites, and Conflagrate bursts it;
+- the Voidwalker builds Daze, and a Daze-payoff unique becomes a warlock's.
+
+### Example warlock builds at 60
+
+- **Demonologist, the minion build (Demon, Legion, Corruption, Drain, Immolate):**
+  - The Imp swarm and the Infernal do most of the damage. Legion and Burning Legion keep the horde
+    full, and Torment points it.
+  - Corruption and Pandemic keep everything Withered for the Succubus's payoffs.
+  - Drain's Life Link heals the minions.
+  - Web: Legion, Demonic Knowledge. Gear: minion damage and horde size.
+  - **Target:** about 70% of the damage from minions.
+- **Plaguebringer (Corruption, Drain, Shadow Bolt):** Spreading Corruption and Pandemic carry the
+  rot through packs. Torment Withers, Shadow Trance and Feast of Souls cash it. Soul Feast and the
+  drains sustain. Web: Soul Siphon.
+- **Destroyer (Shadow Bolt, Immolate, Demon with Demonic Sacrifice):** Splitting and Piercing
+  Bolt clear, Rain of Fire and Firestorm hold the ground, Conflagration pays off the Ignites.
+  Sacrificed demon power. Web: Pyroclasm.
+
+### Building it
+
+- **Server: `Arpg/ArpgWarlock.{h,cpp}`:**
+  - the six skills and their nodes in `ArpgSkills.cpp`;
+  - the web in `ArpgTree.cpp`;
+  - the synergy rows;
+  - spell costs in `ArpgResources.cpp`.
+- **Server: `Arpg/ArpgMinions.{h,cpp}`, the minion rules above for every class:**
+  - the horde list per player and its cap;
+  - the Minion tag on its hits (`TagsOf`, `DamageModForTags` for owned creatures);
+  - cursor-led targeting through the ARPG cast aim;
+  - the leash and teleport;
+  - the minion affixes (a new pool).
+  - Book of the Dead moves onto it.
+- **Client:**
+  - the demon's health bar and the horde count on the HUD;
+  - minion damage numbers in the owner's colours, dimmed;
+  - the class screen already has the warlock (an orc in Nemesis Raiment).
+- **Statistics:** each minion's damage reported as "<name> (minion)", and the minion share in the
+  session line.
+- **Uniques that open the minion pairings:**
+  - Book of the Dead (already raises skeletons, now into the horde);
+  - the Fire Runed Grimoire (the class screen's off-hand);
+  - the warlock pieces of Shadowfang Keep, Scholomance and Dire Maul.
+
 ## Making a character
 
 Built. On an ARPG realm, Create New Character opens the class screen first: five vertical
@@ -1538,7 +1809,7 @@ for capstones and hooks:
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
 5. **Other classes**, one at a time: the mage and the druid are built ("The mage, in full",
-   "The druid, in full"); next the warlock and the shaman.
+   "The druid, in full"); the warlock is designed ("The warlock, in full"), then the shaman.
 
 ### What phase 2 built
 
