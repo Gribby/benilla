@@ -21,6 +21,9 @@ pub(crate) enum ArpgText {
     Hit { school: u8, crit: bool },
     /// A damage over time tick dealt.
     Tick { school: u8 },
+    /// A hit one of the player's minions dealt (its pet, a guardian, the horde): quieter than the
+    /// player's own, so a minion build's numbers read as the minions'.
+    MinionHit { school: u8, crit: bool },
     /// Damage the player took, over the player.
     Taken,
     /// A proc's named burst ("Overload 4,210").
@@ -90,6 +93,13 @@ pub(super) fn look(text: ArpgText) -> Look {
             alpha: 1.0,
             outline: Outline::Thick,
         },
+        ArpgText::MinionHit { school, crit } => Look {
+            color: school_argb(school),
+            size: if crit { 0.95 } else { 0.8 },
+            pops: false,
+            alpha: 0.75,
+            outline: Outline::Normal,
+        },
         ArpgText::Tick { school } => Look {
             color: school_argb(school),
             size: 0.72,
@@ -140,6 +150,20 @@ pub(super) fn body(text: ArpgText, label: Option<&str>, value: u32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_minions_hit_is_quieter_than_the_players() {
+        let mine = look(ArpgText::Hit {
+            school: 2,
+            crit: true,
+        });
+        let minion = look(ArpgText::MinionHit {
+            school: 2,
+            crit: true,
+        });
+        assert_eq!(minion.color, mine.color);
+        assert!(minion.size < mine.size && minion.alpha < mine.alpha && !minion.pops);
+    }
 
     #[test]
     fn big_numbers_take_separators() {
