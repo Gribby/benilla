@@ -117,6 +117,7 @@ mod textinput;
 mod transport;
 mod tutorial;
 mod ui_action;
+mod ui_arpg;
 mod ui_auction;
 mod ui_aura;
 mod ui_bank;

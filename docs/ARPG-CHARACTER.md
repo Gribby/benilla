@@ -726,6 +726,10 @@ Built. Twelve sets, one per class at levels 20, 30, 40 and 50, for the classes t
 | Moonshadow Garb | Druid | 30 | +10 Intellect | +10% Arcane damage | | Moonfire also lands on 1 more within 8 yd |
 | Feralheart Raiment | Druid | 40 | +15 Agility | +12% Melee damage | +6% attack speed | Claw strikes all in front, 40% |
 | Wildheart Vestments | Druid | 50 | +15 Intellect | +12% Nature damage | +1 to all Spell skills | Starfire bursts within 8 yd, 40% |
+| Shadowsworn Rags | Warlock | 20 | +8 Intellect | +10% Shadow damage | | Shadow Bolt pierces 1, 60% |
+| Summoner's Bindings | Warlock | 30 | +10% Minion damage | +15% Minion life | | Corruption lands on 1 more within 8 yd |
+| Felfire Regalia | Warlock | 40 | +15 Intellect | +12% Fire damage | +1 to the horde's size | Immolate bursts within 6 yd, 40% |
+| Dreadlord's Mantle | Warlock | 50 | +20% Minion damage | +12% Shadow damage | +1 to all Spell skills | Shadow Bolt chains to 2 more, 50% |
 
 ## The paladin, in full
 
@@ -1727,8 +1731,241 @@ speed.
   - Fel Domination.
 - The skills, the web, the minion affixes, the costs and the class's cooldown rules live with the
   other classes'.
-- **Not yet:** warlock sets, warlock uniques' rows beyond Book of the Dead (now in the horde), and
-  minion damage numbers on the client.
+- **Built after:** the four warlock sets (above, "Sets") and minion damage numbers (quieter than
+  your own: smaller, dimmer, no crit pop). **Not yet:** warlock uniques' rows beyond Book of the
+  Dead.
+
+## The shaman, in full
+
+Design, not yet built (`ARPG-ROADMAP.md`, M2). The fifth and last class.
+
+### Identity
+
+The elements' caller, with three ways to play that pull apart:
+
+- **Stormcaller:** Lightning Bolt and Chain Lightning. Lightning jumps from body to body and
+  leaves enemies **Shocked**.
+- **Earthwarden:** totems that fight. Searing, Magma and Fire Nova Totems are the class's second
+  minion build: stationary minions you place and move with, where the warlock's follow you.
+- **Enhancer:** a weapon and its imbues. Windfury's extra swings, Stormstrike, and Flametongue
+  and Frostbrand turning the swing into Fire or Frost. It uses the melee rules ("Melee": pace,
+  cleave, Fortify, life on hit).
+
+Every skill tree leans into a state:
+- **Shocked:** a new one, below;
+- Ignited for Flame Shock and Flametongue;
+- Chilled for Frost Shock and Frostbrand;
+- Dazed for the Enhancer's physical blows.
+
+### A new state: Shocked
+
+Lightning has no ailment of its own: Nature's is Poison, which suits the druid's swarms but not a
+storm. So the shaman gets one:
+
+- **Shocked** comes from the shaman's Lightning hits: Lightning Bolt, Chain Lightning, Lightning
+  Shield's discharge and Stormstrike. It is a class rule, not the Nature tag, so a druid's
+  Nature still Poisons.
+- A Shocked enemy takes 5% more damage from everyone per stack, up to 4 stacks, for 4 sec.
+- **Consumed** by Earth Shock for an extra hit of 25% of the hit per stack.
+- The client's hover bar shows it as a 15th state bit (the state mask is a `u16`, so it fits).
+
+### What an ARPG shaman gets beyond the stock class
+
+- **No totem tools.** The Earth, Fire, Water and Air Totems are quest items in vanilla. An ARPG
+  shaman needs none, as no class needs reagents (`Player::CanNoReagentCast`, and its tool check
+  beside it).
+- **Area spells sooner:**
+
+  | Spell | ARPG level | Vanilla |
+  |---|---|---|
+  | Fire Nova Totem | 10 | 12 |
+  | Chain Lightning | 20 | 32 |
+  | Magma Totem | 20 | 26 |
+
+- **Totems drop where you aim, not at your feet,** within 20 yards. With the Walking Totems
+  keystone they follow you instead.
+- **Totems are minions** (`Arpg/ArpgMinions.h`):
+  - their hits take your bonuses by tag (Minion, Totem, and the element);
+  - their ailments are yours;
+  - "+% Minion damage" and the minion affixes count for them;
+  - they don't move or leash, one of each element at a time, as in vanilla.
+- **Ghost Wolf free and instant.** Its cast falls under the instant-cast rule; the speed is the
+  ARPG's travel.
+- Talent spells come free at their row's level, as for every class: Stormstrike, Elemental
+  Mastery, Mana Tide Totem.
+
+### Shaman skills that can be specialised
+
+Six skills for five slots.
+
+| Skill | Covers | Branches | Role |
+|---|---|---|---|
+| **Lightning** | Lightning Bolt, Chain Lightning | Storm, Overload, Conduit | The jumps and the Shock |
+| **Shocks** | Earth Shock, Flame Shock, Frost Shock | Earth, Flame, Frost | The payoffs, one per element |
+| **Fire Totems** | Searing Totem, Magma Totem, Fire Nova Totem | Searing, Magma, Nova | The totems that fight |
+| **Earthen Totems** | Stoneclaw, Earthbind, Strength of Earth, Windfury, Grace of Air, Tremor | Stone, Wind, Ward | Totems that hold and empower |
+| **Strike** | the swing, Stormstrike, the weapon imbues | Windfury, Imbue, Storm | The Enhancer |
+| **Healing Wave** | Healing Wave, Lesser Healing Wave, Chain Heal | Tide, Ancestral, Torrent | Heals that hurt, as the paladin's and the druid's |
+
+#### Lightning
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Storm | Forked Lightning [A] | 3 | Lightning Bolt chains to 1/2/3 more within 10 yd, at 50% |
+| Storm | Quick Bolt [M] | 3 | -0.15 sec Lightning Bolt recovery per rank |
+| Storm | Static [Ail] | 3 | +1 Shock stack per hit, 10% per rank |
+| Storm | **Thunderstorm** [A] | 1 | Chain Lightning strikes every enemy it jumps past, at 40% |
+| Overload | Lightning Overload [Syn] | 3 | Lightning hits: 5% per rank to cast a free copy at 50% |
+| Overload | Concussion [M] | 4 | 6% more Lightning damage per rank |
+| Overload | **Elemental Fury** [M] | 1 | Critical strikes deal 100% more of their bonus |
+| Conduit | Conduit [H] | 3 | Each Shock stack consumed restores 1% mana per rank |
+| Conduit | Lightning Shield [H] | 3 | Lightning Shield's discharge Shocks, and has 1 more charge per rank |
+| Conduit | **Ball Lightning** [H] | 1 | Each Shocked enemy's death fires a Lightning Bolt at the nearest |
+
+#### Shocks
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Earth | Earthquake [Syn] | 1 | Earth Shock consumes Shocked for 25% of the hit per stack (the class rule's stronger form, bursting within 6 yd) |
+| Earth | Reverberation [M] | 3 | -1 sec Shock cooldown per rank |
+| Earth | **Earthen Power** [H] | 1 | Earth Shock Dazes |
+| Flame | Searing Flames [Ail] | 3 | Flame Shock: 15% per rank to Ignite |
+| Flame | Flame Spread [F] | 2 | Flame Shock also lands on 1/2 more within 8 yd |
+| Flame | **Lava Burst** [Syn] | 1 | Flame Shock on an Ignited enemy consumes it to burst within 8 yd |
+| Frost | Frozen Power [M] | 3 | 10% more Frost Shock damage per rank |
+| Frost | Frostbite [Ail] | 3 | Frost Shock on a Chilled enemy: 15% per rank to Freeze |
+| Frost | **Glacial Shock** [A] | 1 | Frost Shock strikes every enemy within 6 yd of its target |
+
+#### Fire Totems
+
+Totems are minions, so these scale with the minion stats too.
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Searing | Searing Bolts [A] | 3 | Searing Totem's bolt chains to 1/2/3 more, at 50% |
+| Searing | Burning Totem [Ail] | 3 | Searing Totem: 10% per rank to Ignite |
+| Searing | **Twin Totems** [K] | 1 | Two Searing Totems at once |
+| Magma | Wide Magma [M] | 3 | +15% Magma Totem radius per rank |
+| Magma | Magma Pulse [M] | 4 | 8% more Magma Totem damage per rank |
+| Magma | **Molten Core** [H] | 1 | Magma Totem's pulses Ignite |
+| Nova | Quick Nova [M] | 2 | Fire Nova Totem goes off 2 sec sooner per rank |
+| Nova | Echoing Nova [H] | 2 | Fire Nova goes off 1/2 more times |
+| Nova | **Cataclysmic Nova** [H] | 1 | Fire Nova consumes Ignite on every enemy it strikes, for the burn left |
+
+#### Earthen Totems
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Stone | Stoneclaw [H] | 3 | Stoneclaw Totem taunts every enemy within 8 yd and has 25% more life per rank |
+| Stone | Earth's Grasp [H] | 2 | Earthbind Totem roots for 1 sec every 3 sec per rank |
+| Stone | **Totemic Ward** [K] | 1 | While a totem of yours stands, you take 10% less damage |
+| Wind | Windfury Totem [H] | 3 | Windfury Totem's extra swings strike all in front, at 30/45/60% |
+| Wind | Gale [M] | 3 | Grace of Air also gives 3% movement speed per rank |
+| Wind | **Storm Totem** [H] | 1 | Your Lightning hits within 10 yd of your totems Shock twice |
+| Ward | Totemic Reach [M] | 3 | +15% totem radius per rank |
+| Ward | Tremor [H] | 2 | Tremor Totem also breaks a stun on you every 10/6 sec |
+| Ward | **Totemic Recall** [H] | 1 | Recalling a totem refunds its mana and readies it |
+
+#### Strike
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Windfury | Windfury Weapon [M] | 3 | Windfury procs 10% more often per rank |
+| Windfury | Tempest Swing [G] | 3 | Windfury's extra swings strike all in front, at 30/45/60% |
+| Windfury | **Unleashed Rage** [H] | 1 | Each Windfury proc gives 5% more Melee damage for 6 sec (stacking to 5) |
+| Imbue | Flametongue [Conv] | 1 | Your swings count as Fire: they Ignite, not Bleed |
+| Imbue | Frostbrand [Conv] | 1 | Your swings count as Frost: they Chill |
+| Imbue | **Rockbiter** [M] | 1 | Your swings build 50% more Daze |
+| Storm | Stormstrike [Syn] | 3 | Stormstrike Shocks for 1/2/3 stacks |
+| Storm | Static Shock [H] | 3 | Swings on a Shocked enemy: 10% per rank to discharge a Lightning Bolt at it |
+| Storm | **Stormbringer** [H] | 1 | Critical swings Shock every enemy within 8 yd |
+
+#### Healing Wave
+
+| Branch | Node | Ranks | Effect |
+|---|---|---|---|
+| Tide | Tidal Force [M] | 4 | 6% more healing per rank |
+| Tide | **Riptide** [H] | 1 | Your heals on yourself send a Lightning Bolt at the nearest enemy for half the heal |
+| Ancestral | Ancestral Healing [H] | 3 | Healing yourself gives 5% more damage per rank for 5 sec |
+| Ancestral | **Healing Stream** [H] | 1 | Healing Stream Totem's pulses strike the nearest enemy for their heal, as Nature |
+| Torrent | Chain Heal [Syn] | 3 | Chain Heal's jumps also strike an enemy near each target, 20% of the heal per rank |
+| Torrent | **Earthliving** [H] | 1 | Your heals Shock every enemy within 8 yd |
+
+### The shaman passive web
+
+The Elemental, Enhancement and Restoration talents are its notables, with two keystones on each
+side.
+
+| Keystone | Side | Effect |
+|---|---|---|
+| **Thunderlord** | Elemental | Lightning Bolt always chains to 2 more (the roadmap's "Lightning Bolt always chains"); Lightning hits 15% less |
+| **Overcharge** | Elemental | Shocked stacks to 8; Shock lasts half as long |
+| **Walking Totems** | Restoration | Your totems follow you; their area is 25% smaller |
+| **Totemic Mastery** | Restoration | Two of each element's totems at once; your own spells deal 20% less |
+| **Windwalker** | Enhancement | Windfury procs twice as often; your spells deal 30% less |
+| **Elemental Weapons** | Enhancement | Both imbues at once (Flametongue and Frostbrand); your swings deal 15% less |
+
+Notables teach the talents:
+- Elemental: Concussion, Call of Thunder, Elemental Fury, Lightning Mastery;
+- Enhancement: Thundering Strikes, Enhancing Totems, Flurry, Weapon Mastery;
+- Restoration: Tidal Mastery, Totemic Focus, Purification, Healing Way.
+
+### The shaman's synergy (`ARPG-SYNERGY.md`)
+
+**Its own rules:**
+- *Shock:* Lightning hits Shock (above).
+- *Earth Shock* consumes Shocked.
+- *Static Discharge:* a Shocked enemy's death Shocks the 2 nearest.
+- *Elemental Crossing:* Frost Shock on an Ignited enemy, or Flame Shock on a Chilled one,
+  strikes again for 50%: the mage's Thermal Shock, the shaman's way.
+
+**Pairings these open:**
+- **The warlock's horde and the totems:** the same minion affixes serve both.
+- **Daze:** Rockbiter's Daze feeds every Daze unique and the paladin's pairings.
+- **Shocked with another class's damage:** every class's damage takes Shocked's more. A Shocked
+  enemy is a good target for any payoff in the group, and for the shaman's own Fire Totems.
+
+### Example shaman builds at 60
+
+- **Stormcaller (Lightning, Shocks, Earthen Totems):**
+  - Forked Lightning and Thunderstorm clear packs, and Static stacks Shock.
+  - Earthquake cashes it in, Ball Lightning carries it on, Storm Totem doubles it.
+  - Web: Thunderlord, Overcharge.
+- **Earthwarden, the totem minion build (Fire Totems, Earthen Totems, Shocks):**
+  - Twin Searing Totems and Molten Core Magma Totems do the work, Walking Totems carry them, and
+    Totemic Ward and Stoneclaw hold the pack.
+  - Web: Walking Totems, Totemic Mastery. Gear: minion damage, as the warlock's.
+  - **Target:** about 70% of the damage from totems.
+- **Enhancer (Strike, Shocks, Earthen Totems):**
+  - Windfury and Tempest Swing clear in front.
+  - Flametongue Ignites and Lava Burst bursts the Ignites. Stormstrike and Stormbringer Shock the
+    pack, and Earthquake cashes it in.
+  - Web: Windwalker, Elemental Weapons.
+
+### How it would be built
+
+- **Server:**
+  - `Arpg/ArpgShaman.{h,cpp}` for the hooks;
+  - the Shocked state in `Arpg/ArpgStates.h` (a 15th state);
+  - totems as minions: `MinionOwner` already finds them. They need the Totem tag on their hits
+    and `UpdateMinions` leaving them unsteered;
+  - totem placement at the ARPG aim, and Walking Totems moving them as Walking Consecration
+    moves its ground;
+  - the totem tool check waived;
+  - the skills, web, costs (Lightning Bolt the free filler, Chain Lightning the spender), sets and
+    synergy rows, with the other classes'.
+- **Client:**
+  - "Shocked" in `ARPG_STATE_NAMES`;
+  - the totem tool check waived beside the reagents';
+  - totems' hits already float as minion numbers.
+- **The class screen** already has the shaman: a tauren in The Ten Storms.
+
+### For Jeff
+
+- **Shocked as a new state (the 15th).** The alternative is making the shaman's Lightning Poison,
+  which reuses the druid's ailment and blurs the two classes. I'd add the state.
+- **Restoration as a fourth way to play,** or only as a support skill for the other three, as here
+  (heals that hurt). Here it's support.
 
 ## Making a character
 
@@ -1812,7 +2049,7 @@ for capstones and hooks:
 3. **Codex pages and runes** (needs the mob packs step for champion packs and fragments).
 4. **The other seven paladin skill trees** and the ARPG item affixes, including +skill levels.
 5. **Other classes**, one at a time: the mage and the druid are built ("The mage, in full",
-   "The druid, in full"); the warlock is built ("The warlock, in full"), then the shaman.
+   "The druid, in full"); the warlock is built ("The warlock, in full"), and the shaman designed ("The shaman, in full").
 
 ### What phase 2 built
 

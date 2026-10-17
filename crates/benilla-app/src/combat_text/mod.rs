@@ -464,13 +464,13 @@ fn melee_impact_text(
         if let Some((category, body)) = melee_text(s.hit_info, s.victim_state, s.damage) {
             // A number (not a miss word) takes the ARPG look: a physical hit.
             let arpg = body.parse::<u32>().ok().map(|value| {
-                (
-                    ArpgText::Hit {
-                        school: 0,
-                        crit: category == 2,
-                    },
-                    value,
-                )
+                let crit = category == 2;
+                let kind = if source == DamageSource::Pet {
+                    ArpgText::MinionHit { school: 0, crit }
+                } else {
+                    ArpgText::Hit { school: 0, crit }
+                };
+                (kind, value)
             });
             text.write(CombatTextSpawn {
                 anchor: victim,

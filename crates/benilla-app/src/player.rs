@@ -26,7 +26,7 @@ use benilla_world::schedule::WorldStage;
 mod approach;
 mod arc;
 // The fork's top-down ARPG view, off unless `WOW_ARPG` is set; not 1.12.1.
-mod arpg;
+pub(crate) mod arpg;
 mod net;
 // Writes the frame onto the body we drive: pose, `MovementState`, the counter-twist gap.
 mod body_pose;

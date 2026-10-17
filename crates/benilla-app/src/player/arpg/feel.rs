@@ -10,7 +10,8 @@
 //!   [`LABEL_ANY_GAP_SECS`], so a pack fight stays readable.
 //! - A heavy kill (a crit, or a big share of the health) bursts in the killing blow's damage type:
 //!   its type's impact kit on the corpse (fire, ice, holy light...), beside `strikes`' gore.
-//! - Kills in a row count up on the HUD (`ArpgHud_Streak`), with a flourish at 10, 25, 50, 100.
+//! - Kills in a row count up on the HUD (`ArpgHud_Streak`, fed by `crate::ui_arpg::feel`), with
+//!   a flourish at 10, 25, 50, 100.
 //! - A champion's or a rare's kill holds every model near it for a beat (`super::impact`). No
 //!   screen flash: the beat, the burst and the shake carry it.
 //! - The world view blooms: bright light bleeds ([`benilla_world::ffx_glow::FfxBloom`]).
@@ -21,7 +22,6 @@ use bevy::prelude::*;
 
 use benilla_protocol::messages::arpg::{PROC_DAMAGE, PROC_EFFECT};
 use benilla_protocol::messages::ArpgProc;
-use benilla_ui::script::UiScript;
 
 use crate::combat_text::{ArpgText, CombatTextSpawn};
 use crate::creature_anim::spell_visual::impact_kit_id;
@@ -102,7 +102,7 @@ fn milestone(n: u32) -> Option<&'static str> {
 
 /// The player's run of kills.
 #[derive(Resource, Default)]
-struct Streak {
+pub(crate) struct Streak {
     count: u32,
     last: f64,
     /// The highest milestone crossed since the HUD was last told: several kills can land at
@@ -110,6 +110,19 @@ struct Streak {
     word: Option<&'static str>,
     /// The count the HUD has not yet been told of.
     dirty: bool,
+}
+
+impl Streak {
+    /// Whether the HUD has a count it has not been told of.
+    pub(crate) fn dirty(&self) -> bool {
+        self.dirty
+    }
+
+    /// The count and the milestone crossed since the HUD was last told, which it now is.
+    pub(crate) fn take_news(&mut self) -> (u32, Option<&'static str>) {
+        self.dirty = false;
+        (self.count, self.word.take())
+    }
 }
 
 pub(super) fn plugin(app: &mut App) {
@@ -126,7 +139,7 @@ pub(super) fn plugin(app: &mut App) {
                 wounds_over_me,
                 show_procs,
                 (remember_blows, burst_kills).chain(),
-                push_streak,
+                crate::ui_arpg::feel::push_streak,
             ),
         );
 }
@@ -310,28 +323,6 @@ fn burst_kills(
         }
         streak.last = now;
         streak.dirty = true;
-    }
-}
-
-/// Tell the HUD of the streak.
-fn push_streak(script: Option<NonSendMut<UiScript>>, mut streak: ResMut<Streak>) {
-    let Some(script) = script else {
-        return;
-    };
-    if !streak.dirty {
-        return;
-    }
-    streak.dirty = false;
-    let word = streak
-        .word
-        .take()
-        .map_or("nil".to_string(), |w| format!("{w:?}"));
-    let chunk = format!(
-        "if ArpgHud_Streak then ArpgHud_Streak({}, {word}) end\n",
-        streak.count
-    );
-    if let Err(e) = script.eval::<()>(&chunk) {
-        warn!("arpg: the HUD refused the kill streak: {e}");
     }
 }
 

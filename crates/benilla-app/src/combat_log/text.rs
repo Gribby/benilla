@@ -271,12 +271,18 @@ pub(super) fn spell_damage_log(
     ) {
         // A number takes the ARPG look: the hit's school, a periodic one as a tick.
         let arpg = body.parse::<u32>().ok().map(|value| {
+            let crit = s.hit_info & 0x2 != 0;
             let kind = if s.periodic {
                 crate::combat_text::ArpgText::Tick { school: s.school }
+            } else if source == DamageSource::Pet {
+                crate::combat_text::ArpgText::MinionHit {
+                    school: s.school,
+                    crit,
+                }
             } else {
                 crate::combat_text::ArpgText::Hit {
                     school: s.school,
-                    crit: s.hit_info & 0x2 != 0,
+                    crit,
                 }
             };
             (kind, value)
