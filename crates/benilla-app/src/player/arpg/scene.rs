@@ -11,15 +11,18 @@ use bevy::prelude::*;
 use crate::cinematic::Cinematic;
 use crate::net::NetHandlerApp;
 
+/// Registered whatever the view, so every session event kind has its owner.
+pub(super) fn register_net(app: &mut App) {
+    app.net_handler(benilla_protocol::SessionEventKind::ArpgScene, on_scene);
+}
+
 pub(super) fn plugin(app: &mut App) {
-    app.net_handler(benilla_protocol::SessionEventKind::ArpgScene, on_scene)
-        .add_systems(Startup, spawn_subtitles)
-        .add_systems(
-            Update,
-            drive_subtitles
-                .in_set(WorldStage::Input)
-                .after(crate::cinematic::CinematicSet),
-        );
+    app.add_systems(Startup, spawn_subtitles).add_systems(
+        Update,
+        drive_subtitles
+            .in_set(WorldStage::Input)
+            .after(crate::cinematic::CinematicSet),
+    );
 }
 
 fn on_scene(In(ev): In<benilla_protocol::SessionEvent>, mut cine: ResMut<Cinematic>) {

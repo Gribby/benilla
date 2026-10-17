@@ -799,6 +799,15 @@ pub(crate) struct BoltStops(Vec<(benilla_protocol::messages::arpg::ArpgBoltStop,
 /// How long a stop waits for its missile, in seconds.
 const BOLT_STOP_WAIT: f64 = 1.5;
 
+/// Fork-only, not 1.12.1: the bolt stops' handler, registered here beside it.
+pub(super) fn register_net(app: &mut App) {
+    use crate::net::NetHandlerApp;
+    app.net_handler(
+        benilla_protocol::SessionEventKind::ArpgBoltStop,
+        on_bolt_stop,
+    );
+}
+
 pub(super) fn on_bolt_stop(
     In(ev): In<benilla_protocol::SessionEvent>,
     time: Res<Time>,

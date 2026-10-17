@@ -546,6 +546,9 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_STATES => {
             ServerPacket::ArpgStates(super::arpg::read_arpg_states(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_MINIONS => {
+            ServerPacket::ArpgMinions(super::arpg::read_arpg_minions(&mut r)?)
+        }
         super::arpg::SMSG_ARPG_SCENE => {
             ServerPacket::ArpgScene(super::arpg::read_arpg_scene(&mut r)?)
         }

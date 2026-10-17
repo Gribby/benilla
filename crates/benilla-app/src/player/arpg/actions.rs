@@ -125,7 +125,7 @@ pub(super) fn plugin(app: &mut App) {
             .before(control)
             .in_set(crate::char_select::InWorldGated),
     )
-    .add_systems(Update, (push_status, push_combo));
+    .add_systems(Update, (push_status, push_combo, push_minions));
 }
 
 /// Fork-only, not 1.12.1: the combo points over the power orb (`ArpgHud_Combo` in
@@ -153,6 +153,49 @@ fn push_combo(
             *last = Some(points);
         }
     }
+}
+
+/// Fork-only, not 1.12.1: the demon's health and the horde's count beside the health orb
+/// (`ArpgHud_Minions` in `arpg_hud.lua`), when they change.
+fn push_minions(
+    script: Option<NonSendMut<UiScript>>,
+    hud: Res<super::champions::ArpgMinionsHud>,
+    mut pushed: Local<
+        crate::ui_script::VmMemo<Option<benilla_protocol::messages::arpg::ArpgMinions>>,
+    >,
+) {
+    let Some(script) = script else {
+        return;
+    };
+    let last = pushed.get(&script);
+    if last.as_ref() == Some(&hud.0) {
+        return;
+    }
+    match script.eval::<bool>(&minions_chunk(&hud.0)) {
+        Ok(true) => *last = Some(hud.0.clone()),
+        Ok(false) => {}
+        Err(e) => {
+            warn!("arpg: the HUD refused the minions: {e}");
+            *last = Some(hud.0.clone());
+        }
+    }
+}
+
+fn minions_chunk(m: &benilla_protocol::messages::arpg::ArpgMinions) -> String {
+    // The name goes over as a Lua string: only its letters, spaces and apostrophes.
+    let name: String = m
+        .demon_name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '\'')
+        .collect();
+    format!(
+        "if not ArpgHud_Minions then return false end\nArpgHud_Minions({}, {}, {}, {}, \"{}\")\nreturn true",
+        u8::from(m.demon),
+        m.demon_health,
+        m.horde,
+        m.horde_cap,
+        name
+    )
 }
 
 fn combo_chunk(points: u8) -> String {

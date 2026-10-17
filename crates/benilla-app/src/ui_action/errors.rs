@@ -388,6 +388,8 @@ pub(crate) fn reagent_totem_refusal(
     self_store: Option<&ObjectStore>,
     objects: &crate::net::Objects,
     errors: &mut CastErrors,
+    // Fork-only, not 1.12.1: the reagents are waived (an ARPG player's own class spell).
+    free_reagents: bool,
 ) -> bool {
     let (Some(d), Some(store)) = (def, self_store) else {
         return false;
@@ -395,7 +397,7 @@ pub(crate) fn reagent_totem_refusal(
     // Totems before reagents, the reference's order.
     let reason = if first_missing_totem(d, store, objects).is_some() {
         0x78
-    } else if first_short_reagent(d, store, objects).is_some() {
+    } else if !free_reagents && first_short_reagent(d, store, objects).is_some() {
         0x5c
     } else {
         return false;
@@ -809,7 +811,8 @@ mod totem_reagent_tests {
             Some(&mining),
             Some(&st),
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert_eq!(errors.0.as_slice(), &[CastFail::local(2575, 0x78)]);
 
@@ -822,7 +825,8 @@ mod totem_reagent_tests {
             Some(&slow_fall),
             Some(&st),
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert_eq!(errors.0.as_slice(), &[CastFail::local(130, 0x5c)]);
 
@@ -833,7 +837,8 @@ mod totem_reagent_tests {
             Some(&both),
             Some(&st),
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert_eq!(errors.0.as_slice(), &[CastFail::local(1, 0x78)]);
 
@@ -844,21 +849,24 @@ mod totem_reagent_tests {
             Some(&plain),
             Some(&st),
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert!(!reagent_totem_refusal(
             2575,
             None,
             Some(&st),
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert!(!reagent_totem_refusal(
             2575,
             Some(&mining),
             None,
             &objs.get(),
-            &mut errors
+            &mut errors,
+            false
         ));
         assert!(errors.0.is_empty());
     }

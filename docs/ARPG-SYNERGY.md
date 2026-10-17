@@ -143,6 +143,22 @@ Some pairings these make, none of them designed as a build:
 | Bear | Crushing Maul | Maul consumes Daze for an extra hit of 80% |
 | Cat | Blood Frenzy | consuming Bleeding spreads it to 2, at the size it had |
 
+## The warlock
+
+**Its own rules:**
+- *Feast of Souls:* Death Coil consumes Withered for an extra hit of 100% and the stacks.
+- *Contagion:* a Withered enemy's death Withers the 2 nearest.
+- *Fel Bond:* a minion's kill of a Withered enemy heals the warlock 2% of maximum health.
+- Its minions' hits are its own for the states (`ARPG-CHARACTER.md`, "Minions"): the Imp
+  Ignites, the Succubus Withers, the Felhunter Overloads, and the Voidwalker builds Daze.
+
+**New tree nodes:**
+
+| Skill | Node | What it opens |
+|---|---|---|
+| Shadow Bolt | Shadow Trance | Shadow Bolt consumes Withered for 100% of the hit and the stacks |
+| Immolate | Conflagration | Conflagrate consumes Ignite to burst within 8 yards |
+
 ## The paladin's block
 
 *Retribution:* blocking a blow takes its attacker a quarter of the way to a Daze.
@@ -198,6 +214,6 @@ A spread on a kill is sized as a hit of a tenth of the fallen's health.
 
 ## Next
 
-- The warlock and the shaman (`ARPG-DECISIONS.md`): their own states' rules from the start
-  (Withered and Poisoned for the warlock, Overloaded and the totems' grounds for the shaman).
+- The shaman (`ARPG-DECISIONS.md`): its own states' rules from the start (Overloaded, and the
+  totems' grounds).
 - Unique rows for Dire Maul, Scholomance, Stratholme and the raids as the later acts come in.

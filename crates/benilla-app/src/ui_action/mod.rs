@@ -131,8 +131,10 @@ impl Spells {
             return None;
         }
         let row = self.cast_times.get(def.casting_time_index)?;
-        mods.casts_at_once(def, row.base_ms)
-            .then(|| self.cast_time_ms(def, caster_level, mods))
+        mods.casts_at_once(def, row.base_ms).then(|| {
+            mods.arpg_summon_recovery(def)
+                .unwrap_or_else(|| self.cast_time_ms(def, caster_level, mods))
+        })
     }
 
     /// [`Self::cast_time_unclamped_ms`] for argument 0, the cast validator's (`0x609e16`): a

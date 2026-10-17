@@ -161,6 +161,12 @@ impl SpellModifiers {
             && d.attributes_ex3 & ATTR_EX3_IGNORE_CASTER_MODIFIERS == 0
     }
 
+    /// Fork-only, not 1.12.1: an ARPG player's own class spells need no reagents (a Soul Shard,
+    /// an Infernal Stone; cmangos `Player::CanNoReagentCast`).
+    pub(crate) fn arpg_free_reagents(&self, d: &SpellDisplay) -> bool {
+        crate::player::arpg_session() && d.spell_family != 0 && d.spell_family == self.class_family
+    }
+
     /// Fork-only, not 1.12.1: whether an ARPG player's spell casts at once, its cast time becoming
     /// its recovery (cmangos `Arpg::CastsAtOnce`): an own-class spell, not a channel, with a GCD
     /// category and a `base_cast_ms` cast time of at most [`ARPG_INSTANT_CAST_MAX_MS`].
@@ -168,7 +174,33 @@ impl SpellModifiers {
         self.gates_pass(d)
             && !d.tooltip_channeled()
             && d.start_recovery_category != 0
-            && (1..=ARPG_INSTANT_CAST_MAX_MS).contains(&base_cast_ms)
+            && base_cast_ms > 0
+            && (base_cast_ms <= ARPG_INSTANT_CAST_MAX_MS || arpg_summon(d))
+    }
+}
+
+/// Fork-only: the summon effect of a demon (`SPELL_EFFECT_SUMMON_PET`).
+const SPELL_EFFECT_SUMMON_PET: u32 = 56;
+/// Fork-only: the spell family of a warlock's spells.
+const SPELLFAMILY_WARLOCK: u32 = 5;
+/// Fork-only: a warlock's recovery after a summon that cast at once (cmangos `SUMMON_RECOVERY_MS`).
+pub(crate) const ARPG_SUMMON_RECOVERY_MS: u32 = 1500;
+
+/// Fork-only, not 1.12.1: a warlock's summon (a demon, Inferno, Ritual of Doom), which casts at
+/// once whatever its cast and recovers for [`ARPG_SUMMON_RECOVERY_MS`] (cmangos
+/// `Arpg::IsArpgSummon`).
+pub(crate) fn arpg_summon(d: &SpellDisplay) -> bool {
+    d.spell_family == SPELLFAMILY_WARLOCK
+        && (d.effects.contains(&SPELL_EFFECT_SUMMON_PET)
+            || d.name == "Inferno"
+            || d.name == "Ritual of Doom")
+}
+
+impl SpellModifiers {
+    /// Fork-only: the cast time a spell that casts at once recovers for, when the summon rule
+    /// sets it (`None`: its own cast time).
+    pub(crate) fn arpg_summon_recovery(&self, d: &SpellDisplay) -> Option<u32> {
+        arpg_summon(d).then_some(ARPG_SUMMON_RECOVERY_MS)
     }
 
     /// The `SpellFamilyFlags` bits whose cells any read for `d` can sum, whatever the op: its

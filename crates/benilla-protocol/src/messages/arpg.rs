@@ -937,6 +937,34 @@ pub fn read_arpg_states(r: &mut impl io::Read) -> io::Result<Vec<ArpgUnitStates>
     Ok(out)
 }
 
+/// The player's demon and horde (cmangos `Arpg/ArpgMinions.h`), sent when they change.
+pub const SMSG_ARPG_MINIONS: u16 = 0x0354;
+
+/// `SMSG_ARPG_MINIONS`: the demon (if any) and the horde, for the HUD.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgMinions {
+    /// Whether a demon is at the player's side.
+    pub demon: bool,
+    /// The demon's health, 0-100.
+    pub demon_health: u8,
+    pub horde: u8,
+    pub horde_cap: u8,
+    /// The demon's name ("" without one).
+    pub demon_name: String,
+}
+
+/// `SMSG_ARPG_MINIONS`: `u8` demon, `u8` its health in percent, `u8` horde count, `u8` horde cap,
+/// cstring the demon's name.
+pub fn read_arpg_minions(r: &mut impl io::Read) -> io::Result<ArpgMinions> {
+    Ok(ArpgMinions {
+        demon: read_u8(r)? != 0,
+        demon_health: read_u8(r)?.min(100),
+        horde: read_u8(r)?,
+        horde_cap: read_u8(r)?,
+        demon_name: read_cstring(r)?,
+    })
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {
@@ -1520,6 +1548,15 @@ mod tests {
         assert_eq!(scene.lines[0].speaker, "Hogger");
         assert_eq!(scene.lines[0].text, "Grr.");
         assert_eq!((scene.lines[0].from_ms, scene.lines[0].to_ms), (500, 4000));
+    }
+
+    #[test]
+    fn minions_read_the_demon_and_the_horde() {
+        let body = [1u8, 80, 4, 9, b'K', b'r', b'i', b'l', 0];
+        let m = read_arpg_minions(&mut body.as_slice()).unwrap();
+        assert!(m.demon);
+        assert_eq!((m.demon_health, m.horde, m.horde_cap), (80, 4, 9));
+        assert_eq!(m.demon_name, "Kril");
     }
 
     #[test]

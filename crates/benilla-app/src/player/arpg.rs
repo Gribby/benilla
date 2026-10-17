@@ -277,6 +277,7 @@ pub(super) fn plugin(app: &mut App) {
     sheet::register_net(app);
     strikes::register_net(app);
     world::register_net(app);
+    scene::register_net(app);
     if !arpg_env_on() {
         // The stock client shows no ARPG hover bar: drop the addon an ARPG session installed.
         app.add_systems(Startup, remove_hud);

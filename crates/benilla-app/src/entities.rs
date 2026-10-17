@@ -12,7 +12,7 @@ use benilla_formats::{
 use benilla_protocol::EntityKind;
 use bevy::prelude::*;
 
-use crate::net::{NetEntity, NetHandlerApp};
+use crate::net::NetEntity;
 use benilla_assets::{AssetSet, LockRecover, WorldAssets};
 use benilla_world::model_fade::apply_render_fade;
 use benilla_world::schedule::WorldStage;
@@ -577,6 +577,8 @@ pub(crate) struct EntitiesPlugin;
 
 impl Plugin for EntitiesPlugin {
     fn build(&self, app: &mut App) {
+        // Fork-only, not 1.12.1: the ARPG server's bolt stops end their missiles.
+        missile::register_net(app);
         app.add_systems(
             Update,
             publish_world_units
@@ -593,10 +595,6 @@ impl Plugin for EntitiesPlugin {
         .init_resource::<missile::PendingMissiles>()
         // Fork-only, not 1.12.1: the ARPG server's bolt stops end their missiles.
         .init_resource::<missile::BoltStops>()
-        .net_handler(
-            benilla_protocol::SessionEventKind::ArpgBoltStop,
-            missile::on_bolt_stop,
-        )
         .add_message::<MissileSound>()
         .add_message::<MissileMiss>()
         .add_message::<dest_fx::GroundBurst>()

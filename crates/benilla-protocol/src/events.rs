@@ -487,6 +487,10 @@ pub enum SessionEvent {
     ArpgScene {
         scene: crate::messages::arpg::ArpgScene,
     },
+    /// Fork-only, not 1.12.1: the player's demon and horde, as they change (`SMSG_ARPG_MINIONS`).
+    ArpgMinions {
+        minions: crate::messages::arpg::ArpgMinions,
+    },
     /// Fork-only, not 1.12.1: nearby enemies' states, as they change (`SMSG_ARPG_STATES`).
     ArpgStates {
         states: Vec<crate::messages::arpg::ArpgUnitStates>,

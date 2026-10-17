@@ -80,12 +80,25 @@ pub(crate) struct ArpgEnemyStates {
     by_guid: HashMap<u64, (u16, u8)>,
 }
 
+/// Fork-only, not 1.12.1: the player's demon and horde (`SMSG_ARPG_MINIONS`, cmangos
+/// `Arpg/ArpgMinions.h`), for the HUD (`ArpgHud_Minions`, pushed from `actions.rs`).
+#[derive(Resource, Default)]
+pub(crate) struct ArpgMinionsHud(pub(crate) benilla_protocol::messages::arpg::ArpgMinions);
+
 /// Registered whatever the view, so every session event kind has its owner.
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgChampions>()
         .init_resource::<ArpgEnemyStates>()
+        .init_resource::<ArpgMinionsHud>()
         .net_handler(SessionEventKind::ArpgChampions, on_champions)
-        .net_handler(SessionEventKind::ArpgStates, on_states);
+        .net_handler(SessionEventKind::ArpgStates, on_states)
+        .net_handler(SessionEventKind::ArpgMinions, on_minions);
+}
+
+fn on_minions(In(ev): In<SessionEvent>, mut hud: ResMut<ArpgMinionsHud>) {
+    if let SessionEvent::ArpgMinions { minions } = ev {
+        hud.0 = minions;
+    }
 }
 
 fn on_states(In(ev): In<SessionEvent>, mut states: ResMut<ArpgEnemyStates>) {

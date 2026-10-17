@@ -227,6 +227,44 @@ end
 local healthOrb = makeOrb("ArpgHudHealthOrb", "BOTTOMLEFT", ORB_INSET)
 local powerOrb = makeOrb("ArpgHudPowerOrb", "BOTTOMRIGHT", -ORB_INSET)
 
+-- Fork-only: a warlock's demon and horde over the health orb (ArpgHud_Minions, pushed from
+-- actions.rs; the server's Arpg/ArpgMinions.h). The demon's health as a bar with its name, the
+-- horde as a count under it; both hide with neither.
+local minionBar = CreateFrame("StatusBar", "ArpgHudMinionBar", UIParent)
+minionBar:SetWidth(120)
+minionBar:SetHeight(10)
+minionBar:SetPoint("BOTTOM", healthOrb, "TOP", 0, 22)
+minionBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+minionBar:SetStatusBarColor(0.55, 0.2, 0.75)
+minionBar:SetMinMaxValues(0, 100)
+minionBar:SetValue(0)
+local minionBack = minionBar:CreateTexture(nil, "BACKGROUND")
+minionBack:SetAllPoints(minionBar)
+minionBack:SetTexture(0, 0, 0, 0.65)
+local minionName = minionBar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+minionName:SetPoint("CENTER", minionBar, "CENTER", 0, 0)
+local hordeText = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+hordeText:SetPoint("BOTTOM", healthOrb, "TOP", 0, 8)
+hordeText:SetTextColor(0.85, 0.6, 1.0)
+minionBar:Hide()
+hordeText:Hide()
+
+function ArpgHud_Minions(demon, health, horde, cap, demonName)
+    if demon and demon > 0 then
+        minionBar:SetValue(health or 0)
+        minionName:SetText(demonName or "")
+        minionBar:Show()
+    else
+        minionBar:Hide()
+    end
+    if horde and horde > 0 then
+        hordeText:SetText("Horde " .. horde .. "/" .. (cap or 0))
+        hordeText:Show()
+    else
+        hordeText:Hide()
+    end
+end
+
 -- Fork-only: the combo points over the power orb (ArpgHud_Combo, pushed from actions.rs). An ARPG
 -- character's points carry from enemy to enemy, so the count shows whatever is targeted; with
 -- none, the pips hide.

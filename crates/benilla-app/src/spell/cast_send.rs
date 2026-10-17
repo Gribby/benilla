@@ -413,7 +413,17 @@ fn send_spell_cast(
     // `CheckReagentsAndTotems 0x6e4000` (TryCast's `0x6e4ded`, before the validator call at
     // `0x6e4f3b`): a missing tool or reagent refuses with 0x78/0x5c. Local because vmangos answers
     // a pickless cast with `ITEM_GONE`.
-    if reagent_totem_refusal(spell_id, def, ctx.rel.self_store, objects, cast_errors) {
+    // Fork-only, not 1.12.1: an ARPG player's own class spells need no reagents (their totems
+    // still count).
+    let free_reagents = def.is_some_and(|d| spell_mods.arpg_free_reagents(d));
+    if reagent_totem_refusal(
+        spell_id,
+        def,
+        ctx.rel.self_store,
+        objects,
+        cast_errors,
+        free_reagents,
+    ) {
         return;
     }
     // The equipped-item requirement (`0x6e4e03`), the same search the button greying and tooltip

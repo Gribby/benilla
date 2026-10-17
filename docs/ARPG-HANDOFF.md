@@ -322,6 +322,14 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 
 ### Untested in game
 
+- **The warlock** (`ARPG-CHARACTER.md`, "The warlock, in full") and **the minion rules**
+  (`Arpg/ArpgMinions.h`). Check:
+  - the demon follows and fights what you fight, and the horde's imps throw Firebolts;
+  - Inferno's Infernal stays friendly for its minute, and Ritual of Doom summons a Doomguard with
+    no party;
+  - the HUD's demon bar and horde count;
+  - "<name> (minion)" lines and `minionPct` in the statistics;
+  - the server log for talent names the web could not find, and for "no spell of Inferno".
 - **Instant casting and the melee pass** (`ARPG-CHARACTER.md`, "Casting" and "Melee"): spells
   cast on the move and recover for their old cast time, which cooldown reduction cuts; melee
   swings twice as fast at half each, cleaves 40% in front, Fortifies (15% less damage taken) and
