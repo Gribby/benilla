@@ -53,6 +53,9 @@ Settled; don't re-ask.
 - **Uniques:** every vanilla named blue and purple is a unique. Each has fixed affixes and its own
   power. Rolled drops are never uniques.
 - **Drop target:** about one purple and one unique every other dungeon run.
+- **No class-only vanilla items (2026-10-18).** Priest robes, tier pieces and the like are open
+  to every class; the server lifts each vanilla item's class restriction at load. Only the ARPG
+  sets keep one class each.
 
 **World**
 - **No quest glows or markers,** anywhere.
