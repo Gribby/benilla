@@ -123,6 +123,8 @@ subtitle window opens, and the next line, the scene's end or a skip cuts it. A l
 the server must outlast its clip, so a new recording usually means retiming the scene in
 `ArpgScenes.cpp` (its camera keys and cues with it). Recorded so far: McBride's three lines and
 Hogger's; a line with no clip stays a subtitle.
+The clips are normalised to −18 LUFS integrated, true peak −1.5 dB (ffmpeg's two-pass
+`loudnorm`), as the raw takes come in near −44 LUFS and play too quietly beside the game's own sounds.
 
 ### Dev notes
 
