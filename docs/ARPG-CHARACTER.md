@@ -1531,6 +1531,10 @@ Dead's skeletons (`Arpg/ArpgMinions.h`).
   | Voidwalker | builds Daze with its physical blows |
 
 - **Horde imps** throw a Firebolt every 2 sec.
+- **They hold the enemy's eye:** a minion's hit is worth 4 times its damage in threat, so a pack
+  turns on the demons and not on the warlock behind them.
+- **Your demon comes back with you:** dying with a demon out, it returns as you rise at your
+  checkpoint (Fel Domination brings it back after its own death in a fight).
 - **Their own stats,** from a new affix pool (frozen like the others, so old items keep theirs):
   - +% Minion damage;
   - +% Minion life;

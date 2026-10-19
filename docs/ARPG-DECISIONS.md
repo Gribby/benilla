@@ -171,3 +171,11 @@ What the statistics showed, and what changed.
     - swing mana halved with the pace.
   - **Statistics:** the session line now carries the build (weapon, swing time, defences, each
     skill's nodes), to tell build problems from balance problems.
+- **2026-10-19 (warlock, levels 8–14, Elwynn).**
+  - The warlock died 4–5 times in 20 minutes, the mage and paladin never. Every death was a melee
+    pack on a 200–280 health warlock while the horde imps stood back: enemies chased the warlock,
+    whose damage held their threat. The one session with the Voidwalker out had no deaths.
+  - So minions' hits now draw 4 times their damage in threat, and a demon out at a death comes
+    back as the warlock rises. If it is still fragile, a warlock defence layer comes next.
+  - Minion share of damage reached 27% (Imp Gate 3, Imp Swarm 1) by level 14.
+  - A crash: horde minions lacked `UNIT_FLAG_PLAYER_CONTROLLED` (fixed; `ARPG-HANDOFF.md`).
