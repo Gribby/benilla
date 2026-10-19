@@ -263,6 +263,13 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 
 - **MSVC macros:** never name an identifier `near`, `far` or `small`. Windows headers define
   them, so Jeff's build breaks while the Linux build passes. Grep new code before committing.
+- **A creature a player owns must be `UNIT_FLAG_PLAYER_CONTROLLED`.** Without it, the minion
+  engaging an enemy makes `Unit::SetInCombatState` treat the player owner as an AI-run master,
+  and an assert kills the server (`Arpg::AdoptHorde` sets it). Any new summon given a player
+  owner needs the flag too.
+- **Reading a server crash:** a failed `MANGOS_ASSERT` writes `ASSERT FAILED: ...` to
+  `Server.log` and `Crashes\asserts.txt`, and Release builds ship `mangosd.pdb`, so the report in
+  `Crashes\` names each function. Ask Jeff for both files.
 - **Lua 5.0** in `arpg_hud.lua`:
   - no `#` length operator and no `%` operator: use `table.getn` and `math.mod`;
   - handlers use `this` and `arg1`;
