@@ -112,12 +112,17 @@ server ends it anyway five seconds past its length. Each plays once per characte
 
 | Scene | When | Around |
 |---|---|---|
-| Act I opens (Alliance) | Taking The Northshire Watch | Marshal McBride, 16 s |
+| Act I opens (Alliance) | Taking The Northshire Watch | Marshal McBride, 23.5 s, voiced |
 | Act I opens (Horde) | Taking The Trial of the Valley | Gornek, 16 s |
-| Hogger | First coming within 40 yards of him on his quest | Hogger, 9.5 s |
+| Hogger | First coming within 40 yards of him on his quest | Hogger, 9.5 s, voiced |
 | Zalazane | First coming within 40 yards of him on his quest | Zalazane, 9.5 s |
 
-Subtitles only for now; the voice can ride the same message later.
+**Voice.** Jeff records the lines. Each clip ships inside the client (`assets/voice/`) and the
+client's `sound/scene_voice.rs` keys it by scene id and line index: a line speaks its clip as its
+subtitle window opens, and the next line, the scene's end or a skip cuts it. A line's window on
+the server must outlast its clip, so a new recording usually means retiming the scene in
+`ArpgScenes.cpp` (its camera keys and cues with it). Recorded so far: McBride's three lines and
+Hogger's; a line with no clip stays a subtitle.
 
 ### Dev notes
 
@@ -137,7 +142,7 @@ or too crowded while walking it.
 | Chapter 3 | Redridge, Duskwood; Stonetalon, Ashenvale; both ending in Silverpine |
 | Finale | Arugal in Shadowfang Keep as an act boss: telegraphs, worgen waves, an enrage; the act's Cache |
 | More scenes | Chapter hand-offs (into Westfall, the Barrens), Arugal; a dev tool to record camera keys while flying |
-| Voice | Deferred |
+| Voice | Gornek's and Zalazane's scene lines; the quest givers' lines if Jeff wants them |
 
 ## The plan for chapters 2 and 3
 

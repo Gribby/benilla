@@ -36,6 +36,7 @@ mod net;
 pub(crate) mod output;
 mod probe;
 mod reverb;
+mod scene_voice;
 mod sheathe;
 mod spell;
 mod ui;
@@ -232,12 +233,13 @@ pub(crate) struct SoundOutput {
     /// The `$WOW_SOUND_PROBE` recorder, here so the kit player can stamp every play.
     pub(crate) probe: Option<probe::Probe>,
     /// Live stream voices, rewritten each frame by their owners ([`zone`], [`glue`],
-    /// [`cinematic`]). They count against [`kit::SOFTWARE_CHANNELS`] like any sound: the
+    /// [`cinematic`], [`scene_voice`]). They count against [`kit::SOFTWARE_CHANNELS`] like any sound: the
     /// reference's music and ambience occupy FMOD channels too. One field per owner, since a
     /// shared counter with several writers drifts.
     pub(crate) zone_streams: usize,
     pub(crate) glue_streams: usize,
     pub(crate) cinematic_streams: usize,
+    pub(crate) scene_streams: usize,
     /// One-shots that lost their slot to a louder newcomer, and plays refused because nothing
     /// live was quieter.
     pub(crate) voices_stolen: u64,
@@ -249,7 +251,11 @@ pub(crate) struct SoundOutput {
 impl SoundOutput {
     /// Everything the device is mixing, the number [`kit::SOFTWARE_CHANNELS`] bounds.
     pub(crate) fn live_voices(&self) -> usize {
-        self.channels.len() + self.zone_streams + self.glue_streams + self.cinematic_streams
+        self.channels.len()
+            + self.zone_streams
+            + self.glue_streams
+            + self.cinematic_streams
+            + self.scene_streams
     }
 }
 
@@ -382,6 +388,7 @@ impl Plugin for SoundPlugin {
             zone_streams: 0,
             glue_streams: 0,
             cinematic_streams: 0,
+            scene_streams: 0,
             voices_stolen: 0,
             voices_denied: 0,
             copies_dropped: 0,
@@ -413,6 +420,7 @@ impl Plugin for SoundPlugin {
         liquid_loop::plugin(app);
         zone::plugin(app);
         cinematic::plugin(app);
+        scene_voice::plugin(app);
         gameobject::plugin(app);
         anim_events::plugin(app);
         emitter_pool::plugin(app);

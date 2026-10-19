@@ -65,7 +65,11 @@ Settled; don't re-ask.
 - **Level-up fanfare:** a banner that lists the level's gains and new spells.
 - Scenes play at the act's key moments (`ARPG-ACT-1.md`).
 
-**Deferred:** voice acting, a weekly raid objective, and the camera's per-room cutaway.
+**Voice (2026-10-19):** Jeff records the scenes' lines himself (McBride and Hogger first), and the
+written line follows the take: McBride's third is now "YOU! $N! Clear them out, and bring me
+Garrick Padfoot!".
+
+**Deferred:** a weekly raid objective, and the camera's per-room cutaway.
 
 **Working agreements**
 - Make the reasonable call, say what was chosen, and keep going. Ask only for decisions that are
