@@ -81,6 +81,17 @@ fn is_instrument_consumer(rel: &str) -> bool {
 /// The designed API: every engine item game code may name, with the record that published it
 /// (`wall`: published without one). Adding a row is a claim made in review, with its record.
 const PUBLISHED: &[(&str, &str)] = &[
+    // Fork-only, the ARPG view's engine seams (docs/ARPG-HANDOFF.md): its bloom, its hit flash,
+    // the see-through walls, the telegraphs' ground art, and the cursor's mesh picking.
+    ("cutaway::Cutaway", "record"),
+    ("cutaway::PickThrough", "record"),
+    ("cutaway::SeedFromViewer", "record"),
+    ("ffx_glow::FfxBloom", "record"),
+    ("ground_fx::spawn_ground_fx_decal", "record"),
+    ("instance_tint::with_flash", "record"),
+    ("interact::PickParts", "record"),
+    ("interact::ray_mesh_bounds", "record"),
+    ("interact::ray_posed_mesh", "record"),
     ("bgwin::BgWinPlugin", "wall"),
     ("bgwin::background_run", "record"),
     ("bgwin::no_pixel_run", "record"),
