@@ -166,7 +166,10 @@ damage size at its level × (1 + 0.5 × level ÷ 60), and a raid's again × (1 +
 after it spawns and again when a fight starts with a different player count or tier, keeping its
 share of health. Caps, melee / spell (DoT ticks as melee): trash 6% / 12%, champions, rares and
 open-world elites 9% / 15%, dungeon bosses 12% / 30%, raid and world bosses 15% / 35%; ordinary
-open-world mobs are uncapped. **The level gap** moves every creature hit on an ARPG player and its
+open-world mobs are uncapped. The tier, the level gap and the difficulty raise the caps, but never
+past a ceiling for anything but a boss: trash 12% / 20%, champions, rares and open-world elites
+16% / 25% (2026-10-21: Razorfen Kraul's Geomancers had been landing Lightning Bolts for 40% of a
+mage's health on a high tier). **The level gap** moves every creature hit on an ARPG player and its
 cap: 10% less per level the player is above the creature (to 40%), 5% more per level below (to
 +25%). Without it a cap that follows the player's own health made out-levelling a dungeon do
 nothing: Van Cleef at 24 hit as hard, as a share of health, as at 18. A boss is rank 3, a ScriptDev `boss_` script, or in a dungeon a
