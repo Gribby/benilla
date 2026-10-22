@@ -17,6 +17,7 @@ pub mod column_grid;
 pub mod coords;
 pub mod materials;
 pub mod minimap_grid;
+pub mod rift;
 mod spatial_cache;
 pub mod trace;
 
@@ -84,6 +85,10 @@ impl AssetReader for MpqAssetReader {
         // The sampler-mode marker (`texture_url`) names the asset, not the archive file.
         let stripped = strip_sampler_marker(raw);
         let internal = stripped.as_deref().unwrap_or(raw);
+        // An ARPG rift's tile: the ADT loader builds it from its layout (`rift`).
+        if rift::serves(internal) {
+            return Ok(VecReader::new(rift::PLACEHOLDER.to_vec()));
+        }
         if !self.chain.contains(internal) {
             return Err(AssetReaderError::NotFound(path.to_path_buf()));
         }

@@ -1,7 +1,8 @@
 # Random areas, Diablo II's way
 
-An exploration (2026-10-22), not yet built: what Diablo II does, what our two engines allow, and
-a plan in phases. Read with `ARPG-PROGRESSION.md` (dungeons, tiers, nightmares).
+An exploration (2026-10-22): what Diablo II does, what our two engines allow, and a plan in
+phases. Phase 1 is built as the **Elwynn Rift** ("Built: the Elwynn Rift", below). Read with
+`ARPG-PROGRESSION.md` (dungeons, tiers, nightmares).
 
 ## What Diablo II does
 
@@ -108,9 +109,55 @@ Phase 1 is a few focused working sessions. The risk is visual: seams and pieces 
 pasted. The tile library's choices (flat ground, one zone's style per area type) are what keep it
 from looking like a quilt.
 
-## For Jeff
+## Built: the Elwynn Rift
 
-- **Where they sit:** a separate "Rift" you enter from a portal or a dungeon menu (D3's Rifts,
-  D4's dungeons), or areas on the act's road between zones (D2's way)?
-- **Which zones' look first?** The Barrens' plains are the easiest (flat, open); Duskwood or
-  Felwood look better with tree walls.
+Jeff's call: modular pieces, randomly laid out, Elwynn-themed first. Where they sit was left open;
+the choice made was a separate Rift entered from a stone (Diablo III's Rifts), so the act's roads
+stay as they are.
+
+**Entry.** A **Rift Stone** (a portal's look, named "Elwynn Rift") stands in Goldshire and in
+Razor Hill, placed when an ARPG character comes near. Stepping onto it makes a new rift and
+takes the character in; party members who step on it while one of theirs is inside join that
+rift. A **Rift Exit** stands at the far end, guarded by a rare, and leads back to the stone.
+Dying releases to Goldshire (the instance's ghost entrance), and the ARPG respawn uses the
+rift's start.
+
+**The map.** Map 520, in no DBC: the server inserts its `Map.dbc` row and its
+`instance_template` row at start (a party instance, levels 1–60, five players); the client adds
+it to its map catalog. Each layout fills a block of 2×2 grids of that map; instances' blocks
+differ (256 of them, a grid apart), so every instance shares the map's terrain without meeting.
+
+**The pieces (server, `Arpg/ArpgRift.cpp`).** Built once, on the first entry, from the server's
+own map 0 `.map` grids over Elwynn: every square of 2×2 chunks (about 67 yards) whose chunks are
+in Elwynn but not Northshire, Goldshire or Stormwind, with no water and no holes. A piece keeps its
+relief (heights less its mean) and is flat when its rise is 10 yards or less.
+
+**A layout:**
+- the open region: a 32×32-chunk field (about 1070 yards a side), a 2-chunk closed border, a
+  cellular automaton (52% open, five passes of the 5-of-9 rule), its largest region kept (200
+  chunks at least, else rolled again): clearings joined by paths, with loops;
+- the start on its west side, the exit the farthest walk from it;
+- a piece for each 2×2 chunks: a flat one where any chunk is open, any one elsewhere;
+- heights: base 60, plus each piece's relief (shared edges averaged, three blend passes within 3
+  nodes of a seam), plus hills of up to 42 yards (uneven along their length) rising steeply where
+  the region is closed. The walls are the closed pieces' trees on steep ground, as Diablo II's
+  are cliffs and tree lines;
+- 20 packs of Elwynn's hostile natives (`NativesWithin`) on open chunks at least 6 chunks' walk
+  from the start, at the character's level, formed as the road's packs are (champions and rares
+  by chance, a shrine beside some); a rare a level up at the exit.
+
+**The client (`benilla-assets` `rift.rs`).** `SMSG_ARPG_RIFT` brings the layout: a header (the
+block, the pieces' sources) and the heights in bands of 32 rows. Once whole, the layout is
+published and map 520's directory becomes `ArpgRift<id>`, so the terrain stream drops the old
+rift's tiles and requests the new one's by itself. The MPQ reader answers those tiles with a
+placeholder, and the ADT loader builds each one: every chunk is the real Elwynn chunk (texture
+layers, alpha, baked shadow, ground clutter) moved into place, its vertices on the sent heights
+(inner ones the mean of their corners, as the server's are), its normals from the whole height
+field so seams light alike; the doodads whose centre stands on it move with it, raised or lowered
+by the ground's change, under rift-only ids. No buildings, no water.
+
+**Limits for now:** no vmaps or mmaps for the rift, so creatures walk straight and see through
+trees; the stones' spots are first guesses (`STONES` in `ArpgRift.cpp`); the rift's light is
+whatever the client's lighting gives a map with no `Light.dbc` rows. Phase 2 (more area types,
+navmeshes, a revealing map) stands as planned.
+

@@ -77,6 +77,7 @@ pub fn decode(packet: ServerPacket) -> Vec<SessionEvent> {
         ServerPacket::ArpgStates(states) => vec![SessionEvent::ArpgStates { states }],
         ServerPacket::ArpgMinions(minions) => vec![SessionEvent::ArpgMinions { minions }],
         ServerPacket::ArpgBoons(boons) => vec![SessionEvent::ArpgBoons { boons }],
+        ServerPacket::ArpgRift(rift) => vec![SessionEvent::ArpgRift { rift }],
         ServerPacket::Weather {
             weather_type,
             grade,

@@ -106,6 +106,14 @@ impl MapCatalog {
         self.dirs.len()
     }
 
+    /// Define or redefine a map no `Map.dbc` row names (the ARPG rifts'), or point it at another
+    /// directory: its directory, display name and `InstanceType`.
+    pub fn set_map(&mut self, map_id: u32, dir: &str, name: &str, instance_type: u32) {
+        self.dirs.insert(map_id, dir.to_string());
+        self.names.insert(map_id, name.to_string());
+        self.instance_types.insert(map_id, instance_type);
+    }
+
     pub fn is_empty(&self) -> bool {
         self.dirs.is_empty()
     }

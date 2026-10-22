@@ -1023,6 +1023,95 @@ pub fn read_arpg_boons(r: &mut impl io::Read) -> io::Result<ArpgBoons> {
     })
 }
 
+/// A rift's layout and heights (cmangos `Arpg/ArpgRift.h`), sent before the player enters.
+pub const SMSG_ARPG_RIFT: u16 = 0x0356;
+
+/// `SMSG_ARPG_RIFT`: a layout's header, or a band of its heights.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ArpgRift {
+    Layout(ArpgRiftLayout),
+    Heights(ArpgRiftHeights),
+}
+
+/// Kind 1: which source square each piece is.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgRiftLayout {
+    pub id: u32,
+    /// The block's first server grid (`gx` along WoW X).
+    pub gx0: u8,
+    pub gy0: u8,
+    /// Outer heights a side (257).
+    pub nodes: u16,
+    /// The `AreaTable` id of its ground.
+    pub area: u16,
+    /// What the heights are offset from.
+    pub base: f32,
+    /// 16×16, i-major: source grid `gx`, `gy`, first chunk `a` (along X), `b`.
+    pub pieces: Vec<[u8; 4]>,
+}
+
+/// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
+/// a yard over the layout's base.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ArpgRiftHeights {
+    pub id: u32,
+    pub first_row: u16,
+    pub rows: u16,
+    pub values: Vec<i16>,
+}
+
+/// `SMSG_ARPG_RIFT`: `u8` kind; kind 1: `u32` id, `u8` gx0, `u8` gy0, `u16` nodes, `u16` area,
+/// `f32` base, then 256 × `u8` gx, gy, a, b; kind 2: `u32` id, `u16` first row, `u16` rows, then
+/// rows × 257 `i16`.
+pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
+    match read_u8(r)? {
+        1 => {
+            let id = read_u32_le(r)?;
+            let gx0 = read_u8(r)?;
+            let gy0 = read_u8(r)?;
+            let nodes = read_u16_le(r)?;
+            let area = read_u16_le(r)?;
+            let base = read_f32_le(r)?;
+            let mut pieces = Vec::with_capacity(256);
+            for _ in 0..256 {
+                pieces.push([read_u8(r)?, read_u8(r)?, read_u8(r)?, read_u8(r)?]);
+            }
+            Ok(ArpgRift::Layout(ArpgRiftLayout {
+                id,
+                gx0,
+                gy0,
+                nodes,
+                area,
+                base,
+                pieces,
+            }))
+        }
+        2 => {
+            let id = read_u32_le(r)?;
+            let first_row = read_u16_le(r)?;
+            let rows = read_u16_le(r)?;
+            let n = usize::from(rows) * 257;
+            if n > 257 * 257 {
+                return Err(io::Error::new(io::ErrorKind::InvalidData, "rift rows"));
+            }
+            let mut values = Vec::with_capacity(n);
+            for _ in 0..n {
+                values.push(read_i16_le(r)?);
+            }
+            Ok(ArpgRift::Heights(ArpgRiftHeights {
+                id,
+                first_row,
+                rows,
+                values,
+            }))
+        }
+        k => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("rift kind {k}"),
+        )),
+    }
+}
+
 /// One telegraph: where it lands and when.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ArpgTelegraph {

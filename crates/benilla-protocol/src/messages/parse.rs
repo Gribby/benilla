@@ -552,6 +552,7 @@ fn parse_server_body(
         super::arpg::SMSG_ARPG_BOONS => {
             ServerPacket::ArpgBoons(super::arpg::read_arpg_boons(&mut r)?)
         }
+        super::arpg::SMSG_ARPG_RIFT => ServerPacket::ArpgRift(super::arpg::read_arpg_rift(&mut r)?),
         super::arpg::SMSG_ARPG_SCENE => {
             ServerPacket::ArpgScene(super::arpg::read_arpg_scene(&mut r)?)
         }

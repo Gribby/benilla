@@ -75,8 +75,19 @@ fn load_world_map(mut commands: Commands, world_assets: Option<Res<WorldAssets>>
     };
     let mut chain = world_assets.chain.lock_recover();
     match load_map_catalog(&mut chain) {
-        Ok(c) => {
+        Ok(mut c) => {
             info!("Map.dbc: {} maps catalogued", c.len());
+            // The ARPG rifts' map, in no DBC: a party instance whose tiles stream from the
+            // directory its layout names (`benilla_assets::rift`), none until one arrives.
+            let rift = benilla_assets::rift::RIFT_MAP;
+            if c.directory(rift).is_none() {
+                c.set_map(
+                    rift,
+                    &benilla_assets::rift::rift_dir(0),
+                    benilla_assets::rift::RIFT_NAME,
+                    1,
+                );
+            }
             commands.insert_resource(MapCatalogRes(c));
             // `$WOW_MAP` picks a server-less run's map (a named capture scenario sets it before
             // `Startup`); a live session's `player::wire_in` overwrites it from the server.

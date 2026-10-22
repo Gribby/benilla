@@ -69,6 +69,10 @@ Settled; don't re-ask.
 written line follows the take: McBride's third is now "YOU! $N! Clear them out, and bring me
 Garrick Padfoot!".
 
+**Random areas (2026-10-22):** modular, random outdoor areas in Diablo II's way, and the first is
+**Elwynn-themed**: a Rift entered from a Rift Stone (Goldshire, and Razor Hill for the Horde),
+each entry a new layout of 2×2-chunk pieces of Elwynn's own ground (`ARPG-RANDOM-AREAS.md`).
+
 **Deferred:** a weekly raid objective, and the camera's per-room cutaway.
 
 **Working agreements**

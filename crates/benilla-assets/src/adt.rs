@@ -143,7 +143,11 @@ impl AssetLoader for AdtLoader {
         let mut bytes = Vec::new();
         reader.read_to_end(&mut bytes).await?;
         let to_io = |e: anyhow::Error| std::io::Error::other(format!("{e:#}"));
-        let tile = adt_to_tile_mesh(&bytes).map_err(to_io)?;
+        let tile = if bytes == crate::rift::PLACEHOLDER {
+            rift_tile(ctx).await?
+        } else {
+            adt_to_tile_mesh(&bytes).map_err(to_io)?
+        };
 
         // Layer array: a solid-green fallback at index 0, then each unique layer texture, packed
         // once the whole tile is read.
@@ -242,6 +246,20 @@ impl AssetLoader for AdtLoader {
     fn extensions(&self) -> &[&str] {
         &["adt"]
     }
+}
+
+/// An ARPG rift's tile, built from its layout and the source tiles' chunks (`crate::rift`).
+async fn rift_tile(ctx: &mut LoadContext<'_>) -> std::io::Result<benilla_formats::TileMesh> {
+    let path = ctx.path().path().to_string_lossy().into_owned();
+    let not_found = || std::io::Error::other(format!("rift tile {path}: no layout"));
+    let (id, tx, ty) = crate::rift::parse_rift_path(&path).ok_or_else(not_found)?;
+    let layout = crate::rift::layout(id).ok_or_else(not_found)?;
+    let mut composer = crate::rift::RiftComposer::new(layout, tx, ty).ok_or_else(not_found)?;
+    while let Some(source) = composer.next_source() {
+        let bytes = ctx.read_asset_bytes(mpq_url(&source)).await.ok();
+        composer.feed(bytes.as_deref());
+    }
+    Ok(composer.finish())
 }
 
 /// Read a layer texture with its blocks intact, preferring the `_s` specular variant (sheen mask in

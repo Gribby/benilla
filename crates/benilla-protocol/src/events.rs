@@ -495,6 +495,10 @@ pub enum SessionEvent {
     ArpgBoons {
         boons: crate::messages::arpg::ArpgBoons,
     },
+    /// Fork-only, not 1.12.1: a rift's layout or a band of its heights (`SMSG_ARPG_RIFT`).
+    ArpgRift {
+        rift: crate::messages::arpg::ArpgRift,
+    },
     /// Fork-only, not 1.12.1: nearby enemies' states, as they change (`SMSG_ARPG_STATES`).
     ArpgStates {
         states: Vec<crate::messages::arpg::ArpgUnitStates>,

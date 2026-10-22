@@ -81,6 +81,9 @@ impl WmoCrossfade {
     }
 }
 
+/// Where an ARPG rift takes its light: Goldshire, Elwynn Forest.
+const RIFT_LIGHT_AT: [f32; 3] = [-9460.0, 60.0, 57.0];
+
 /// Loads `Light.dbc` into the [`LightSampler`] and seeds [`WowLighting`] with spawn-zone noon for
 /// frame 0; without client data it stays default.
 pub(super) fn setup_lighting(
@@ -221,6 +224,13 @@ pub(super) fn update_time_lighting(
     // The map must be the current continent: `Light.dbc` spheres are filtered by continent, and
     // the wrong map falls back to the other continent's global light.
     let map = current_map.as_ref().map_or(0, |m| m.0);
+    // An ARPG rift is cut from Elwynn Forest and lit as it is, at Goldshire (`Light.dbc` has no
+    // rows for its map).
+    let (map, wow_pos) = if map == benilla_assets::rift::RIFT_MAP {
+        (0, RIFT_LIGHT_AT)
+    } else {
+        (map, wow_pos)
+    };
     // Submerged, the underwater `LightParams` (slot 1) replaces the atmosphere for every consumer;
     // the reference switches the active param and draws no overlay.
     let submerged = eye_liquid.submersion();
