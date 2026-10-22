@@ -118,7 +118,7 @@ stay as they are.
 **Entry.** A **Rift Stone** (a portal's look, named "Elwynn Rift") stands in Goldshire and in
 Razor Hill, placed when an ARPG character comes near. Stepping onto it makes a new rift and
 takes the character in; party members who step on it while one of theirs is inside join that
-rift. A **Rift Exit** stands at the far end, guarded by a rare, and leads back to the stone.
+rift (the world thread binds them to its instance before the teleport). A **Rift Exit** stands at the far end, guarded by a rare, and leads back to the stone.
 Dying releases to Goldshire (the instance's ghost entrance), and the ARPG respawn uses the
 rift's start.
 
@@ -157,7 +157,8 @@ field so seams light alike; the doodads whose centre stands on it move with it, 
 by the ground's change, under rift-only ids. No buildings, no water.
 
 **Limits for now:** no vmaps or mmaps for the rift, so creatures walk straight and see through
-trees; the stones' spots are first guesses (`STONES` in `ArpgRift.cpp`); the rift's light is
+trees; a ghost released in a rift goes to Goldshire's graveyard side (the instance's one ghost
+entrance, the Horde's too), with no way back to the corpse but the spirit healer; the stones' spots are first guesses (`STONES` in `ArpgRift.cpp`); the rift's light is
 whatever the client's lighting gives a map with no `Light.dbc` rows. Phase 2 (more area types,
 navmeshes, a revealing map) stands as planned.
 

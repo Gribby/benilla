@@ -257,7 +257,10 @@ impl RiftComposer {
     }
 
     /// The tile: its chunks and doodads, no buildings.
-    pub fn finish(self) -> TileMesh {
+    pub fn finish(mut self) -> TileMesh {
+        // MCIN order (row by row from the north-west), which `chunk_at` assumes of a whole tile;
+        // the chunks were placed grouped by source.
+        self.chunks.sort_by_key(|c| c.index_y * 16 + c.index_x);
         TileMesh {
             chunks: self.chunks,
             doodads: self.doodads,
@@ -435,15 +438,21 @@ mod tests {
     }
 
     #[test]
-    fn a_placed_chunk_sits_on_the_lattice_under_the_sent_heights() {
-        let mut layout = flat_layout(60.0);
-        // A slope along i: each node a yard higher.
-        for i in 0..RIFT_NODES {
-            for j in 0..RIFT_NODES {
-                layout.heights[i * RIFT_NODES + j] = 60.0 + i as f32;
-            }
+    fn a_composed_tile_keeps_its_chunks_in_mcin_order() {
+        let layout = Arc::new(flat_layout(60.0));
+        let mut composer = RiftComposer::new(layout.clone(), 23, 20).expect("covered");
+        let src = blank_chunk();
+        // Placed out of order, as sources group them.
+        for (la, lb) in [(5, 9), (0, 0), (15, 1), (0, 15)] {
+            composer.chunks.push(place_chunk(&layout, &src, la, lb));
         }
-        let src = ChunkMesh {
+        let tile = composer.finish();
+        let order: Vec<(u32, u32)> = tile.chunks.iter().map(|c| (c.index_y, c.index_x)).collect();
+        assert_eq!(order, vec![(0, 0), (0, 15), (5, 9), (15, 1)]);
+    }
+
+    fn blank_chunk() -> ChunkMesh {
+        ChunkMesh {
             positions: vec![[0.0, 0.0, 0.0]; 145],
             normals: Vec::new(),
             uvs: vec![[0.0, 0.0]; 145],
@@ -461,7 +470,19 @@ mod tests {
             area_id: 40,
             impassable: true,
             liquids: Vec::new(),
-        };
+        }
+    }
+
+    #[test]
+    fn a_placed_chunk_sits_on_the_lattice_under_the_sent_heights() {
+        let mut layout = flat_layout(60.0);
+        // A slope along i: each node a yard higher.
+        for i in 0..RIFT_NODES {
+            for j in 0..RIFT_NODES {
+                layout.heights[i * RIFT_NODES + j] = 60.0 + i as f32;
+            }
+        }
+        let src = blank_chunk();
         let chunk = place_chunk(&layout, &src, 17, 3);
         // The corner: grid 21's chunk 1 along X, grid 23's chunk 3 along Y.
         let nw = chunk.positions[0];
