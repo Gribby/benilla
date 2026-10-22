@@ -388,14 +388,15 @@ pub(crate) fn reagent_totem_refusal(
     self_store: Option<&ObjectStore>,
     objects: &crate::net::Objects,
     errors: &mut CastErrors,
-    // Fork-only, not 1.12.1: the reagents are waived (an ARPG player's own class spell).
+    // Fork-only, not 1.12.1: the reagents and totem items are waived (an ARPG player's own class
+    // spell: a shaman's totems need no Earth, Fire, Water or Air Totem).
     free_reagents: bool,
 ) -> bool {
     let (Some(d), Some(store)) = (def, self_store) else {
         return false;
     };
     // Totems before reagents, the reference's order.
-    let reason = if first_missing_totem(d, store, objects).is_some() {
+    let reason = if !free_reagents && first_missing_totem(d, store, objects).is_some() {
         0x78
     } else if !free_reagents && first_short_reagent(d, store, objects).is_some() {
         0x5c
@@ -867,6 +868,17 @@ mod totem_reagent_tests {
             &objs.get(),
             &mut errors,
             false
+        ));
+        assert!(errors.0.is_empty());
+
+        // An ARPG player's own class spell waives both.
+        assert!(!reagent_totem_refusal(
+            1,
+            Some(&both),
+            Some(&st),
+            &objs.get(),
+            &mut errors,
+            true
         ));
         assert!(errors.0.is_empty());
     }

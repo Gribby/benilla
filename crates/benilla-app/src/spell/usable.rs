@@ -361,17 +361,18 @@ pub(crate) fn spell_usable(
     }
     // Leg 3 (`0x6e4000`): every reagent count carried, every totem tool present.
     let carried = |entry: u32| ctx.carried.get(&entry).copied().unwrap_or(0);
-    // Fork-only, not 1.12.1: an ARPG player's own class spells need no reagents.
+    // Fork-only, not 1.12.1: an ARPG player's own class spells need no reagents and no totem
+    // items (a shaman's totems).
     if !ctx.spell_mods.arpg_free_reagents(d) {
         for &(entry, count) in &d.reagents {
             if entry != 0 && carried(entry) < count {
                 return (false, false);
             }
         }
-    }
-    for &totem in &d.totems {
-        if totem != 0 && carried(totem) == 0 {
-            return (false, false);
+        for &totem in &d.totems {
+            if totem != 0 && carried(totem) == 0 {
+                return (false, false);
+            }
         }
     }
     // Leg 4 (`0x6e40e0`): some worn item matches the class and subclass mask.

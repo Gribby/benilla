@@ -136,6 +136,8 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgSynergy` | Trigger rows over the states: on a hit, crit, kill, state applied or consumed, apply / strike / burst / spread / daze; owned by a class, a skill-tree node or a worn unique, with cooldowns |
 | `ArpgScenes` | Short cutscenes: camera tracks authored around an anchor NPC, subtitles and emote cues, `SMSG_ARPG_SCENE`, played by the client's cinematic player and closed by `CMSG_COMPLETE_CINEMATIC`; once per character (`character_arpg_scene`) |
 | `ArpgBoons` | Barrier (a pool that takes blows before health, `BarrierAbsorb` in the core's absorb step) and boons (timed or standing named effects), `SMSG_ARPG_BOONS` |
+| `ArpgShrines` | Shrines beside packs and in dungeons: written game object templates (98000+), touched by walking onto them, each a boon |
+| `ArpgShaman` | The shaman's hooks: Shock and its payoffs, Windfury, the totems' nodes (totems are minions with the Totem tag), Walking Totems, Totemic Ward, Earthliving |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:
@@ -397,9 +399,6 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 - Stop enemies dodging and parrying ARPG players.
 
 **Not built yet:**
-- Druid, warlock and shaman (in that order): a web, six skills and keystone hooks each, as the
-  mage's ("The mage, in full" says how classes share the systems: node numbers 40-59, 60-79 and
-  80-99 within each skill's hundred).
 - Real item models on the ground.
 
 **Roadmap:**

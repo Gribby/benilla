@@ -51,13 +51,15 @@ const AURA_KEY: u32 = 0xA400_0000;
 /// The states' looks, for those the server keeps to itself (Chill, Freeze, Daze and stuns are real
 /// auras the client draws already): by state bit, the spells whose aura each wears, the first with
 /// a state kit in the client's data.
-const STATE_AURAS: [(u16, &[u32]); 6] = [
+const STATE_AURAS: [(u16, &[u32]); 8] = [
     (1 << 2, &[348, 2120, 133]),   // Ignited: Immolate, Flamestrike, Fireball
     (1 << 3, &[772, 703, 1822]),   // Bleeding: Rend, Garrote, Rake
     (1 << 4, &[2818, 1978, 5570]), // Poisoned: Deadly Poison, Serpent Sting, Insect Swarm
     (1 << 5, &[589, 172, 980]),    // Withered: Shadow Word: Pain, Corruption, Curse of Agony
     (1 << 6, &[2855, 12042]),      // Overloaded: Detect Magic, Arcane Power
     (1 << 7, &[21183, 20185, 20184]), // Judged: the Judgements' debuffs
+    (1 << 14, &[770, 16857]),      // Vulnerable: Faerie Fire's glow
+    (1 << 15, &[324, 325]),        // Shocked: Lightning Shield's orbs
 ];
 /// The state auras' keys, apart from the affixes'.
 const STATE_KEY: u32 = 0xA500_0000;

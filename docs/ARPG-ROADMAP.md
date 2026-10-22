@@ -34,7 +34,7 @@ has been tuned against real play.
 | Pillar | State | What is missing |
 |---|---|---|
 | Combat feel | First pass | Resource model, difficulty tuning, non-piercing projectiles, hit and kill polish from play |
-| Classes | 3 of 5 | Warlock, Shaman; the three built ones untested past the mid 20s |
+| Classes | 5 of 5 | The shaman unplayed (built 2026-10-22); the others untested past the mid 20s |
 | Build depth | Systems built | Numbers untuned; one skill carries each build (Fireball is ~100% of a mage's damage) |
 | Loot | Breadth built | Drop rates untuned; no stash, no crafting depth, sets only to 50 |
 | Journey 1-60 | Vanilla content, ARPG layer on top | Played to about 26; zone pacing, density and pacing past that unknown |

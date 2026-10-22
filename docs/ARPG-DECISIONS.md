@@ -12,8 +12,8 @@ Settled; don't re-ask.
 
 **Scope**
 - 1.0 is for Jeff and friends, played solo. There's no co-op tuning and no public server.
-- **Five classes, final: Paladin, Mage, Druid, Warlock, Shaman.** The first three are built. The
-  warlock is next, then the shaman (`ARPG-ROADMAP.md`, M2). Their branch ideas are in
+- **Five classes, final: Paladin, Mage, Druid, Warlock, Shaman.** All five are built (the shaman
+  on 2026-10-22; `ARPG-CHARACTER.md`, "The shaman, in full"). Their branch ideas are in
   `ARPG-SKILL-TREES.md`:
   - **Warlock:** Plaguebringer, Demonologist and Destroyer. Its keystone flavour is "every kill
     raises an imp".

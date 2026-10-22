@@ -29,7 +29,8 @@ state. cmangos `Arpg/ArpgStates.{h,cpp}`.
 | Scorched Ground | standing in a Flamestrike or Rain of Fire | (read only) | (read only) |
 | Frozen Ground | standing in a Blizzard | (read only) | (read only) |
 | Storm Ground | standing in a Hurricane | (read only) | (read only) |
-| **Vulnerable** | a set-up spell landing: Faerie Fire, Curse of Weakness, Recklessness, the Elements or Shadow, Hammer of Justice, Frost Nova, Judgement of the Crusader, Frost Shock, Earthbind, and the free fillers (Frostbolt, Wrath, Searing Pain) | takes 20% more damage from everything, 6 sec | (read only) |
+| **Vulnerable** | a set-up spell landing: Faerie Fire, Curse of Weakness, Recklessness, the Elements or Shadow, Hammer of Justice, Frost Nova, Judgement of the Crusader, Frost Shock, Earthbind, and the free fillers (Frostbolt, Wrath, Searing Pain, Lightning Bolt) | takes 20% more damage from everything, 6 sec | (read only) |
+| **Shocked** | the shaman's Lightning hits (Lightning Bolt, Chain Lightning, Stormstrike, Lightning Shield with Charged Shield), a stack each | takes 5% more damage from everything a stack, up to 4 (8 under Overcharge), 4 sec | Earth Shock: an extra hit of 25% of its own per stack |
 
 **Vulnerable** (Diablo IV's, 2026-10-21) is the set-up every class has: the debuff or control
 that opens a fight now pays, a fifth more damage from every source, the minions' included. It
@@ -221,6 +222,6 @@ A spread on a kill is sized as a hit of a tenth of the fallen's health.
 
 ## Next
 
-- The shaman (`ARPG-DECISIONS.md`): its own states' rules from the start (Overloaded, and the
-  totems' grounds).
+- The shaman's synergy rows (it has its class rules: Shock, Static Discharge, Elemental
+  Crossing, `ARPG-CHARACTER.md`), and the totems' grounds.
 - Unique rows for Dire Maul, Scholomance, Stratholme and the raids as the later acts come in.
