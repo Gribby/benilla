@@ -384,8 +384,8 @@ follower's share of health and damage.
   4 minutes in all.
 
 The final kill's corpse holds a cache: a green, a blue, a 20% purple, an 8% unique, 2-4 orbs and
-gold. Every ARPG player who fought in the event, or stands within 120 yards, gains 8% (purge),
-10% (hunt) or 12% (siege) of a level (gold at 60) and the event's bounty credit. Out of time, the
+gold. Every ARPG player who fought in the event, or stands within 120 yards, gains 3% (purge),
+3.5% (hunt) or 4% (siege) of a level (gold at 60) and the event's bounty credit. Out of time, the
 event fails and its summons go. The zone hears each start, wave, finish and failure in chat.
 
 The client shows the event in a tracker under the minimap: the objective and its progress, the
@@ -396,10 +396,13 @@ orange column of light stands over the spot until the event ends.
 
 **Bounties** belong to the zone you are in. Each zone gives three, which the tracker heads with
 the zone's name:
-- complete 2 of its events (30% of a level);
-- slay 20-30 of its creatures (none grey; 20%);
-- slay 2-4 of its champions or rares (25%), or, 35% of the time when a dungeon suits the zone's
-  level, defeat that dungeon's final boss (45%).
+- complete 2 of its events (10% of a level);
+- slay 20-30 of its creatures (none grey; 7%);
+- slay 2-4 of its champions or rares (8%), or, 35% of the time when a dungeon suits the zone's
+  level, defeat that dungeon's final boss (15%).
+
+(Their experience was cut to a third on 2026-10-22: kills alone came near the pace Jeff chose,
+and the bounties doubled it; `ARPG-DECISIONS.md`, "Tuning from play".)
 
 They are kept per zone, so going back finds them as you left them. A city, or a zone you have
 outlevelled by more than 5, has none. A dungeon keeps the bounties of the zone you entered it

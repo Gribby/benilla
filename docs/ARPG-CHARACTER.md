@@ -234,8 +234,8 @@ its own):
   each white swing and Seal of Righteousness hit is half: the same damage in twice the hits, so a
   two-hander swings every ~1.8 sec, not 3.6. Procs a minute (Seal of Command, weapon enchants,
   item procs) stay at the weapon's own rate.
-- **Cleave.** Every swing strikes the other enemies in front of it for 40% of the hit; Wide
-  Swing's ranks make it 55/70/85%.
+- **Cleave.** Every swing strikes the other enemies in front of it for 55% of the hit (40% until
+  2026-10-22); Wide Swing's ranks make it 70/85/100%.
 - **Fortify.** A swing that lands means 15% less damage taken for 4 sec.
 - **Life on hit.** A swing heals 1% of maximum health for each enemy it strikes, the first five.
 
@@ -616,12 +616,19 @@ Vanilla items keep their stats. On top of them, the ARPG layer adds:
     - *A shard* on an item adds its affix, when the affix fits the item and its rarity has room, or
       raises the value it already has a third of the way to the item's top.
     - An item takes four shard crafts in all; its tooltip counts them ("Forged 2/4").
+  - **Gambling**, Diablo IV's (2026-10-22): the Forge's bottom rows name sixteen slots (head,
+    chest, finger, a two-hand weapon...). A click spends gold on a random item for that slot near
+    the character's level, rolled as a drop is but with better odds: 4% unique, 14% purple, 36%
+    blue, the rest green. The price is 30 copper times the level squared (30 silver at 10, 4.8
+    gold at 40, about 11 gold at 60), shown on the Forge. Not in combat. It gives gold a use
+    beyond the vendors, and a way to chase a slot the drops keep missing.
   - A crafted item keeps its affixes as a list in place of its seed's
     (`character_arpg_item.affixes`, `forged`). An affix's id is its place in the list; new affixes
     only ever go on its end. The orbs' `item_template` rows (92001-92007) are written at start, as
     the Codex's are.
-  - `CMSG_ARPG_ACTION` kind 24: `u8` op (1-7 an orb, 8 salvage, 9 a shard), `u8` bag (255 the
-    equipped slots, 0 the backpack, 1-4 the bags), `u8` slot from 1, `u16` affix.
+  - `CMSG_ARPG_ACTION` kind 24: `u8` op (1-7 an orb, 8 salvage, 9 a shard, 10 a gamble), `u8`
+    bag (255 the equipped slots, 0 the backpack, 1-4 the bags), `u8` slot from 1, `u16` affix (a
+    gamble's slot kind, 1-16, with bag and slot 0).
     `SMSG_ARPG_PURSE` (0x34B): `u8` orb count, per orb `u8` id, `u16` held, cstring name and
     text; `u16` shard count, per shard `u16` affix, `u16` held, cstring name.
 - **Built (base items for the raids):** `Arpg/ArpgBases.{h,cpp}` on the server. Vanilla's whites
@@ -782,7 +789,7 @@ had read carried to the capstones that took their place (`ArpgSkills.cpp`, `TREE
 | Skill | Covers | Branches | Role |
 |---|---|---|---|
 | **Crusader** | The held swing and every Seal | Reach, Righteous, Zeal | Melee: a Seal is the swing's damage |
-| **Holy Light** | Holy Light, Flash of Light | Radiance, Retribution | Healing, and healing as offence |
+| **Holy Light** | Holy Light, Flash of Light | Radiance, Grace, Retribution | Healing, and healing as offence |
 | **Judgement** | Judgement | Chain, Burst, Verdict | Burst, chaining |
 | **Consecration** | Consecration | Ground, Smite, Refuge | Ground control |
 | **Hammers** | Hammer of Justice, Hammer of Wrath | Thrown, Stun, Execute | Stun and the thrown execute |
@@ -792,12 +799,15 @@ had read carried to the capstones that took their place (`ArpgSkills.cpp`, `TREE
 **[H]** a hook, **[Ail]** an ailment node: the skill's hits have that chance per rank to inflict
 the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled in
 `ArpgDamage.cpp`). A modifier on a two-spell skill can name one spell ("Hammer of Wrath" only).
+**[More]** a share of "more" damage for the skill's hits, its ticks and its minions' (`More` in
+`ArpgSkills.cpp`, read in `DamagePartsFor`; the sheet names it). Every tree holds 25-30 ranks
+against a skill's cap of 20, so filling one is a choice (2026-10-22).
 
 #### Crusader
 
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
-| Reach | Wide Swing [H] | 3 | Swings strike every other enemy in front for 55/70/85%, not the base 40% |
+| Reach | Wide Swing [H] | 3 | Swings strike every other enemy in front for 70/85/100%, not the base 55% |
 | Reach | Long Arm [H] | 2 | +1 yd melee reach per rank |
 | Reach | Heavy Hand [H] | 4 | 5% more Physical damage per rank with a two-hander |
 | Reach | Rending Strikes [Ail] | 3 | 8% per rank to cause Bleeding |
@@ -822,6 +832,8 @@ the ailment, whatever their own damage type (`Ail` in `ArpgSkills.cpp`, rolled i
 | Radiance | Swift Light [M] | 3 | -0.2 sec recovery per rank |
 | Radiance | **Crusader's Grace** [Syn] | 1 | A critical Judgement, Exorcism or Hammer of Wrath makes the next Holy Light or Flash of Light instant |
 | Radiance | **Dawnbringer** [H] | 1 | Heals on yourself also send half their amount as a Holy bolt |
+| Grace | Pure Light [M] | 3 | 10% less Holy Light and Flash of Light mana cost per rank |
+| Grace | Radiant Light [M] | 3 | Critical heals heal 20% more of their bonus per rank |
 | Retribution | Searing Radiance [H] | 3 | Heals strike the nearest enemy within 20 yd for 15% per rank |
 | Retribution | Judging Light [H] | 2 | Heals Judge every enemy within 8 yd, a hit of 25% per rank (3 sec) |
 | Retribution | Avenging Light [H] | 3 | Healing yourself: 5% more damage per rank for 5 sec |
@@ -850,6 +862,9 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 
 #### Consecration
 
+A paladin's Consecration deals 150% more, innately (2026-10-22): its ticks were a twentieth of a
+swing, for 22% of the mana.
+
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
 | Ground | Wide Blessing [M] | 4 | +10% radius per rank |
@@ -862,6 +877,8 @@ Lightforged (the web's keystone) a self-heal heals nothing but still strikes.
 | Refuge | Hallowed Ground [H] | 3 | 1% health a second per rank inside |
 | Refuge | Steadfast [H] | 1 | No stuns inside |
 | Refuge | **Martyr's Ward** [H] | 1 | Retribution Aura burns every enemy within 10 yd each second, doubled |
+| Smite | Devotion [M] | 3 | 10% less Consecration mana cost per rank (after Sacred Seal) |
+| Refuge | Zealous Ground [More] | 3 | 6% more Consecration damage per rank (after Martyr's Ward) |
 
 #### Hammers
 
@@ -1071,7 +1088,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Volley | **Flame Echo** [A] | 1 | Every 3rd Fireball echoes, at 70% |
 | Inferno | Searing Bolt [M] | 4 | 6% more damage per rank |
 | Inferno | Kindle [Ail] | 3 | 8% per rank to Ignite |
-| Inferno | Lingering Flame [M] | 3 | 15% more burn per rank |
+| Inferno | Lingering Flame [M] | 3 | Your Ignites burn 15% more per rank |
 | Inferno | **Pyroclasm** [H] | 1 | Critical hits explode for 60% within 8 yd |
 | Pyre | Quick Pyre [M] | 3 | -0.5 sec Pyroblast recovery per rank |
 | Pyre | **Hot Streak** [Syn] | 1 | A critical Fire Blast or Scorch makes the next Pyroblast instant |
@@ -1086,7 +1103,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Shards | Bitter Cold [M] | 4 | 6% more Frostbolt damage per rank |
 | Shards | Glacial Chain [A] | 2 | Chains to 1/2 more within 10 yd, at 50% |
 | Shards | **Echoing Frost** [A] | 1 | Every 3rd Frostbolt echoes, at 60% |
-| Winter | Deep Chill [Ail] | 3 | 10% per rank to chill (a critical hit on the chilled freezes) |
+| Winter | Deep Chill [Ail] | 3 | 10% per rank to deepen the cold: Freezes the Chilled, Chills the rest |
 | Winter | **Winter's Grasp** [Syn] | 1 | Frost Nova makes the next Frostbolt instant, and it shatters into 3 shards for 50% |
 | Winter | Razor Ice [M] | 3 | Critical strikes 20% more of their bonus per rank |
 | Winter | **Shatterstorm** [H] | 1 | Frostbolt on a frozen enemy shatters for 80% within 8 yd |
@@ -1108,7 +1125,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Flux | **Arcane Echoes** [Syn] | 1 | A critical Arcane Explosion makes the next Arcane Missiles free, each missile jumping to 1 more for 50% |
 | Flux | **Overcharge** [H] | 1 | Your Overload bursts deal 40% more |
 | Focus | Focused Mind [M] | 3 | Critical strikes 15% more of their bonus per rank |
-| Focus | Long Reach [M] | 2 | +10% range per rank |
+| Focus | Lingering Barrage [M] | 2 | +1 sec channel per rank: one more missile |
 | Focus | **Arcane Siphon** [H] | 1 | Each missile that hits restores 0.5% of maximum mana |
 
 #### Arcane Explosion
@@ -1125,6 +1142,7 @@ Six skills for five slots, like the paladin's. The hooks are in `ArpgMage.cpp`.
 | Mana | Mana Efficiency [M] | 3 | 10% less mana cost per rank |
 | Mana | **Resonance** [Syn] | 1 | A critical Arcane Missile makes the next Arcane Explosion 50% wider |
 | Mana | **Mana Burst** [H] | 1 | 1% of maximum mana per enemy hit, 5% at most a cast |
+| Mana | Arcane Mastery [More] | 4 | 6% more Arcane Explosion damage per rank |
 
 #### Storms
 
@@ -1286,7 +1304,7 @@ Six skills for five slots. The hooks are in `ArpgDruid.cpp`.
 |---|---|---|---|
 | **Wrath** | Wrath, Starfire | Volley, Starfall, Grace | The bolts: split, chain, Starfire bursts |
 | **Moonfire** | Moonfire, Insect Swarm | Lunar, Swarm, Moonglow | Damage over time that spreads |
-| **Hurricane** | Hurricane | Gale, Hail | The storm |
+| **Hurricane** | Hurricane | Gale, Squall, Hail | The storm |
 | **Bear** | Maul, Swipe, Demoralizing Roar | Maul, Swipe, Guardian | The bear: cleave and endure |
 | **Cat** | Claw, Shred, Rake, Rip, Ferocious Bite | Claws, Bleed, Finisher | The cat: Bleeds and finishers |
 | **Rejuvenation** | Rejuvenation, Regrowth, Healing Touch, Entangling Roots | Bloom, Wild, Roots | Heals that hurt, and roots |
@@ -1296,7 +1314,7 @@ Six skills for five slots. The hooks are in `ArpgDruid.cpp`.
 | Branch | Node | Ranks | Effect |
 |---|---|---|---|
 | Volley | Splitting Wrath [A] | 3 | 1/1/2 extra bolts, at 45/60/60% |
-| Volley | Quick Wrath [M] | 3 | -0.1 sec Wrath recovery per rank |
+| Volley | Quick Wrath [M] | 3 | -0.15 sec Wrath recovery per rank |
 | Volley | Thorned Wrath [Ail] | 3 | 8% per rank to Poison |
 | Volley | **Wrath of Cenarius** [A] | 1 | Wrath chains to 3 more within 10 yd, at 60% |
 | Starfall | Lunar Fury [M] | 4 | 6% more Starfire damage per rank |
@@ -1319,6 +1337,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 | Lunar | Lunar Burn [M] | 3 | 15% more Moonfire burn per rank |
 | Lunar | **Moonkissed** [Syn] | 1 | A critical Wrath or Starfire makes the next Moonfire also land on 3 more within 8 yd |
 | Lunar | **Full Moon** [F] | 1 | Moonfire spreads to every enemy within 10 yd when its target dies |
+| Lunar | Moonlit Wrath [More] | 3 | 8% more Moonfire damage per rank (after Full Moon) |
 | Swarm | Plague [F] | 2 | Insect Swarm also lands on 1/2 more within 8 yd |
 | Swarm | Locusts [Ail] | 3 | Moonfire's hits 10% per rank to Poison |
 | Swarm | Swarm Fury [M] | 3 | 10% more Insect Swarm damage per rank |
@@ -1339,6 +1358,9 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 | Hail | Biting Hail [H] | 3 | Each strike has 5% per rank to chill |
 | Hail | Eye of the Wild [H] | 3 | Each enemy struck heals you 0.3% of maximum health per rank (3% a second at most) |
 | Hail | **Thunderhead** [M] | 1 | Hurricane costs half the mana |
+| Squall | Stinging Hail [Ail] | 3 | Each strike 6% per rank to Poison |
+| Squall | Gale Force [More] | 4 | 6% more Hurricane damage per rank |
+| Squall | Thrifty Gale [M] | 3 | 10% less mana cost per rank |
 
 #### Bear
 
@@ -1351,6 +1373,7 @@ are hooks on their ticks (`OnDruidTick`, called from `SpellAuras.cpp`).
 | Swipe | **Roaring Swipe** [Syn] | 1 | Demoralizing Roar makes the next Swipe deal 60% more |
 | Swipe | Wide Swipe [M] | 2 | +15% Swipe area per rank |
 | Swipe | **Ravaging Swipe** [M] | 1 | Swipe strikes up to 10 enemies (3 in vanilla) |
+| Swipe | Ursine Might [More] | 4 | 6% more Bear damage per rank |
 | Guardian | Bristling Fur [H] | 3 | In Bear Form, each blow taken gives 2 rage per rank (once a second) |
 | Guardian | Survival Instincts [H] | 3 | Bear hits heal you for 2% of their damage per rank |
 | Guardian | **Thorned Hide** [H] | 1 | In Bear Form, enemies that hit you take 30% of your attack power as Nature (once a second each) |
@@ -1388,6 +1411,8 @@ Like the paladin's Holy Light: heals, which the tree turns on enemies too.
 | Roots | Living Root [F] | 2 | Entangling Roots also roots 1/2 more within 6 yd |
 | Roots | Grasping Vines [M] | 3 | 20% more Entangling Roots damage per rank |
 | Roots | **Overgrowth** [F] | 1 | Entangling Roots roots every enemy within 10 yd of its target |
+| Wild | Thrift of the Grove [M] | 3 | 10% less mana cost per rank (after Wrath of the Wild) |
+| Roots | Thorny Vines [More] | 3 | 10% more Entangling Roots damage per rank (after Overgrowth) |
 
 #### Druid Codex pages
 
@@ -1626,9 +1651,12 @@ Six skills for five slots.
 | Agony | Lingering Curse [F] | 2 | Curse of Agony also lands on 1/2 more within 8 yd |
 | Agony | Tormented Soul [Syn] | 3 | Agony's ticks: 10% per rank to Wither |
 | Agony | **Haunting Agony** [H] | 1 | Curse of Agony deals 100% more to Withered enemies |
-| Siphon | Siphoning [M] | 3 | 10% more Siphon Life damage per rank |
+| Siphon | Siphoning [M] | 3 | 15% more Siphon Life damage (and healing) per rank |
 | Siphon | Grim Reach [M] | 2 | +3 sec duration on all three per rank |
 | Siphon | **Soul Feast** [H] | 1 | Every damage over time tick heals 0.3% of maximum health, 3% a second at most |
+| Plague | Blight [More] | 4 | 6% more Corruption skill damage per rank (after Pandemic) |
+| Agony | Anguish [More] | 3 | 10% more Curse of Agony damage per rank (after Haunting Agony) |
+| Siphon | Dark Thrift [M] | 2 | 15% less mana cost per rank (after Soul Feast) |
 
 #### Immolate
 
@@ -1643,6 +1671,8 @@ Six skills for five slots.
 | Hellfire | Hellfire Ward [M] | 3 | 25% less self-damage from Hellfire per rank |
 | Hellfire | Infernal Heat [Syn] | 3 | Each Hellfire tick: your minions deal 5% more per rank for 4 sec |
 | Hellfire | **Backlash** [H] | 1 | 20% less damage taken while you channel Hellfire |
+| Pyre | Fel Kindling [M] | 3 | 10% less mana cost per rank (after Conflagration) |
+| Cataclysm | Downpour [More] | 3 | 10% more Rain of Fire damage per rank (after Firestorm) |
 
 #### Drain
 
@@ -1656,6 +1686,9 @@ Six skills for five slots.
 | Pact | Dark Pact [M] | 3 | Life Tap gives 1% more of your maximum mana per rank |
 | Pact | Death's Grasp [M] | 2 | -10 sec Death Coil cooldown per rank |
 | Pact | **Demonic Pact** [H] | 1 | Life Tap also heals you 5% of your maximum health, taken from your demon |
+| Siphon | Essence Drain [More] | 4 | 6% more Drain skill damage per rank (after Life Link) |
+| Reaping | Soul Hunger [More] | 3 | 10% more Drain Soul damage per rank (after Reaping) |
+| Pact | Dark Bargain [M] | 3 | 10% less Drain skill mana cost per rank (after Demonic Pact) |
 
 #### Demon
 

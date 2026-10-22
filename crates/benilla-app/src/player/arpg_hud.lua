@@ -2447,6 +2447,37 @@ local function craftAsk(op, affix)
     SetCVar("arpgCraft", op .. ":" .. forgeItem.bag .. ":" .. forgeItem.slot .. ":" .. (affix or 0) .. ":" .. craftNonce)
 end
 
+-- Gambling: the slot kinds (the server's Arpg/ArpgCraft.cpp GAMBLE_KINDS, in order), their price
+-- (GAMBLE_COST_PER_LEVEL_SQ copper times the level squared, at least 1 silver) and odds.
+local GAMBLE_KINDS = {
+    { "Head", "INV_Helmet_01" }, { "Shoulders", "INV_Shoulder_02" }, { "Chest", "INV_Chest_Chain" },
+    { "Hands", "INV_Gauntlets_04" }, { "Waist", "INV_Belt_03" }, { "Legs", "INV_Pants_03" },
+    { "Feet", "INV_Boots_05" }, { "Wrists", "INV_Bracer_07" }, { "Back", "INV_Misc_Cape_02" },
+    { "Neck", "INV_Jewelry_Amulet_01" }, { "Finger", "INV_Jewelry_Ring_01" },
+    { "Trinket", "INV_Jewelry_Talisman_01" }, { "One-hand weapon", "INV_Sword_04" },
+    { "Two-hand weapon", "INV_Axe_09" }, { "Off hand", "INV_Shield_06" },
+    { "Ranged weapon", "INV_Weapon_Bow_05" },
+}
+local GAMBLE_ODDS = "Odds: 4% unique, 14% purple, 36% blue, the rest green."
+
+local function gambleCost()
+    local level = UnitLevel("player") or 1
+    return math.max(100, 30 * level * level)
+end
+
+local function moneyText(copper)
+    local gold, silver = math.floor(copper / 10000), math.floor(copper / 100) - math.floor(copper / 10000) * 100
+    if gold > 0 and silver > 0 then return gold .. "g " .. silver .. "s" end
+    if gold > 0 then return gold .. "g" end
+    return silver .. "s"
+end
+
+local function gambleAsk(kind)
+    craftNonce = craftNonce + 1
+    if craftNonce >= 1000 then craftNonce = 1 end
+    SetCVar("arpgCraft", "10:0:0:" .. kind .. ":" .. craftNonce)
+end
+
 local function forgeItemTexture()
     if not forgeItem then return nil end
     if forgeItem.bag == 255 then
@@ -2508,6 +2539,7 @@ local function forgePaint()
             row:Hide()
         end
     end
+    forge.gamblePrice:SetText(moneyText(gambleCost()) .. " a slot")
     forge.page:SetText(n > 0 and (shardPage .. " / " .. pages) or "No shards yet: salvage items for them.")
     if shardPage > 1 then forge.prev:Enable() else forge.prev:Disable() end
     if shardPage < pages then forge.next:Enable() else forge.next:Disable() end
@@ -2533,7 +2565,7 @@ local function forgeBuild()
     if forge then return forge end
     local f = CreateFrame("Frame", "ArpgForgeFrame", UIParent)
     f:SetWidth(360)
-    f:SetHeight(420)
+    f:SetHeight(528)
     f:SetPoint("LEFT", UIParent, "LEFT", 80, 40)
     f:SetFrameStrata("DIALOG")
     f:EnableMouse(true)
@@ -2665,6 +2697,38 @@ local function forgeBuild()
     f.next:SetScript("OnClick", function() shardPage = shardPage + 1 forgePaint() end)
     f.page = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.page:SetPoint("LEFT", f.next, "RIGHT", 8, 0)
+
+    -- Gamble (Diablo IV's): gold for a random item of a slot, no item in the Forge needed.
+    local gambleLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    gambleLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -398)
+    gambleLabel:SetText("Gamble")
+    f.gamblePrice = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.gamblePrice:SetPoint("LEFT", gambleLabel, "RIGHT", 8, 0)
+    for i = 1, table.getn(GAMBLE_KINDS) do
+        local b = CreateFrame("Button", "ArpgForgeGamble" .. i, f)
+        b:SetWidth(32)
+        b:SetHeight(32)
+        local col, row = i - 1, 0
+        if col >= 8 then col, row = col - 8, 1 end
+        b:SetPoint("TOPLEFT", f, "TOPLEFT", 16 + col * 40, -416 - row * 38)
+        b.icon = b:CreateTexture(nil, "ARTWORK")
+        b.icon:SetAllPoints(b)
+        b.icon:SetTexture("Interface\\Icons\\" .. GAMBLE_KINDS[i][2])
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints(b)
+        hl:SetTexture(1, 1, 1, 0.2)
+        b.kind = i
+        b:SetScript("OnClick", function() gambleAsk(this.kind) end)
+        b:SetScript("OnEnter", function()
+            if not GameTooltip then return end
+            GameTooltip:SetOwner(this, "ANCHOR_TOP")
+            GameTooltip:SetText("Gamble: " .. GAMBLE_KINDS[this.kind][1], 0.9, 0.8, 0.5)
+            GameTooltip:AddLine("A random item for this slot near your level, for " .. moneyText(gambleCost()) .. ".", 1, 1, 1, 1)
+            GameTooltip:AddLine(GAMBLE_ODDS, 0.7, 0.7, 0.7, 1)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+    end
 
     -- Salvage: the item goes, for shards of its affixes and a chance at an orb.
     local salvage = CreateFrame("Button", "ArpgForgeSalvage", f, "UIPanelButtonTemplate")

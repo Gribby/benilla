@@ -9,8 +9,9 @@
 //! `ArpgPurse_Update` (the feed is `crate::ui_arpg::world`).
 //!
 //! The Forge answers through the session-only setting `arpgCraft`, "op:bag:slot:affix:nonce"
-//! ([`parse_craft`]), turned into `ClientCommand::ArpgCraft`; a bounty is abandoned through the
-//! tree's action setting (kind 13).
+//! ([`parse_craft`]), turned into `ClientCommand::ArpgCraft`: ops 1-9 work on an item (an orb, a
+//! salvage, a shard), op 10 is a gamble, its affix the slot kind (1-16) and no item. A bounty is
+//! abandoned through the tree's action setting (kind 13).
 
 use benilla_protocol::messages::arpg::EVENT_LIVE;
 use benilla_protocol::messages::{ArpgBounty, ArpgEvent, ArpgPurse};
@@ -20,6 +21,10 @@ use benilla_world::view::WorldCamera;
 use crate::net::{ClientCommand, NetCommands, NetHandlerApp};
 
 use super::*;
+
+/// The Forge's gamble (cmangos `Arpg::CRAFT_GAMBLE`), and how many slot kinds it takes.
+const GAMBLE_OP: u8 = 10;
+const GAMBLE_KINDS: u16 = 16;
 
 /// The Forge's action setting (session-owned, never saved).
 pub(crate) const CVAR_CRAFT: &str = "arpgCraft";
@@ -176,7 +181,9 @@ fn parse_craft(value: &str) -> Option<Craft> {
     let slot = parts.next()?.parse().ok()?;
     let affix = parts.next()?.parse().ok()?;
     parts.next()?;
-    ((1..=9).contains(&op) && slot >= 1).then_some(Craft {
+    let on_item = (1..=9).contains(&op) && slot >= 1;
+    let gamble = op == GAMBLE_OP && (1..=GAMBLE_KINDS).contains(&affix);
+    (on_item || gamble).then_some(Craft {
         op,
         bag,
         slot,
@@ -235,6 +242,18 @@ mod tests {
         );
         assert_eq!(parse_craft("0"), None);
         assert_eq!(parse_craft("12:0:1:0:1"), None);
+        // A gamble names a slot kind and no item.
+        assert_eq!(
+            parse_craft("10:0:0:11:4"),
+            Some(Craft {
+                op: 10,
+                bag: 0,
+                slot: 0,
+                affix: 11
+            })
+        );
+        assert_eq!(parse_craft("10:0:0:0:4"), None);
+        assert_eq!(parse_craft("10:0:0:17:4"), None);
         assert_eq!(parse_craft("4:0:0:0:1"), None);
         assert_eq!(parse_craft("4:0:3:0"), None);
     }

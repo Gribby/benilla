@@ -168,6 +168,8 @@ Jeff asked for more Diablo IV in the game. What was taken, and how it was fitted
   each bane adds 10% experience and 5 to the epic chance. Runs differ without new maps.
 - **Choice nodes:** pairs of mutually exclusive nodes in a skill tree (Diablo IV's skill
   modifiers), so builds must commit. Demonic Sacrifice against Sacrifice was the first.
+- **Gambling:** gold for a random item of a chosen slot at the Forge, with better rarity odds than
+  drops. Gold had little use, and it lets a player chase one slot.
 - **Not taken:** the Paragon board (the passive web already plays that role), and gear-socketed
   Aspects (uniques already give each item its power).
 
@@ -209,6 +211,18 @@ What the statistics showed, and what changed.
   - **Warlock deaths:** 11.8 an hour at levels 10–14. Fel Ward (Barrier on kills) was added.
   - **Razorfen Kraul's elite casters** hit for 40% of health, from damage caps that scaled with
     the tier. The caps for trash and champions now stop at a ceiling.
-  - **The paladin** dealt about a third of the mage's damage. Zeal now works under any seal, Quick
-    Hammer is shorter, and Hammer of Justice is cheaper on cooldown with Hammer slotted.
-  - **Levelling** ran 3–8 times vanilla's pace, against the 1.3–1.5 times Jeff chose.
+  - **The paladin** dealt about 40% of the mage's damage at 20–29, and killed 8.6 a combat minute
+    against the mage's 37: the gap is area. The innate cleave is 55% (from 40%; Wide Swing
+    70/85/100%), a paladin's Consecration deals 150% more (its ticks were 57 against 598 a swing),
+    Zeal works under any Seal, Quick Hammer is shorter, and Hammer of Justice's cooldown is
+    shorter with Hammers slotted.
+  - **Levelling** ran 3–8 times vanilla's pace, against the 1.3–1.5 times Jeff chose (some
+    levels came from admin commands, so the figure is rough). By the formulas, a mage at 10–19
+    killing about 8 creatures a minute earns about 7% of a level a minute from kills, close to
+    the target, and the bounties (20–45% of a level each) about as much again. So bounty and
+    event experience is a third of what it was, and the session statistics now count experience
+    by source (`xp`) to check the next round.
+  - **Skill trees:** Hurricane, Drain and Corruption held 17–19 ranks against a skill's cap of 20,
+    so they could be filled with nothing to choose. Every tree now holds 25–30 (a new "more"
+    node kind does most of it), and number-only nodes became rules where cheap: Lingering Flame
+    makes Ignites burn more, Deep Chill freezes the Chilled, Lingering Barrage adds a missile.

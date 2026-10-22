@@ -36,7 +36,9 @@ fn the_forge_puts_an_item_in_and_sends_an_orb_and_a_salvage() {
          FIRST = GetCVar(\"arpgCraft\")\n\
          ArpgForgeSalvage:Click()\n\
          ArpgForgeSalvage:Click()\n\
-         SECOND = GetCVar(\"arpgCraft\")\n"
+         SECOND = GetCVar(\"arpgCraft\")\n\
+         ArpgForgeGamble11:Click()\n\
+         THIRD = GetCVar(\"arpgCraft\")\n"
     );
     script.run(&chunk).expect("the Forge runs");
     let first = script.eval::<String>("return FIRST").unwrap();
@@ -46,6 +48,11 @@ fn the_forge_puts_an_item_in_and_sends_an_orb_and_a_salvage() {
     );
     let second = script.eval::<String>("return SECOND").unwrap();
     assert!(second.starts_with("8:0:3:0:"), "the salvage: {second}");
+    let third = script.eval::<String>("return THIRD").unwrap();
+    assert!(
+        third.starts_with("10:0:0:11:"),
+        "the gamble for a ring: {third}"
+    );
 }
 
 #[test]

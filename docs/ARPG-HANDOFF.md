@@ -175,8 +175,8 @@ last 10 seconds of blows, each fight (seconds, kills and foes, damage dealt and 
 damage taken, lowest health and mana, flasks, rolls, top spells), the times of packs players
 killed, and every 5 minutes a session summary (levels and the
 minutes each took, kills by kind, damage by spell, damage taken by source, seconds in combat, low
-on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone, and the
-build: weapon and swing time, health, armour, block, dodge, each slotted skill's nodes).
+on mana, low on health, casts refused for want of power, flasks, rolls, minutes per zone, experience
+by source (`xp`: kills, bounties, events, quests), and the build: weapon and swing time, health, armour, block, dodge, each slotted skill's nodes).
 `update-arpg-server.bat` runs `send-arpg-stats.bat`, which commits them to the server repo's
 `arpg-stats` branch (its own clone in `.arpg-stats`). To read them: `git fetch origin arpg-stats`
 in the server repo, then `git show origin/arpg-stats:stats/<date>.jsonl`. Use them before tuning:
