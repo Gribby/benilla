@@ -153,6 +153,24 @@ Jeff's call: no cast times; the GCD carries the pacing, and cooldown reduction s
   errors. The server therefore reckons the ARPG GCD the client's way: per family bit, no cast
   speed (`Arpg::ClientSpellMod`).
 
+### Diablo IV's features (2026-10-22)
+
+Jeff asked for more Diablo IV in the game. What was taken, and how it was fitted:
+- **Barrier:** a pool that takes damage before health, capped at half of health and gone 6 sec
+  after the last gain. It gives the warlock a defence (Fel Ward) without flat armour, and gives
+  shrines a defensive kind.
+- **Vulnerable:** a state taking 20% more damage for 6 sec, set by debuffs (Faerie Fire, the
+  curses, Hammer of Justice, Frost Nova and others; `ARPG-SYNERGY.md`). It is a "more"
+  multiplier, so setting it up pays a build back in proportion, in line with "power from synergy".
+- **Shrines:** short, strong boons on the road and in dungeons (`ARPG-PROGRESSION.md`,
+  "Shrines"). They break up the steady pace of a run with moments to push.
+- **Nightmare dungeons:** from Brutal up, each run rolls banes (harder) and one blessing (kinder);
+  each bane adds 10% experience and 5 to the epic chance. Runs differ without new maps.
+- **Choice nodes:** pairs of mutually exclusive nodes in a skill tree (Diablo IV's skill
+  modifiers), so builds must commit. Demonic Sacrifice against Sacrifice was the first.
+- **Not taken:** the Paragon board (the passive web already plays that role), and gear-socketed
+  Aspects (uniques already give each item its power).
+
 ## Tuning from play
 
 What the statistics showed, and what changed.
@@ -179,3 +197,18 @@ What the statistics showed, and what changed.
     back as the warlock rises. If it is still fragile, a warlock defence layer comes next.
   - Minion share of damage reached 27% (Imp Gate 3, Imp Swarm 1) by level 14.
   - A crash: horde minions lacked `UNIT_FLAG_PLAYER_CONTROLLED` (fixed; `ARPG-HANDOFF.md`).
+- **2026-10-22 (all three classes, levels 1–25).**
+  - **One-button play:** Fireball was 87% of the mage's casts, Wrath 94% of the druid's, Shadow
+    Bolt 90% of the warlock's, and the mage was short of mana 1.9% of the time in combat. So:
+    - Fireball's cost 11% → 15%, so a long fight needs the filler between;
+    - the filler's refund 3% → 4%;
+    - the fillers' hits make their target Vulnerable (20% more taken, 6 sec), so filler then
+      spender beats either alone.
+  - **Early warlock mana:** levels 1–9 ran dry, so Searing Pain is learnt at level 1 as a second
+    spell.
+  - **Warlock deaths:** 11.8 an hour at levels 10–14. Fel Ward (Barrier on kills) was added.
+  - **Razorfen Kraul's elite casters** hit for 40% of health, from damage caps that scaled with
+    the tier. The caps for trash and champions now stop at a ceiling.
+  - **The paladin** dealt about a third of the mage's damage. Zeal now works under any seal, Quick
+    Hammer is shorter, and Hammer of Justice is cheaper on cooldown with Hammer slotted.
+  - **Levelling** ran 3–8 times vanilla's pace, against the 1.3–1.5 times Jeff chose.

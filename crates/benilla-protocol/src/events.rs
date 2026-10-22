@@ -491,6 +491,10 @@ pub enum SessionEvent {
     ArpgMinions {
         minions: crate::messages::arpg::ArpgMinions,
     },
+    /// Fork-only, not 1.12.1: the player's Barrier and boons, as they change (`SMSG_ARPG_BOONS`).
+    ArpgBoons {
+        boons: crate::messages::arpg::ArpgBoons,
+    },
     /// Fork-only, not 1.12.1: nearby enemies' states, as they change (`SMSG_ARPG_STATES`).
     ArpgStates {
         states: Vec<crate::messages::arpg::ArpgUnitStates>,

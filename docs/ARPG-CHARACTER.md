@@ -239,6 +239,22 @@ its own):
 - **Fortify.** A swing that lands means 15% less damage taken for 4 sec.
 - **Life on hit.** A swing heals 1% of maximum health for each enemy it strikes, the first five.
 
+### Barrier and boons
+
+Diablo IV's **Barrier** (cmangos `Arpg/ArpgBoons.h`): a pool that takes blows before health.
+
+- Each gain adds to the pool, up to half of maximum health, and holds it 6 sec from the latest
+  gain; then it is gone. Every blow of any school spends it first, shown as an absorb.
+- On the HUD it is a silver film over the health orb, from the bottom up to its share of maximum
+  health, a silver rim while it holds, and its amount beside the health ("412 +120").
+- **Sources:** the warlock's Fel Ward (below); shrines and nodes to come.
+
+**Boons** are the named, timed effects on the player, listed right of the health orb with their
+time left (a shrine's), and the standing effects of the place the player is in, in red with no
+timer (a nightmare dungeon's affixes). One message carries both: `SMSG_ARPG_BOONS` (0x355): `u32`
+barrier, `u32` maximum health, `u8` n, per boon `u8` id, `u8` kind (0 timed, 1 standing), `u32` ms
+left, `u32` ms in all, cstring name.
+
 ## Skills and skill trees
 
 ### Specialisation
@@ -286,6 +302,14 @@ branches and one or two capstones at the ends. The branches compete for the same
 | Synergy | Hexagon | Interacts with another skill or a tag: "Judgement on an enemy in your Consecration..." | Small per-node hooks |
 | Capstone | Large star | A big rule change at the end of a branch; needs its Codex page to learn | A hook per capstone |
 | Rune socket | Ring | Holds one rune: a portable mechanic for any skill whose tags fit | The uniques kit |
+
+**Choices** (Diablo IV's mutually exclusive upgrades, 2026-10-21): two nodes may share a choice
+group, and only one of them may hold ranks. They stand side by side in their cell, the other
+greys out once one is taken ("A choice: you took ..."), and refunding the taken one opens the
+other. Saved ranks that a reshaped tree no longer allows (a node whose parent holds none, the
+second side of a choice) are dropped at login and their points come back. `SMSG_ARPG_SKILLS`
+version 3 sends each node's group (`u8`, after its page home). The first choice: the warlock's
+Demon tree, Torment → Sacrifice (the horde and Soul Link beneath) or Demonic Sacrifice.
 
 ## Drops that unlock skills
 
@@ -1020,7 +1044,7 @@ the level their talent row needs.
 
 ### Thermal Shock: Frostbolt sets up, fire pays off
 
-Every mage has it, no node needed: Frostbolt, the free filler that gives 3% mana back
+Every mage has it, no node needed: Frostbolt, the free filler that gives 4% mana back and makes its target Vulnerable
 (`ARPG-ROADMAP-RESOURCES.md`), always chills what it hits, and fire spells deal 30% more to a
 chilled enemy. Frostbolt then Fireball beats Fireball alone, in damage and in mana.
 
@@ -1499,7 +1523,12 @@ The fourth class, and the one that gets others to do its killing. It has three w
   - Ritual of Doom summons its Doomguard beside you for 60 sec: no portal, no party, no sacrifice.
   - Their cooldowns are 1 min and 3 min, not an hour.
 - **Life Tap** stays as the resource trick: health into mana. **Searing Pain** is the free filler,
-  giving 3% mana back on a hit.
+  giving 3% mana back on a hit, from level 1 (vanilla's 18: until then the warlock spent 30% of
+  its fights under a fifth of its mana).
+- **Fel Ward** (its defence, 2026-10-21): every kill, its own or a minion's, gives Barrier of 5%
+  of maximum health (8% under Demon Skin or Demon Armor), so a warlock in the thick of packs
+  grows a shield as it kills. With minions drawing 4 times their damage in threat, it answers the
+  2026-10-19 deaths (11.8 an hour, all attrition from melee packs).
 - Talent spells come free at their row's level, as for every class: Siphon Life, Conflagrate,
   Shadowburn, Fel Domination, Soul Link and the others.
 

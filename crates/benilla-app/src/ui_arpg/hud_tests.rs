@@ -86,7 +86,13 @@ fn the_hud_addon_loads_and_paints() {
          assert(bountyRows[1]:IsShown() and not bountyRows[2]:IsShown())\n\
          ArpgEvent_Update(nil)\n\
          assert(not eventBlock:IsShown())\n\
-         ArpgPurse_Update({{orbs={{}},shards={{}}}})\n"
+         ArpgPurse_Update({{orbs={{}},shards={{}}}})\n\
+         ArpgHud_Boons(40, 100, {{{{\"Shrine of Greed\", 9000, 20000, 0}}, {{\"Bursting\", 0, 0, 1}}}})\n\
+         assert(boonHud.frac == 0.4, boonHud.frac)\n\
+         assert(boonHud.rows[1]:IsShown() and boonHud.rows[2]:IsShown() and not boonHud.rows[3]:IsShown())\n\
+         assert(boonHud.rows[2]:GetText() == \"Bursting\", boonHud.rows[2]:GetText())\n\
+         ArpgHud_Boons(0, 100, {{}})\n\
+         assert(boonHud.frac == 0 and not boonHud.rows[1]:IsShown())\n"
     );
     script.run(&chunk).expect("the HUD addon runs");
 }

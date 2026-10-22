@@ -29,6 +29,13 @@ state. cmangos `Arpg/ArpgStates.{h,cpp}`.
 | Scorched Ground | standing in a Flamestrike or Rain of Fire | (read only) | (read only) |
 | Frozen Ground | standing in a Blizzard | (read only) | (read only) |
 | Storm Ground | standing in a Hurricane | (read only) | (read only) |
+| **Vulnerable** | a set-up spell landing: Faerie Fire, Curse of Weakness, Recklessness, the Elements or Shadow, Hammer of Justice, Frost Nova, Judgement of the Crusader, Frost Shock, Earthbind, and the free fillers (Frostbolt, Wrath, Searing Pain) | takes 20% more damage from everything, 6 sec | (read only) |
+
+**Vulnerable** (Diablo IV's, 2026-10-21) is the set-up every class has: the debuff or control
+that opens a fight now pays, a fifth more damage from every source, the minions' included. It
+multiplies with Dazed's 10%. The free fillers set it up too (2026-10-22), so a filler then the
+spenders beats the spender alone: the play statistics showed one spell at about 90% of every
+class's casts.
 
 **Daze** is the physical and holy state. Every physical or holy hit builds it by twice its share of
 the enemy's health (a hit for a tenth of its health builds a fifth); a Consecration's tick builds

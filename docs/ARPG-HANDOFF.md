@@ -88,7 +88,9 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
   | 0x343 | ITEM_AFFIXES | 0x34B | PURSE |
   | 0x344 | TELEGRAPH | 0x34C | COMPARE |
 
-  `NUM_MSG_TYPES` is 0x34D. A new opcode means three changes: bump it in
+  Later opcodes: 0x34D–0x352 (costs, bolt stop, scene and others), 0x353 STATES, 0x354
+  MINIONS, 0x355 BOONS (Barrier and boons, `Arpg/ArpgBoons.h`). `NUM_MSG_TYPES` is 0x356. A new
+  opcode means three changes: bump it in
   `src/game/Server/Opcodes.h`, add a row to `Opcodes.cpp`, and add the client reader.
 - **The client's UI** is a Lua 5.0 addon the client installs: `crates/benilla-app/src/player/arpg_hud.lua`.
   - The HUD, the passive web and Skills window, the tracker and the Forge all live there.
@@ -133,6 +135,7 @@ Epoch style ARPG on a self-hosted server. It is two forks, always worked on toge
 | `ArpgStates` | Enemy states, the shared language of synergy: the ailments read as states, Daze build-up to Dazed, Stunned, Consecrated; apply, consume (what a state held comes back for the payoff), `SMSG_ARPG_STATES` (0x353) for the hover bar (`ARPG-SYNERGY.md`) |
 | `ArpgSynergy` | Trigger rows over the states: on a hit, crit, kill, state applied or consumed, apply / strike / burst / spread / daze; owned by a class, a skill-tree node or a worn unique, with cooldowns |
 | `ArpgScenes` | Short cutscenes: camera tracks authored around an anchor NPC, subtitles and emote cues, `SMSG_ARPG_SCENE`, played by the client's cinematic player and closed by `CMSG_COMPLETE_CINEMATIC`; once per character (`character_arpg_scene`) |
+| `ArpgBoons` | Barrier (a pool that takes blows before health, `BarrierAbsorb` in the core's absorb step) and boons (timed or standing named effects), `SMSG_ARPG_BOONS` |
 | `ArpgDruid` | The druid's keystone hooks (on hit, periodic tick, heal, blow taken, kill, a pulse each second) and the ARPG combo points that carry between enemies; its web is in `ArpgTree`, its trees in `ArpgSkills` |
 
 **Hooks** into core code are marked `// ARPG:` and are found in:
@@ -261,6 +264,12 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 
 ### Pitfalls that have bitten
 
+- **Lua's 200 locals:** `arpg_hud.lua` is one chunk, and a Lua function holds at most 200 locals
+  at once. A test that puts a line of its own in front of the addon tipped it over (2026-10-22).
+  New HUD state goes into a table (`boonHud`), or a section goes in a `do ... end` block (the web
+  and the Forge are); keep about 30 spare.
+- **The states mask is 16 bits:** `SMSG_ARPG_STATES` sends each enemy's states as a uint16, and
+  Vulnerable took bit 14. One more state fits; past that the packet must grow, on both sides.
 - **MSVC macros:** never name an identifier `near`, `far` or `small`. Windows headers define
   them, so Jeff's build breaks while the Linux build passes. Grep new code before committing.
 - **A creature a player owns must be `UNIT_FLAG_PLAYER_CONTROLLED`.** Without it, the minion

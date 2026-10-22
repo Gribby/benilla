@@ -398,9 +398,43 @@ local function animateOrb(orb, dt, t)
     end
 end
 
+-- Fork-only: Barrier (the server's Arpg/ArpgBoons.h), a pool that takes blows before health, as
+-- Diablo IV draws it: a silver film over the health orb's liquid, from the bottom up to its share
+-- of maximum health, a silver rim while it holds, and its amount beside the health ("+120").
+-- The Barrier and the boons keep their state in this one table: the addon's main chunk is near
+-- Lua's limit of 200 locals.
+local boonHud = { barrier = 0, frac = 0, rim = { 0.85, 0.88, 0.95 }, rows = {}, list = {}, since = 0 }
+for i = 1, ORB_COLS do
+    local c = healthOrb.cols[i]
+    c.shell = healthOrb:CreateTexture(nil, "OVERLAY")
+    c.shell:SetTexture(0.92, 0.94, 1.0, 0.34)
+    c.shell:SetWidth((ORB_RADIUS * 2) / ORB_COLS + 0.5)
+    c.shell:SetPoint("BOTTOM", healthOrb, "CENTER", c.x, -c.half)
+    c.shell:Hide()
+end
+
+function boonHud.paintBarrier()
+    local frac, rim = boonHud.frac, boonHud.rim
+    local level = -ORB_RADIUS + 2 * ORB_RADIUS * frac
+    for i = 1, ORB_COLS do
+        local c = healthOrb.cols[i]
+        local height = math.min(level, c.half) + c.half
+        if frac > 0 and height > 0.5 then
+            c.shell:SetHeight(height)
+            c.shell:Show()
+            c.rim:SetTexture(rim[1], rim[2], rim[3], 1)
+        else
+            c.shell:Hide()
+            c.rim:SetTexture(RIM_R, RIM_G, RIM_B, 1)
+        end
+    end
+end
+
 local function refreshOrbs()
     local health, most = UnitHealth("player") or 0, UnitHealthMax("player") or 0
-    paintOrb(healthOrb, most > 0 and health / most or 0, HEALTH_COLOR, health)
+    local healthText = health
+    if boonHud.barrier > 0 then healthText = health .. " |cffdde4ff+" .. boonHud.barrier .. "|r" end
+    paintOrb(healthOrb, most > 0 and health / most or 0, HEALTH_COLOR, healthText)
     local power, top = UnitMana("player") or 0, UnitManaMax("player") or 0
     local color = POWER_COLORS[UnitPowerType("player") or 0] or POWER_COLORS[0]
     paintOrb(powerOrb, top > 0 and power / top or 0, color, power)
@@ -1117,6 +1151,10 @@ addArpgOptionsPage()
 -- click gives one back, Respec gives everything back (free, out of combat). Requests go back
 -- through the session-only setting arpgTreeAction, as a number.
 
+-- What the rest of the addon reaches of the web and the portal button; the rest is a block of its
+-- own, off the main chunk's 200 locals.
+local treeData, treeFrame, treeAsk, lineDots, placeDots, colorDots, treeBuild, treeRedraw, portalButton
+do
 local WEB_REGION_RGB = {
     [0] = { 0.86, 0.36, 0.30 },  -- Crusader
     [1] = { 0.98, 0.84, 0.45 },  -- Lightbringer
@@ -1129,13 +1167,13 @@ local WEB_SOLID_TEX = "Interface\\Buttons\\WHITE8X8"
 -- Paths are rows of small squares this far apart, in web units: solid at any zoom, and no
 -- texture-coordinate tricks (a rotated route-line texture tiles outside its square).
 local WEB_DOT_STEP = 8
-local treeData, treeFrame, treeNonce = nil, nil, 0
+local treeNonce = 0
 local webById, webNext = {}, {}
 -- The web spans about 1100 units each way, centred a little below the start.
 local webView = { x = 0, y = 90, zoom = nil }
 
 -- kind 1 take, 2 respec, 3 query, 4 give back: kind * 100000 + node * 100 + a nonce under 100.
-local function treeAsk(kind, node)
+function treeAsk(kind, node)
     treeNonce = treeNonce + 1
     if treeNonce >= 100 then treeNonce = 1 end
     SetCVar("arpgTreeAction", tostring(kind * 100000 + (node or 0) * 100 + treeNonce))
@@ -1149,7 +1187,7 @@ function ArpgHud_TownPortal()
     treeAsk(12)
 end
 
-local portalButton = CreateFrame("Button", "ArpgHudPortalButton", UIParent)
+portalButton = CreateFrame("Button", "ArpgHudPortalButton", UIParent)
 portalButton:SetWidth(28)
 portalButton:SetHeight(28)
 portalButton:SetPoint("BOTTOMLEFT", UIParent, "BOTTOM", BAR_HALF + 14 + 70 + 10, BAR_FOOT + 2)
@@ -1226,7 +1264,7 @@ local function webBlocked(n)
 end
 
 -- A path is `n` squares in `line` (a table of textures, grown as needed), on `parent`.
-local function lineDots(line, parent, layer, n)
+function lineDots(line, parent, layer, n)
     for k = 1, n do
         if not line[k] then
             local T = parent:CreateTexture(nil, layer)
@@ -1238,7 +1276,7 @@ local function lineDots(line, parent, layer, n)
 end
 
 -- Lay `line`'s first `n` squares evenly from (ax, ay) to (bx, by), from `parent`'s TOPLEFT, y down.
-local function placeDots(line, parent, n, ax, ay, bx, by, size)
+function placeDots(line, parent, n, ax, ay, bx, by, size)
     for k = 1, n do
         local t = (k - 0.5) / n
         local T = line[k]
@@ -1250,7 +1288,7 @@ local function placeDots(line, parent, n, ax, ay, bx, by, size)
     end
 end
 
-local function colorDots(line, n, r, g, b, a)
+function colorDots(line, n, r, g, b, a)
     for k = 1, n do line[k]:SetVertexColor(r, g, b, a) end
 end
 
@@ -1429,7 +1467,7 @@ local function webCursor()
     return x / scale - f.view:GetLeft(), f.view:GetTop() - y / scale
 end
 
-local function treeBuild()
+function treeBuild()
     if treeFrame then return treeFrame end
     local f = CreateFrame("Frame", "ArpgTreeFrame", UIParent)
     local width = math.min(1000, UIParent:GetWidth() - 60)
@@ -1524,7 +1562,7 @@ local function treeBuild()
 end
 
 -- Take a new layout: index it, make what it needs, then paint and lay it out.
-local function treeRedraw()
+function treeRedraw()
     if not treeData then return end
     local f = treeBuild()
     webById, webNext = {}, {}
@@ -1572,6 +1610,7 @@ local function treeRedraw()
     webPaint()
     webLayout()
 end
+end -- the web's block
 
 -- ── The Skills tab ──
 -- The server owns the skills (Arpg/ArpgSkills.h) and hands them to ArpgSkills_Update. Five slots
@@ -1619,11 +1658,23 @@ local function bitSet(mask, bit)
     return m - math.floor(m / 2) * 2 == 1
 end
 
+-- The node of `n`'s choice (Diablo IV's mutually exclusive upgrades: the server's choice groups)
+-- that already holds ranks, other than `n` itself; nil when the choice is open.
+local function skillChoiceTaken(k, n)
+    if not n.choice or n.choice == 0 then return nil end
+    for _, o in ipairs(k.nodes) do
+        if o.id ~= n.id and o.choice == n.choice and o.rank > 0 then return o end
+    end
+    return nil
+end
+
 -- Why a rank cannot go into node `n` of skill `k` now, or nil when it can.
 local function skillBlocked(k, n)
     if not skillSlot(k.id) then return "Specialise " .. k.name .. " in a slot first" end
     if n.sealed then return "Sealed: read its Codex page first" end
     if n.rank >= n.max then return "Fully learned" end
+    local other = skillChoiceTaken(k, n)
+    if other then return "A choice: you took " .. other.name .. " (refund it to switch)" end
     if skillRank(k, n.parent) == 0 then return "Needs a rank in the node above" end
     if k.spent >= k.cap then return k.name .. " has all " .. k.cap .. " points it can take" end
     if skillsData.spent >= skillsData.total then return "No skill points left" end
@@ -1638,6 +1689,9 @@ local function skillShowTip(button)
     local rgb = SKILL_KIND_RGB[n.kind] or SKILL_KIND_RGB[1]
     GameTooltip:AddLine((SKILL_KIND_NAME[n.kind] or "") .. "   Rank " .. n.rank .. "/" .. n.max, rgb[1], rgb[2], rgb[3])
     GameTooltip:AddLine(n.text, 1, 0.82, 0, 1)
+    if n.choice and n.choice > 0 then
+        GameTooltip:AddLine("A choice: take this or the node beside it, not both.", 0.55, 0.8, 1, 1)
+    end
     if n.sealed then
         GameTooltip:AddLine("Sealed", 0.64, 0.21, 0.93)
         if n.home and n.home ~= "" then
@@ -1982,6 +2036,12 @@ local function skillsPaint()
     end
     local all = { { id = 0, kind = 0, col = 1, row = 0, parent = -1, max = 0, rank = 1, icon = k.icon, name = k.name, text = k.text } }
     for _, n in ipairs(k.nodes) do tinsert(all, n) end
+    -- Nodes sharing a cell (a choice's two sides) stand side by side in it.
+    local cellCount, cellSeen = {}, {}
+    for _, n in ipairs(all) do
+        local key = n.col .. ":" .. n.row
+        cellCount[key] = (cellCount[key] or 0) + 1
+    end
     local pos = {}
     for i, n in ipairs(all) do
         local b = p.nodes[i]
@@ -1990,6 +2050,13 @@ local function skillsPaint()
             p.nodes[i] = b
         end
         local x, y = at(n.col, n.row)
+        local key = n.col .. ":" .. n.row
+        local many = cellCount[key] or 1
+        if many > 1 then
+            local nth = (cellSeen[key] or 0) + 1
+            cellSeen[key] = nth
+            x = x + (nth - (many + 1) / 2) * (SKILL_NODE + 26)
+        end
         pos[n.id] = { x, y }
         local size = n.kind == 4 and SKILL_NODE + 8 or (n.kind == 0 and SKILL_NODE + 12 or SKILL_NODE)
         b:SetWidth(size)
@@ -2359,8 +2426,12 @@ end
 -- the session-only setting arpgCraft, "op:bag:slot:affix:nonce" (bag 255 the character's slots).
 
 BINDING_NAME_ARPGFORGE = "Forge"
+-- The item in and forgeSelect stand outside; the rest of the Forge is a block of its own, off the
+-- main chunk's 200 locals.
+local forgeItem, forgeSelect
+do
 local purse = { orbs = {}, shards = {} }
-local forge, forgeItem = nil, nil
+local forge = nil
 local craftNonce = 0
 local lastPickup = nil
 local SHARD_ROWS = 8
@@ -2442,7 +2513,7 @@ local function forgePaint()
     if shardPage < pages then forge.next:Enable() else forge.next:Disable() end
 end
 
-local function forgeSelect(bag, slot)
+function forgeSelect(bag, slot)
     forgeItem = { bag = bag, slot = slot }
     forgePaint()
 end
@@ -2713,3 +2784,73 @@ forgeButton:SetScript("OnEnter", function()
     end
 end)
 forgeButton:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
+end -- the Forge's block
+
+-- Fork-only: Barrier and the boons (ArpgHud_Boons, pushed from actions.rs; the server's
+-- Arpg/ArpgBoons.h). Boons stand in a column right of the health orb, each with its time left,
+-- counted down here from the time the server gave; a standing one (a nightmare dungeon's affix)
+-- has no timer and shows in red, its blessing in green.
+boonHud.ROWS = 8
+for i = 1, boonHud.ROWS do
+    local row = UIParent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    row:SetPoint("BOTTOMLEFT", healthOrb, "BOTTOMRIGHT", 10, 6 + (i - 1) * 14)
+    row:SetJustifyH("LEFT")
+    row:Hide()
+    boonHud.rows[i] = row
+end
+
+function boonHud.draw()
+    local now = GetTime()
+    local shown = 0
+    for i = 1, table.getn(boonHud.list) do
+        local b = boonHud.list[i]
+        local left = b.standing and 0 or (b.ends - now)
+        if (b.standing or left > 0) and shown < boonHud.ROWS then
+            shown = shown + 1
+            local row = boonHud.rows[shown]
+            if b.standing then
+                row:SetText(b.name)
+                -- A nightmare's bane in red, its blessing in green.
+                if string.find(b.name, "^Blessing") then
+                    row:SetTextColor(0.45, 1.0, 0.45)
+                else
+                    row:SetTextColor(1.0, 0.45, 0.4)
+                end
+            else
+                row:SetText(b.name .. "  " .. math.ceil(left) .. "s")
+                row:SetTextColor(1.0, 0.85, 0.35)
+            end
+            row:Show()
+        end
+    end
+    for i = shown + 1, boonHud.ROWS do
+        boonHud.rows[i]:Hide()
+    end
+end
+
+boonHud.clock = CreateFrame("Frame")
+boonHud.clock:SetScript("OnUpdate", function()
+    boonHud.since = boonHud.since + (arg1 or 0)
+    if boonHud.since >= 0.25 then
+        boonHud.since = 0
+        boonHud.draw()
+    end
+end)
+
+function ArpgHud_Boons(amount, maxHealth, list)
+    boonHud.barrier = amount or 0
+    if maxHealth and maxHealth > 0 then
+        boonHud.frac = math.min(1, boonHud.barrier / maxHealth)
+    else
+        boonHud.frac = 0
+    end
+    boonHud.paintBarrier()
+    refreshOrbs()
+    local now = GetTime()
+    boonHud.list = {}
+    for i = 1, table.getn(list or {}) do
+        local b = list[i]
+        table.insert(boonHud.list, { name = b[1] or "", ends = now + (b[2] or 0) / 1000, standing = (b[4] or 0) == 1 })
+    end
+    boonHud.draw()
+end

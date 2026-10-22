@@ -36,7 +36,7 @@ is the whole game.
 **Built** (cmangos `Arpg/ArpgResources.{h,cpp}`, client `spell/usable.rs` and `spell/mods.rs`):
 overdraw with at least half the cost left (rather than any mana at all, so Frostbolt's refund
 cannot buy a Pyroblast), mana costs as a share of the pool by the tables below, the fillers'
-refunds (Frostbolt and Wrath 3% once a cast, a sealed paladin swing 2%), free shapeshifting,
+refunds (Frostbolt, Wrath and Searing Pain 4% once a cast, a sealed paladin swing 2%), free shapeshifting,
 regeneration of 1.5% a second with no five-second rule, globes giving 8% mana, and
 `SMSG_ARPG_COSTS` (0x350) so the client shows and checks the same costs. The play statistics count
 overdraws and read low mana at 20% and low health at 35%.
@@ -62,8 +62,8 @@ Shock (phase 3). The cat needs no fallback: its auto-attack costs nothing.
 
 | Skill | Role | Cost | Notes |
 |---|---|---|---|
-| Frostbolt | Free filler | 0 | Restores 3% a hit; slows; stacks Chill |
-| Fireball | Main spender | 11% | Consumes Chill for bonus damage |
+| Frostbolt | Free filler | 0 | Restores 4% a hit; slows; stacks Chill; sets Vulnerable |
+| Fireball | Main spender | 15% | Consumes Chill for bonus damage |
 | Arcane Missiles | Expensive burst | 18% per channel | Best damage per second |
 | Blizzard | Area | 25% | Consumes Chill |
 | Fire Blast | Cooldown | 0, 6 s | Reset by a Fireball crit (already a synergy) |
@@ -90,7 +90,7 @@ adds damage through Chill. That answers "I'm only incentivised to cast Fireball"
   Auto-attack is the free generator; Maul 15, Swipe 20.
 - Cat: energy 100, regen as 1.12; Claw 35 builds combo points; each finisher refunds 5 energy a
   point; a free fallback swipe so cat is never idle.
-- Caster: Wrath is the free filler (3% a hit); Moonfire 8%, Starfire 15%, Healing Touch 20%.
+- Caster: Wrath is the free filler (4% a hit, sets Vulnerable); Moonfire 8%, Starfire 15%, Healing Touch 20%.
 
 ## Phase 2: difficulty
 

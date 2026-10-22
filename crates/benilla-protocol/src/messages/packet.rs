@@ -428,6 +428,7 @@ pub enum ServerPacket {
     ArpgStates(Vec<crate::messages::arpg::ArpgUnitStates>),
     /// Fork-only, not 1.12.1: `SMSG_ARPG_MINIONS`, the player's demon and horde.
     ArpgMinions(crate::messages::arpg::ArpgMinions),
+    ArpgBoons(crate::messages::arpg::ArpgBoons),
     /// `SMSG_WEATHER`: `u32 type, f32 grade, u32 soundId, u8 instant`; sounds 8533..8558, 0 clear.
     Weather {
         weather_type: u32,
@@ -1421,6 +1422,7 @@ impl ServerPacket {
             ServerPacket::ArpgScene(_) => "SMSG_ARPG_SCENE".into(),
             ServerPacket::ArpgStates(_) => "SMSG_ARPG_STATES".into(),
             ServerPacket::ArpgMinions(_) => "SMSG_ARPG_MINIONS".into(),
+            ServerPacket::ArpgBoons(_) => "SMSG_ARPG_BOONS".into(),
             ServerPacket::TextEmote { .. } => "SMSG_TEXT_EMOTE".into(),
             ServerPacket::Emote { .. } => "SMSG_EMOTE".into(),
             ServerPacket::ItemQueryResponse { .. } => "SMSG_ITEM_QUERY_SINGLE_RESPONSE".into(),

@@ -96,7 +96,7 @@ fn skills_chunk(skills: &ArpgSkills, icon: impl Fn(u32) -> Option<String>) -> St
                 .iter()
                 .map(|n| {
                     format!(
-                        "{{id={},kind={},col={},row={},parent={},max={},rank={},icon={},name={},text={},sealed={},home={}}}",
+                        "{{id={},kind={},col={},row={},parent={},max={},rank={},icon={},name={},text={},sealed={},home={},choice={}}}",
                         n.id,
                         n.kind,
                         n.column,
@@ -109,6 +109,7 @@ fn skills_chunk(skills: &ArpgSkills, icon: impl Fn(u32) -> Option<String>) -> St
                         lua_str(&n.text),
                         n.sealed,
                         lua_str(&n.page_home),
+                        n.choice,
                     )
                 })
                 .collect();
@@ -238,6 +239,7 @@ mod tests {
                     text: "Chains.".into(),
                     sealed: false,
                     page_home: String::new(),
+                    choice: 0,
                 }],
             }],
             fragments: 3,

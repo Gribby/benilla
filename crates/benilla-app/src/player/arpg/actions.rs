@@ -142,6 +142,7 @@ pub(super) fn plugin(app: &mut App) {
             crate::ui_arpg::actions::push_status,
             crate::ui_arpg::actions::push_combo,
             crate::ui_arpg::actions::push_minions,
+            crate::ui_arpg::actions::push_boons,
         ),
     );
 }

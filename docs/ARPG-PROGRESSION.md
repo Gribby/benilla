@@ -415,6 +415,65 @@ abandon it for another (`CMSG_ARPG_ACTION` kind 25, `u8` slot). Saved in
 `character_arpg_zone_bounty` (by zone), which the server creates. `SMSG_ARPG_BOUNTIES` (0x34A): `u8` count, per bounty `u8` slot, `u8`
 kind, `u16` have and need, cstring title and reward.
 
+## Nightmare dungeons
+
+Diablo IV's nightmare dungeons, as seeded runs (cmangos `Arpg/ArpgDungeons.h`, 2026-10-21): from
+**Brutal** up, each dungeon run rolls affixes when its tier is chosen, so no two runs of the same
+dungeon play alike.
+
+- **Banes** on its monsters: one on Brutal, two on Torment I, three on Torment II and III.
+
+  | Bane | Effect |
+  |---|---|
+  | Bursting | Every dead foe (not critters or friends) bursts into flame a moment later (half a Fire Enchanted burst) |
+  | Frenzied | Enemies attack 25% faster |
+  | Stalwart | Enemies have 30% more health |
+  | Vengeful | Enemies deal 20% more damage |
+
+- **One blessing** for its players:
+
+  | Blessing | Effect |
+  |---|---|
+  | Shrines | Up to twice as many shrines, found three times as often |
+  | Bloodlust | Kills heal 3% of your health |
+  | Fortune | The Cache holds a blue more for each player, and 15% more chance at a unique |
+  | Thrift | Skills cost 25% less mana |
+
+- **The reward:** each bane gives the run 10% more experience, and the Warden and the Cache 5%
+  more chance at a purple and at a unique.
+- **Shown:** the map is told the nightmare when the tier is set ("Nightmare: Bursting (the dead
+  burst ...). Blessing: Bloodlust (...)."), and the affixes stand in the HUD's boon column for as
+  long as the player is inside, banes in red, the blessing in green.
+
+## Shrines
+
+Diablo II's and IV's shrines (cmangos `Arpg/ArpgShrines.h`, 2026-10-21): a stone that gives a
+short, strong boon to whoever walks onto it.
+
+- **Where:** beside 12% of the packs placed ahead in the open world, and in a dungeon beside its
+  trash (1 in 40 settling creatures, at most 2 an instance). An open-world shrine left alone goes
+  after 10 minutes.
+- **The touch:** stepping within 3 yards of it. It shows its name on hover but can't be clicked,
+  so it needs nothing of the client; it vanishes with a flash of light, the boon goes on the HUD
+  beside the health orb with its time (`ARPG-CHARACTER.md`, "Barrier and boons"), and the chat
+  says what it does.
+- **The kinds:**
+
+  | Shrine | Time | Boon |
+  |---|---|---|
+  | Wrath | 20 sec | 50% more damage |
+  | Protection | 10 sec | A Barrier of half your health, filled again each second |
+  | Greed | 30 sec | Your kills' loot rolls its rarity as three tiers higher, a 30% chance of an extra item, three times the gold |
+  | Celerity | 15 sec | Swiftness (50% faster movement) and 25% faster attacks |
+  | Channeling | 15 sec | Your skills cost no mana |
+  | Storms | 20 sec | An arcane nova around you each second in combat |
+
+- **Built from:** generic game objects written into `gameobject_template` at start (entries
+  98000 up), each wearing a vanilla shrine's or altar's model; the server log names the look each
+  got ("Shrine of Wrath wears the look of ..."). Only rows named "Shrine of ..." are rewritten: an
+  entry the world database uses for something else is left alone, and that kind of shrine never
+  appears (the log says so).
+
 ## Build order
 
 1. Packs: level-scaled sizes, lesser followers, shared aggro, the dev spawn tool, the fight log.

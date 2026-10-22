@@ -8,7 +8,7 @@ use benilla_protocol::messages::ArpgStatus;
 use benilla_ui::script::UiScript;
 
 use crate::player::arpg::actions::ArpgActionState;
-use crate::player::arpg::champions::ArpgMinionsHud;
+use crate::player::arpg::champions::{ArpgBoonsHud, ArpgMinionsHud};
 
 /// Fork-only, not 1.12.1: the combo points over the power orb (`ArpgHud_Combo` in
 /// `arpg_hud.lua`). An ARPG character's points are its own, carried from enemy to enemy (cmangos
@@ -61,6 +61,51 @@ pub(crate) fn push_minions(
             *last = Some(hud.0.clone());
         }
     }
+}
+
+/// Fork-only, not 1.12.1: the Barrier over the health orb and the boons beside it
+/// (`ArpgHud_Boons` in `arpg_hud.lua`), on each `SMSG_ARPG_BOONS`. The addon counts the boons'
+/// time down itself from the time left given.
+pub(crate) fn push_boons(
+    script: Option<NonSendMut<UiScript>>,
+    hud: Res<ArpgBoonsHud>,
+    mut pushed: Local<crate::ui_script::VmMemo<Option<u32>>>,
+) {
+    let Some(script) = script else {
+        return;
+    };
+    let last = pushed.get(&script);
+    if *last == Some(hud.serial) {
+        return;
+    }
+    match script.eval::<bool>(&boons_chunk(&hud.boons)) {
+        Ok(true) => *last = Some(hud.serial),
+        Ok(false) => {}
+        Err(e) => {
+            warn!("arpg: the HUD refused the boons: {e}");
+            *last = Some(hud.serial);
+        }
+    }
+}
+
+/// `ArpgHud_Boons(barrier, maxHealth, { {name, msLeft, msTotal, standing}, ... })`.
+fn boons_chunk(b: &benilla_protocol::messages::arpg::ArpgBoons) -> String {
+    use crate::ui_arpg::tree::lua_str;
+    let mut list = String::from("{");
+    for boon in &b.boons {
+        list.push_str(&format!(
+            "{{{}, {}, {}, {}}},",
+            lua_str(&boon.name),
+            boon.ms_left,
+            boon.ms_total,
+            u8::from(boon.standing)
+        ));
+    }
+    list.push('}');
+    format!(
+        "if not ArpgHud_Boons then return false end\nArpgHud_Boons({}, {}, {})\nreturn true",
+        b.barrier, b.max_health, list
+    )
 }
 
 fn minions_chunk(m: &benilla_protocol::messages::arpg::ArpgMinions) -> String {

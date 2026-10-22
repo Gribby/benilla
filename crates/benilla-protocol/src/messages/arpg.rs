@@ -174,6 +174,9 @@ pub struct ArpgSkillNode {
     pub sealed: bool,
     /// Where a capstone's page drops ("Herod, Scarlet Monastery"); empty for other nodes.
     pub page_home: String,
+    /// A choice group (version 3): of the skill's nodes sharing a non-zero group, only one may
+    /// hold ranks, as Diablo IV's mutually exclusive upgrades. 0: no choice.
+    pub choice: u8,
 }
 
 /// A rune: a portable mechanic socketed in a skill tree (version 2).
@@ -228,16 +231,18 @@ pub struct ArpgSkills {
 /// spell, C strings name and text. Version 2 adds, per skill after the cap, `u8` socketed rune and
 /// the points the socket opens at; per node after the text, `u8` sealed and a C string page home;
 /// and at the end `u16` fragments, `u8` fragments a page takes, `u8` rune count and per rune `u8`
-/// id, `u32` icon spell, C strings name and text, `u8` held and `u8` the skills it fits.
+/// id, `u32` icon spell, C strings name and text, `u8` held and `u8` the skills it fits. Version 3
+/// adds, per node after the page home, `u8` its choice group.
 pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
     let version = read_u8(r)?;
-    if version != 1 && version != 2 {
+    if !(1..=3).contains(&version) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            format!("ARPG skills version {version}, this client reads 1 and 2"),
+            format!("ARPG skills version {version}, this client reads 1 to 3"),
         ));
     }
     let v2 = version >= 2;
+    let v3 = version >= 3;
     let points_total = read_u16_le(r)?;
     let points_spent = read_u16_le(r)?;
     let level = read_u8(r)?;
@@ -284,10 +289,14 @@ pub fn read_arpg_skills(r: &mut impl io::Read) -> io::Result<ArpgSkills> {
                 text: read_cstring(r)?,
                 sealed: false,
                 page_home: String::new(),
+                choice: 0,
             };
             if v2 {
                 node.sealed = read_u8(r)? != 0;
                 node.page_home = read_cstring(r)?;
+            }
+            if v3 {
+                node.choice = read_u8(r)?;
             }
             nodes.push(node);
         }
@@ -896,7 +905,7 @@ pub fn read_arpg_scene(r: &mut impl io::Read) -> io::Result<ArpgScene> {
 pub const SMSG_ARPG_STATES: u16 = 0x0353;
 
 /// The state bits, in the server's order (`Arpg::State`).
-pub const ARPG_STATE_NAMES: [&str; 14] = [
+pub const ARPG_STATE_NAMES: [&str; 15] = [
     "Chilled",
     "Frozen",
     "Ignited",
@@ -911,6 +920,7 @@ pub const ARPG_STATE_NAMES: [&str; 14] = [
     "Scorched Ground",
     "Frozen Ground",
     "Storm Ground",
+    "Vulnerable",
 ];
 
 /// One unit's states.
@@ -962,6 +972,53 @@ pub fn read_arpg_minions(r: &mut impl io::Read) -> io::Result<ArpgMinions> {
         horde: read_u8(r)?,
         horde_cap: read_u8(r)?,
         demon_name: read_cstring(r)?,
+    })
+}
+
+/// Barrier and the player's timed effects (cmangos `Arpg/ArpgBoons.h`), sent when they change.
+pub const SMSG_ARPG_BOONS: u16 = 0x0355;
+
+/// One boon: a shrine's buff with its time, or a standing effect of the place (no timer).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgBoon {
+    pub id: u8,
+    /// No timer: an effect of the place the player is in (a nightmare dungeon's affixes).
+    pub standing: bool,
+    /// Its time left when sent, and its whole length, in ms (0 for a standing one).
+    pub ms_left: u32,
+    pub ms_total: u32,
+    pub name: String,
+}
+
+/// `SMSG_ARPG_BOONS`: the Barrier pool and the boons, for the HUD.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ArpgBoons {
+    pub barrier: u32,
+    /// The player's maximum health as sent, for the Barrier's share of the orb.
+    pub max_health: u32,
+    pub boons: Vec<ArpgBoon>,
+}
+
+/// `SMSG_ARPG_BOONS`: `u32` barrier, `u32` maximum health, `u8` n, then per boon `u8` id, `u8`
+/// kind (0 timed, 1 standing), `u32` ms left, `u32` ms in all, cstring name.
+pub fn read_arpg_boons(r: &mut impl io::Read) -> io::Result<ArpgBoons> {
+    let barrier = read_u32_le(r)?;
+    let max_health = read_u32_le(r)?;
+    let n = read_u8(r)?;
+    let mut boons = Vec::with_capacity(capacity_hint(n, 255));
+    for _ in 0..n {
+        boons.push(ArpgBoon {
+            id: read_u8(r)?,
+            standing: read_u8(r)? != 0,
+            ms_left: read_u32_le(r)?,
+            ms_total: read_u32_le(r)?,
+            name: read_cstring(r)?,
+        });
+    }
+    Ok(ArpgBoons {
+        barrier,
+        max_health,
+        boons,
     })
 }
 
@@ -1169,10 +1226,11 @@ mod tests {
                 text: "Chains.".into(),
                 sealed: false,
                 page_home: String::new(),
+                choice: 0,
             }
         );
         assert!(skills.runes.is_empty());
-        assert!(read_arpg_skills(&mut [3u8].as_slice()).is_err());
+        assert!(read_arpg_skills(&mut [4u8].as_slice()).is_err());
     }
 
     #[test]
@@ -1224,6 +1282,36 @@ mod tests {
                 fits: 0b0010_1000,
             }]
         );
+    }
+
+    #[test]
+    fn skills_v3_read_each_nodes_choice_group() {
+        let mut body = vec![3];
+        body.extend_from_slice(&40u16.to_le_bytes());
+        body.extend_from_slice(&12u16.to_le_bytes());
+        body.extend_from_slice(&[30, 0, 1, 5]);
+        body.extend_from_slice(&688u32.to_le_bytes());
+        body.extend_from_slice(b"Demon\0Your demon.\0");
+        body.extend_from_slice(&[3, 20, 0, 10, 0]);
+        body.push(2);
+        for (id, choice) in [(570u16, 7u8), (571, 7)] {
+            body.extend_from_slice(&id.to_le_bytes());
+            body.extend_from_slice(&[4, 2, 3]);
+            body.extend_from_slice(&568u16.to_le_bytes());
+            body.extend_from_slice(&[1, 0]);
+            body.extend_from_slice(&688u32.to_le_bytes());
+            body.extend_from_slice(b"N\0T\0");
+            body.push(0);
+            body.push(0);
+            body.push(choice);
+        }
+        body.extend_from_slice(&0u16.to_le_bytes());
+        body.extend_from_slice(&[5, 0]);
+        let skills = read_arpg_skills(&mut body.as_slice()).unwrap();
+        let demon = &skills.skills[0];
+        assert_eq!(demon.nodes.len(), 2);
+        assert_eq!((demon.nodes[0].choice, demon.nodes[1].choice), (7, 7));
+        assert_eq!(demon.nodes[1].parent, 568);
     }
 
     #[test]
@@ -1560,6 +1648,30 @@ mod tests {
     }
 
     #[test]
+    fn boons_read_the_barrier_and_each_boon() {
+        let mut body = Vec::new();
+        body.extend_from_slice(&120u32.to_le_bytes());
+        body.extend_from_slice(&800u32.to_le_bytes());
+        body.push(2);
+        body.extend_from_slice(&[3, 0]);
+        body.extend_from_slice(&9000u32.to_le_bytes());
+        body.extend_from_slice(&20000u32.to_le_bytes());
+        body.extend_from_slice(b"Shrine of Greed\0");
+        body.extend_from_slice(&[100, 1]);
+        body.extend_from_slice(&0u32.to_le_bytes());
+        body.extend_from_slice(&0u32.to_le_bytes());
+        body.extend_from_slice(b"Bursting\0");
+        let b = read_arpg_boons(&mut body.as_slice()).unwrap();
+        assert_eq!((b.barrier, b.max_health), (120, 800));
+        assert_eq!(b.boons.len(), 2);
+        assert_eq!(b.boons[0].name, "Shrine of Greed");
+        assert_eq!((b.boons[0].ms_left, b.boons[0].ms_total), (9000, 20000));
+        assert!(!b.boons[0].standing);
+        assert!(b.boons[1].standing);
+        assert_eq!(b.boons[1].name, "Bursting");
+    }
+
+    #[test]
     fn states_read_each_unit() {
         let mut body = vec![2u8];
         for (guid, mask, daze) in [(0xF130_0000_0000_0001u64, 1u16 << 8, 0u8), (7, 0, 60)] {
@@ -1571,6 +1683,7 @@ mod tests {
         assert_eq!(states.len(), 2);
         assert_eq!(states[0].mask, 1 << 8);
         assert_eq!(ARPG_STATE_NAMES[8], "Dazed");
+        assert_eq!(ARPG_STATE_NAMES[14], "Vulnerable");
         assert_eq!(states[1].daze, 60);
     }
 }

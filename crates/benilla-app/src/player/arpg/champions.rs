@@ -83,19 +83,37 @@ pub(crate) struct ArpgEnemyStates {
 #[derive(Resource, Default)]
 pub(crate) struct ArpgMinionsHud(pub(crate) benilla_protocol::messages::arpg::ArpgMinions);
 
+/// Fork-only, not 1.12.1: the player's Barrier and boons (`SMSG_ARPG_BOONS`, cmangos
+/// `Arpg/ArpgBoons.h`), for the HUD (`ArpgHud_Boons`, pushed from `crate::ui_arpg::actions`). The
+/// serial moves with each message, so the same boons sent again (a renewed shrine) still push.
+#[derive(Resource, Default)]
+pub(crate) struct ArpgBoonsHud {
+    pub(crate) boons: benilla_protocol::messages::arpg::ArpgBoons,
+    pub(crate) serial: u32,
+}
+
 /// Registered whatever the view, so every session event kind has its owner.
 pub(super) fn register_net(app: &mut App) {
     app.init_resource::<ArpgChampions>()
         .init_resource::<ArpgEnemyStates>()
         .init_resource::<ArpgMinionsHud>()
+        .init_resource::<ArpgBoonsHud>()
         .net_handler(SessionEventKind::ArpgChampions, on_champions)
         .net_handler(SessionEventKind::ArpgStates, on_states)
-        .net_handler(SessionEventKind::ArpgMinions, on_minions);
+        .net_handler(SessionEventKind::ArpgMinions, on_minions)
+        .net_handler(SessionEventKind::ArpgBoons, on_boons);
 }
 
 fn on_minions(In(ev): In<SessionEvent>, mut hud: ResMut<ArpgMinionsHud>) {
     if let SessionEvent::ArpgMinions { minions } = ev {
         hud.0 = minions;
+    }
+}
+
+fn on_boons(In(ev): In<SessionEvent>, mut hud: ResMut<ArpgBoonsHud>) {
+    if let SessionEvent::ArpgBoons { boons } = ev {
+        hud.boons = boons;
+        hud.serial = hud.serial.wrapping_add(1);
     }
 }
 
