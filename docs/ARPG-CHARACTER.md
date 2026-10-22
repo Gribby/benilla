@@ -1829,7 +1829,7 @@ mask, after Vulnerable):
   and Lightning Shield's discharge with Charged Shield. It is a class rule, not the Nature tag, so
   a druid's Nature still Poisons.
 - A Shocked enemy takes 5% more damage from everyone per stack, up to 4 stacks (8 under
-  Overcharge), for 4 sec from the last (2 under Overcharge).
+  Overcharge), for 4 sec from the last (3 under Overcharge).
 - **Consumed** by Earth Shock for an extra hit of 25% of its hit per stack.
 - The hover bar shows it, and the enemy wears Lightning Shield's orbs.
 
@@ -1863,6 +1863,8 @@ mask, after Vulnerable):
   - they don't move or leash (Walking Totems aside), one of each element at a time, as in vanilla.
 - Talent spells come free at their row's level, as for every class: Stormstrike, Elemental
   Mastery, Mana Tide Totem.
+- Totem spells are scored as the totem's, a minion's, through the core's owner redirect
+  (`Arpg::TotemCastScope`); totems take minion life too.
 - **Not built:** totems placed where you aim (they go up at your feet), Tremor Totem breaking
   stuns, and Totemic Recall.
 
@@ -1987,7 +1989,7 @@ side. Restoration's smalls carry the minion stats, for the totems.
 | Keystone | Side | Effect |
 |---|---|---|
 | **Thunderlord** | Elemental | Lightning Bolt always chains to 2 more within 10 yd at 50% (the roadmap's "Lightning Bolt always chains"); Lightning deals 15% less |
-| **Overcharge** | Elemental | Shocked stacks to 8; Shock lasts half as long |
+| **Overcharge** | Elemental | Shocked stacks to 8; it lasts 3 sec, not 4 |
 | **Walking Totems** | Restoration | Your totems walk with you; they deal 15% less |
 | **Totem Lord** | Restoration | Your totems deal 50% more; your own spells deal 20% less |
 | **Windwalker** | Enhancement | Your Windfury Weapon strikes twice as often (20% more a swing); your spells deal 30% less |
