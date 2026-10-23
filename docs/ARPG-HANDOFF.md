@@ -266,6 +266,10 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 
 ### Pitfalls that have bitten
 
+- **Maps registered at run time and the vmap/navmesh managers:** both take their list of maps at
+  startup and assert on any other map id (`VMapManager2::_loadMap`, `MMapManager::loadMap`). The
+  rift map (520) is registered later, so `TerrainInfo::LoadMapAndVMap` skips both for it; it
+  crashed on entering a rift once vmaps were on (2026-10-23). A new synthetic map needs the same.
 - **Lua's 200 locals:** `arpg_hud.lua` is one chunk, and a Lua function holds at most 200 locals
   at once. A test that puts a line of its own in front of the addon tipped it over (2026-10-22).
   New HUD state goes into a table (`boonHud`), or a section goes in a `do ... end` block (the web
