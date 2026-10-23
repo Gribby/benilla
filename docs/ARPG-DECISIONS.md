@@ -89,6 +89,12 @@ tunnels between sheer rock walls the camera looks down into, not WoW's real inte
 the rift map as areas of their own rather than a separate map id: the same effect, without binds
 to cross between maps.)
 
+**Buildings collide (2026-10-23),** at Jeff's ask. The server, not the client, chooses each
+random area's building from Elwynn's own WMOs in its vmaps, and puts the real model into the
+instance as dynamic collision, so line of sight, bolts and heights meet its walls. Creatures walk
+round the buildings' footprints, since the areas have no navmesh. The client draws the building
+the server names.
+
 **Deferred:** a weekly raid objective, and the camera's per-room cutaway.
 
 **Working agreements**

@@ -1059,6 +1059,10 @@ pub struct ArpgRiftLayout {
     /// A side area's look beyond its sites (1 webs, 2 candles, 3 dig works, 4 burnt farms,
     /// 5 wolf woods, 6 warren), 0 none.
     pub flavour: u8,
+    /// Each site's building, as `sites` (newer servers; empty otherwise): the model's vmaps
+    /// name (the WMO's file name, its spaces underscores; empty where it raised none, and the
+    /// client picks its own) and the height its origin stands at. The server's collision is that model, at the site turned its way.
+    pub buildings: Vec<(String, f32)>,
 }
 
 /// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
@@ -1120,6 +1124,15 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
                 Err(e) => return Err(e),
             };
+            let buildings_n = match read_u8(r) {
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
+                Err(e) => return Err(e),
+            };
+            let mut buildings = Vec::with_capacity(usize::from(buildings_n));
+            for _ in 0..buildings_n {
+                buildings.push((read_cstring(r)?, read_f32_le(r)?));
+            }
             Ok(ArpgRift::Layout(ArpgRiftLayout {
                 id,
                 gx0,
@@ -1132,6 +1145,7 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 marks,
                 sites,
                 flavour,
+                buildings,
             }))
         }
         2 => {
@@ -1299,6 +1313,18 @@ mod tests {
             panic!("a layout");
         };
         assert_eq!(burnt.flavour, 4);
+        assert!(burnt.buildings.is_empty());
+        bytes.push(1);
+        bytes.extend_from_slice(b"Elwynn_Farm_01.wmo\0");
+        bytes.extend_from_slice(&58.5f32.to_le_bytes());
+        let ArpgRift::Layout(built) = read_arpg_rift(&mut bytes.as_slice()).expect("buildings")
+        else {
+            panic!("a layout");
+        };
+        assert_eq!(
+            built.buildings,
+            vec![("Elwynn_Farm_01.wmo".to_string(), 58.5)]
+        );
     }
 
     #[test]

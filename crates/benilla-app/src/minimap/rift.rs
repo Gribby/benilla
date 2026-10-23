@@ -270,6 +270,7 @@ mod tests {
             marks: Vec::new(),
             sites: Vec::new(),
             flavour: 0,
+            buildings: Vec::new(),
         }
     }
 

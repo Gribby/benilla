@@ -56,6 +56,10 @@ pub struct RiftLayout {
     pub sites: Vec<RiftSite>,
     /// A side area's look beyond its sites: [`FLAVOUR_WEBS`] and the rest, 0 none.
     pub flavour: u8,
+    /// Each site's building as the server raised it (its collision): the WMO's vmaps name and
+    /// its origin's height, by the site's index. Empty from older servers, and a name empty
+    /// where the server raised none: then the client picks one itself.
+    pub buildings: Vec<(String, f32)>,
 }
 
 /// Jasperlode Hollow: webs and egg sacs, from Duskwood's tiles.
@@ -685,6 +689,9 @@ struct DressKit {
     /// Burnt farmhouses (a hideout's), with their lift; the burnt props round them.
     burnt_houses: Vec<(String, f32)>,
     burnt: Vec<String>,
+    /// Every WMO the tiles hold, by its vmaps name ([`vmaps_name`]): the server names a site's
+    /// building so.
+    by_vmaps_name: HashMap<String, String>,
     /// A Defias camp's tents, bedrolls and crates; a den's bones; a wolf wood's trees.
     defias: Vec<String>,
     bones: Vec<String>,
@@ -719,6 +726,9 @@ impl DressKit {
             "azora",
         ];
         for w in &source.wmos {
+            self.by_vmaps_name
+                .entry(vmaps_name(&w.model))
+                .or_insert_with(|| w.model.clone());
             let lower = w.model.to_ascii_lowercase();
             if named(&lower, &GRAND) {
                 continue;
@@ -850,9 +860,44 @@ fn dress_uid(chunk_index: u32, ordinal: u32) -> u32 {
     RIFT_UID_BASE | (chunk_index << 18) | 0x1_0000 | (ordinal & 0xFFFF)
 }
 
+/// A model path as the server's vmaps name it, compared without case: the file's name, its
+/// spaces underscores.
+fn vmaps_name(path: &str) -> String {
+    path.rsplit(['\\', '/'])
+        .next()
+        .unwrap_or(path)
+        .to_ascii_lowercase()
+        .replace(' ', "_")
+}
+
 /// One of a site's buildings, with its lift over the ground.
 fn pick_building(list: &[(String, f32)], rng: &mut Rng) -> Option<(String, f32)> {
     (!list.is_empty()).then(|| list[rng.next() as usize % list.len()].clone())
+}
+
+/// A site's building and its origin's height: the one the server raised (where its collision
+/// is), else (an older server, one without vmaps, a site it raised none at, or a model no tile
+/// here holds) one picked from `list`, without collision.
+fn site_building(
+    layout: &RiftLayout,
+    kit: &DressKit,
+    index: usize,
+    site: &RiftSite,
+    list: &[(String, f32)],
+    rng: &mut Rng,
+) -> Option<(String, f32)> {
+    let picked = pick_building(list, rng);
+    if let Some((name, z)) = layout
+        .buildings
+        .get(index)
+        .filter(|(name, _)| !name.is_empty())
+    {
+        if let Some(model) = kit.by_vmaps_name.get(&vmaps_name(name)) {
+            return Some((model.clone(), *z));
+        }
+        bevy::log::warn!("rift: the server's building {name} is in none of the area's tiles");
+    }
+    picked.map(|(model, lift)| (model, site.z + lift))
 }
 
 /// The tile's dressing: the sites whose centre it holds, and obstacles on its open ground.
@@ -933,10 +978,11 @@ fn dress_tile(
                 } else {
                     &kit.houses
                 };
-                if let Some((model, lift)) = pick_building(houses, &mut rng) {
+                if let Some((model, z)) = site_building(layout, kit, index, site, houses, &mut rng)
+                {
                     wmos.push(WmoInstance {
                         model,
-                        position: [cx, cy, site.z + lift],
+                        position: [cx, cy, z],
                         rotation: [0.0, rotation_y(o), 0.0],
                         unique_id: uid(),
                         doodad_set: 0,
@@ -1005,10 +1051,12 @@ fn dress_tile(
                 }
             }
             SITE_TOWER => {
-                if let Some((model, lift)) = pick_building(&kit.towers, &mut rng) {
+                if let Some((model, z)) =
+                    site_building(layout, kit, index, site, &kit.towers, &mut rng)
+                {
                     wmos.push(WmoInstance {
                         model,
-                        position: [cx, cy, site.z + lift],
+                        position: [cx, cy, z],
                         rotation: [0.0, rotation_y(o), 0.0],
                         unique_id: uid(),
                         doodad_set: 0,
@@ -1350,6 +1398,7 @@ mod tests {
             marks: Vec::new(),
             sites: Vec::new(),
             flavour: 0,
+            buildings: Vec::new(),
         }
     }
 
@@ -1522,6 +1571,46 @@ mod tests {
         for d in d0.iter().filter(|d| d.model.contains("Rock")) {
             assert!((d.position[0] - fx).hypot(d.position[1] - fy) > 22.0);
         }
+    }
+
+    #[test]
+    fn a_site_raises_the_building_the_server_named_where_its_collision_is() {
+        assert_eq!(
+            vmaps_name("World\\wmo\\Azeroth\\Buildings\\Human Farm\\Human Farm.WMO"),
+            "human_farm.wmo"
+        );
+        let mut layout = flat_layout(60.0);
+        let (fx, fy) = (
+            (32.0 - 20.0) * TILE_SIZE - 40.0 * UNIT as f32,
+            (32.0 - 23.0) * TILE_SIZE - 40.0 * UNIT as f32,
+        );
+        layout.sites = vec![RiftSite {
+            kind: SITE_FARMSTEAD,
+            x: fx,
+            y: fy,
+            z: 60.0,
+            o: 1.0,
+            radius: 22.0,
+        }];
+        let barn = "World\\wmo\\Azeroth\\Buildings\\Barn\\Elwynn Barn.wmo".to_string();
+        let mut kit = DressKit {
+            houses: vec![("Farm.wmo".into(), 0.5)],
+            ..DressKit::default()
+        };
+        kit.by_vmaps_name.insert(vmaps_name(&barn), barn.clone());
+        layout.buildings = vec![("Elwynn_Barn.wmo".into(), 61.25)];
+        let (mut d, mut w) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 0, 0, &mut d, &mut w);
+        assert_eq!(w.len(), 1);
+        assert_eq!(
+            (w[0].model.as_str(), w[0].position[2]),
+            (barn.as_str(), 61.25)
+        );
+        // None raised there (a server without vmaps): the client's own pick, as before.
+        layout.buildings = vec![(String::new(), 60.0)];
+        let (mut d, mut w) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 0, 0, &mut d, &mut w);
+        assert_eq!((w[0].model.as_str(), w[0].position[2]), ("Farm.wmo", 60.5));
     }
 
     #[test]

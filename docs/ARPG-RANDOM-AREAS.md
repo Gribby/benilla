@@ -232,7 +232,8 @@ camps) with buildings and obstacles.
   own). A layout puts them at clearings (a chunk open all round), four chunks apart, away from
   the start, the exit and the branches, and levels the ground under each (blending back over six
   yards). Packs keep two chunks clear of them, but a gnoll camp gets its own pack round its fire.
-  The sites go to the client with the layout (`SMSG_ARPG_RIFT`, after the marks).
+  The sites go to the client with the layout (`SMSG_ARPG_RIFT`, after the marks); each site's
+  building (a vmaps name and a height) after the flavour.
 - **Dressed by the client** (`benilla-assets` `rift.rs`, `DressKit`, `dress_tile`), from models
   in the area's own source tiles, found by name: a farmstead is one of those tiles' farmhouses or
   barns (towns, the abbey, walls, mines and the Tower of Azora left out) in a fence ring with a
@@ -240,10 +241,25 @@ camps) with buildings and obstacles.
   camp is tents round a fire, bones and banners; a watchtower one of the tiles' towers with rubble;
   a logging site logs, stumps and a sawhorse. A site whose tiles have no fitting model is dressed
   with what they have. Rocks, logs and stumps stand on a third of the open chunks, clear of sites.
-- **The limit:** the buildings are the client's alone. Players collide with them, but the server
-  has no collision for this map, so creatures and spells pass through their walls. Sites keep
-  packs away so fights rarely meet a building; real collision waits on navmeshes built at run
-  time (Phase 2).
+- **Server collision.** The server picks each farmstead's and watchtower's building, not the
+  client: at start it reads map 0's vmaps tiles for the source grids (and the burnt farms'
+  borrowed grids), keeps the WMOs named like a farm, barn, tower or burnt farm (the client's
+  keywords), with each one's lift over the ground it stood on and its footprint (the model's
+  bounds). A site takes one from the area's own grids (the client has those tiles); the
+  hideout's farmsteads are burnt farms. A site with none (no fitting WMO there) gets the client's
+  own pick, without collision. The layout packet names it per site (its vmaps name, after the flavour) with the height
+  its origin stands at, and the client draws that WMO (found by file name among the area's tiles;
+  an older server, or a name no tile holds, falls back to the client's own pick).
+  When the area's creatures are placed, each building's vmaps model goes into the instance's map
+  as a dynamic model (`GameObjectModel::constructNamed`, `Map::InsertGameObjectModel`), so line of
+  sight, bolts (they stop at `GetHitPosition`), knockbacks and heights meet its walls. The map has
+  no navmesh, so a creature walks straight; `PathFinder::BuildShortcut` hands its walk to
+  `Arpg::RiftDetour`, which goes round any building footprint in the way by the footprints'
+  corners (the shortest way, a yard or two out from the walls). A walk starting or ending inside a
+  footprint (a player by a wall or under the eaves) is routed to the nearest point just outside
+  it, then on. Players collide with the WMO on the client as anywhere.
+  Without vmaps on the server there are no buildings in the catalogue: the client picks its own,
+  without collision, as before.
 
 ## Built: the side areas' own looks
 
