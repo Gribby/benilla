@@ -606,8 +606,10 @@ fn rotation_y(heading: f32) -> f32 {
 #[derive(Default)]
 struct DressKit {
     /// Buildings (WMOs): a farm's house or barn, a watchtower.
-    houses: Vec<String>,
-    towers: Vec<String>,
+    /// With each its origin's height over the ground it stood on in its source tile, so it sits as
+    /// it was built (a buried foundation stays buried).
+    houses: Vec<(String, f32)>,
+    towers: Vec<(String, f32)>,
     /// Props (M2s) by use.
     fences: Vec<String>,
     hay: Vec<String>,
@@ -651,13 +653,23 @@ impl DressKit {
             if named(&lower, &GRAND) {
                 continue;
             }
+            let lift = source
+                .chunks
+                .iter()
+                .find_map(|c| source_ground(c, w.position[0], w.position[1]))
+                .map_or(0.0, |ground| w.position[2] - ground);
+            let building = |list: &mut Vec<(String, f32)>| {
+                if list.len() < 12 && !list.iter().any(|(n, _)| n == &w.model) {
+                    list.push((w.model.clone(), lift));
+                }
+            };
             if named(&lower, &["tower"]) {
-                add(&mut self.towers, &w.model);
+                building(&mut self.towers);
             } else if named(
                 &lower,
                 &["farm", "barn", "house", "shack", "cottage", "mill"],
             ) {
-                add(&mut self.houses, &w.model);
+                building(&mut self.houses);
             }
         }
         for d in &source.doodads {
@@ -669,7 +681,13 @@ impl DressKit {
             } else if named(
                 &lower,
                 &[
-                    "pumpkin", "wheat", "corn", "crop", "cabbage", "squash", "vine",
+                    "pumpkin",
+                    "wheat",
+                    "cornstalk",
+                    "crop",
+                    "cabbage",
+                    "squash",
+                    "grape",
                 ],
             ) {
                 add(&mut self.crops, &d.model);
@@ -701,7 +719,9 @@ impl DressKit {
             ) {
                 add(&mut self.logging, &d.model);
             }
-            if named(&lower, &["rock", "boulder", "stump", "log"]) && !named(&lower, &["tree"]) {
+            if named(&lower, &["rock", "boulder", "stump", "log"])
+                && !named(&lower, &["tree", "cliff"])
+            {
                 add(&mut self.obstacles, &d.model);
             }
         }
@@ -712,6 +732,11 @@ impl DressKit {
 /// count with bit 16 set (cave props take bit 17).
 fn dress_uid(chunk_index: u32, ordinal: u32) -> u32 {
     RIFT_UID_BASE | (chunk_index << 18) | 0x1_0000 | (ordinal & 0xFFFF)
+}
+
+/// One of a site's buildings, with its lift over the ground.
+fn pick_building(list: &[(String, f32)], rng: &mut Rng) -> Option<(String, f32)> {
+    (!list.is_empty()).then(|| list[rng.next() as usize % list.len()].clone())
 }
 
 /// The tile's dressing: the sites whose centre it holds, and obstacles on its open ground.
@@ -787,10 +812,10 @@ fn dress_tile(
             };
         match site.kind {
             SITE_FARMSTEAD => {
-                if let Some(model) = pick(&kit.houses, &mut rng) {
+                if let Some((model, lift)) = pick_building(&kit.houses, &mut rng) {
                     wmos.push(WmoInstance {
                         model,
-                        position: [cx, cy, site.z],
+                        position: [cx, cy, site.z + lift],
                         rotation: [0.0, rotation_y(o), 0.0],
                         unique_id: uid(),
                         doodad_set: 0,
@@ -859,10 +884,10 @@ fn dress_tile(
                 }
             }
             SITE_TOWER => {
-                if let Some(model) = pick(&kit.towers, &mut rng) {
+                if let Some((model, lift)) = pick_building(&kit.towers, &mut rng) {
                     wmos.push(WmoInstance {
                         model,
-                        position: [cx, cy, site.z],
+                        position: [cx, cy, site.z + lift],
                         rotation: [0.0, rotation_y(o), 0.0],
                         unique_id: uid(),
                         doodad_set: 0,
@@ -923,6 +948,14 @@ fn dress_tile(
                 .sites
                 .iter()
                 .any(|s| (s.x - x).hypot(s.y - y) < s.radius + 6.0)
+            {
+                continue;
+            }
+            // Nor on the arrival, the exit, the way back or a side area's door.
+            if layout
+                .marks
+                .iter()
+                .any(|&(_, mx, my)| (mx - x).hypot(my - y) < 14.0)
             {
                 continue;
             }
@@ -1059,6 +1092,14 @@ fn place_doodads(
         };
         seen.push(d.unique_id);
         let (x, y) = (d.position[0] + dx, d.position[1] + dy);
+        // A site's ground is its own: no source tree in a farmhouse or a crop row.
+        if layout
+            .sites
+            .iter()
+            .any(|s| (s.x - x).hypot(s.y - y) < s.radius + 2.0)
+        {
+            continue;
+        }
         let now = layout.ground(x, y);
         let mut moved = d.clone();
         moved.position = [x, y, d.position[2] + (now - was)];
@@ -1206,7 +1247,10 @@ mod tests {
             },
         ];
         let kit = DressKit {
-            houses: vec!["World\\wmo\\Azeroth\\Buildings\\HumanFarm\\Farm.wmo".into()],
+            houses: vec![(
+                "World\\wmo\\Azeroth\\Buildings\\HumanFarm\\Farm.wmo".into(),
+                0.5,
+            )],
             fences: vec!["World\\Generic\\Human\\Passive Doodads\\Fences\\Fence.mdx".into()],
             crops: vec!["World\\Azeroth\\Elwynn\\Passive Doodads\\Pumpkin.mdx".into()],
             hay: vec!["World\\Generic\\Hay.mdx".into()],
@@ -1221,7 +1265,11 @@ mod tests {
         // The farmstead's house is tile (0, 0)'s, on the levelled ground; the plot has none.
         assert_eq!(w0.len(), 1);
         assert!(w1.is_empty());
-        assert_eq!(w0[0].position, [fx, fy, 60.0]);
+        assert_eq!(
+            w0[0].position,
+            [fx, fy, 60.5],
+            "levelled ground, lifted as built"
+        );
         // A fence ring round the farmstead, crops in the plot, and every id distinct.
         let fences = d0.iter().filter(|d| d.model.contains("Fence")).count();
         assert!(fences > 20, "{fences} fence pieces");
