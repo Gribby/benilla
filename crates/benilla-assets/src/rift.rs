@@ -71,6 +71,18 @@ impl RiftLayout {
         (i, j)
     }
 
+    /// The ground height at a (fractional) node, bilinear.
+    fn ground_at_node(&self, i: f32, j: f32) -> f32 {
+        let max = (RIFT_NODES - 1) as f32;
+        let (i, j) = (i.clamp(0.0, max), j.clamp(0.0, max));
+        let (i0, j0) = (i.floor() as usize, j.floor() as usize);
+        let (ti, tj) = (i - i0 as f32, j - j0 as f32);
+        let h = |a: usize, b: usize| self.height(a, b);
+        let top = h(i0, j0) * (1.0 - tj) + h(i0, j0 + 1) * tj;
+        let bottom = h(i0 + 1, j0) * (1.0 - tj) + h(i0 + 1, j0 + 1) * tj;
+        top * (1.0 - ti) + bottom * ti
+    }
+
     /// The ground height under a WoW (x, y), bilinear over the outer heights.
     pub fn ground(&self, x: f32, y: f32) -> f32 {
         let (i, j) = self.node_at(x, y);
@@ -206,15 +218,38 @@ struct CaveKit {
     wall: Option<String>,
     props: Vec<String>,
     lights: Vec<String>,
+    /// Every texture seen, for a floor or a wall the names didn't give.
+    seen: Vec<String>,
 }
 
 /// Sources a cave reads for its kit; it takes no chunk of theirs.
 const CAVE_SOURCES: usize = 4;
 
 impl CaveKit {
+    /// A floor and a wall from what was seen when the names gave neither.
+    fn settle(&mut self) {
+        if self.floor.is_none() {
+            self.floor = self
+                .seen
+                .iter()
+                .find(|t| Some(*t) != self.wall.as_ref())
+                .cloned();
+        }
+        if self.wall.is_none() {
+            self.wall = self
+                .seen
+                .iter()
+                .find(|t| Some(*t) != self.floor.as_ref())
+                .cloned();
+        }
+    }
+
     fn take(&mut self, source: &TileMesh) {
         for chunk in &source.chunks {
             for name in &chunk.layer_textures {
+                if self.seen.len() < 16 && !self.seen.contains(name) {
+                    self.seen.push(name.clone());
+                }
                 let lower = name.to_ascii_lowercase();
                 if self.wall.is_none() && (lower.contains("rock") || lower.contains("cliff")) {
                     self.wall = Some(name.clone());
@@ -272,9 +307,17 @@ impl RiftComposer {
         }
         let mut sources: Vec<_> = by_source.into_iter().collect();
         sources.sort_by_key(|(k, _)| *k);
-        // A cave reads a few sources for its kit only.
+        // A cave reads a few sources for its kit only: the same few for all its tiles (from all
+        // its pieces), or each quarter would paint and furnish itself its own way.
         if layout.theme == THEME_CAVE {
-            sources.truncate(CAVE_SOURCES);
+            let mut all: Vec<(u8, u8)> = layout.pieces.iter().map(|p| (p[0], p[1])).collect();
+            all.sort_unstable();
+            all.dedup();
+            sources = all
+                .into_iter()
+                .take(CAVE_SOURCES)
+                .map(|k| (k, Vec::new()))
+                .collect();
         }
         Some(Self {
             layout,
@@ -340,6 +383,7 @@ impl RiftComposer {
     /// The tile: its chunks and doodads, no buildings.
     pub fn finish(mut self) -> TileMesh {
         if self.layout.theme == THEME_CAVE {
+            self.kit.settle();
             let (ox, oy) = self.tile;
             for ca in 0..16 {
                 for cb in 0..16 {
@@ -529,9 +573,11 @@ fn cave_props(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize, out: &mu
             if steepness(layout, i, j) > 0.05 {
                 continue;
             }
-            let walled = [(-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)]
+            // Beside a wall rising over it, not on the rim above one.
+            let here = layout.ground_at_node(i, j);
+            let walled = [(-3.0, 0.0), (3.0, 0.0), (0.0, -3.0), (0.0, 3.0)]
                 .iter()
-                .any(|(di, dj)| steepness(layout, i + di, j + dj) > 0.35);
+                .any(|(di, dj)| layout.ground_at_node(i + di, j + dj) > here + 10.0);
             if !walled || rng.unit() > 0.12 {
                 continue;
             }
@@ -679,6 +725,7 @@ mod tests {
             wall: Some("Tileset\\Elwynn\\ElwynnRock.blp".into()),
             props: vec!["World\\Generic\\MineCart.mdx".into()],
             lights: vec!["World\\Generic\\Lantern.mdx".into()],
+            seen: Vec::new(),
         };
         // Chunk 5 along X spans nodes 40..48: its first rows are the wall.
         let chunk = cave_chunk(&layout, &kit, 5, 3);
@@ -688,32 +735,45 @@ mod tests {
         let n = benilla_formats::ALPHA_MAP_SIZE as usize;
         assert!(alpha[(4 * n + 10) * 4] > 200, "the wall is rock");
         assert_eq!(alpha[((n - 4) * n + 10) * 4], 0, "the floor is dirt");
-        // Props stand on flat floor beside the wall, on the ground.
+        // Props stand on the floor at the wall's foot (chunk 4, below it), on the ground, and
+        // none on the rim above (chunk 5's far side).
         let mut props = Vec::new();
         for lb in 0..32 {
-            cave_props(&layout, &kit, 5, lb, &mut props);
+            cave_props(&layout, &kit, 4, lb, &mut props);
         }
         assert!(!props.is_empty());
         for p in &props {
             assert!((p.position[2] - layout.ground(p.position[0], p.position[1])).abs() < 0.01);
             assert!(
-                p.position[2] >= 89.0,
-                "on the high floor past the wall: {}",
+                p.position[2] < 61.0,
+                "on the floor below the wall: {}",
                 p.position[2]
             );
         }
+        let mut rim = Vec::new();
+        for lb in 0..32 {
+            cave_props(&layout, &kit, 5, lb, &mut rim);
+        }
+        assert!(
+            rim.iter().all(|p| p.position[2] < 61.0),
+            "nothing on the rim"
+        );
         let mut again = Vec::new();
         for lb in 0..32 {
-            cave_props(&layout, &kit, 5, lb, &mut again);
+            cave_props(&layout, &kit, 4, lb, &mut again);
         }
         assert_eq!(
             props.len(),
             again.len(),
             "the same props for the same layout"
         );
-        // A cave reads few sources.
-        let composer = RiftComposer::new(Arc::new(layout), 23, 20).expect("covered");
-        assert!(composer.sources.len() <= CAVE_SOURCES);
+        // A cave reads few sources, the same for each of its tiles.
+        let layout = Arc::new(layout);
+        let first = RiftComposer::new(layout.clone(), 23, 20).expect("covered");
+        let second = RiftComposer::new(layout, 24, 21).expect("covered");
+        assert!(first.sources.len() <= CAVE_SOURCES);
+        let keys = |c: &RiftComposer| c.sources.iter().map(|(k, _)| *k).collect::<Vec<_>>();
+        assert_eq!(keys(&first), keys(&second));
     }
 
     #[test]
