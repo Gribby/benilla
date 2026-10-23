@@ -93,6 +93,20 @@ fn take_rift(assembly: &mut RiftAssembly, rift: ArpgRift) -> Option<RiftLayout> 
                 heights,
                 theme: header.theme,
                 marks: header.marks,
+                sites: header
+                    .sites
+                    .into_iter()
+                    .map(
+                        |(kind, [x, y, z, o, radius])| benilla_assets::rift::RiftSite {
+                            kind,
+                            x,
+                            y,
+                            z,
+                            o,
+                            radius,
+                        },
+                    )
+                    .collect(),
             })
         }
     }
@@ -116,6 +130,7 @@ mod tests {
             pieces: vec![[48, 32, 0, 0]; 256],
             theme: 1,
             marks: vec![(1, -1.0, 2.0)],
+            sites: Vec::new(),
         };
         assert!(take_rift(&mut assembly, ArpgRift::Layout(header)).is_none());
         let mut whole = None;

@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use benilla_formats::{adt_to_tile_mesh, ChunkMesh, Doodad, TileMesh, TILE_SIZE};
+use benilla_formats::{adt_to_tile_mesh, ChunkMesh, Doodad, TileMesh, WmoInstance, TILE_SIZE};
 
 /// The rifts' map id: in no `Map.dbc`, defined by the server and here alike.
 pub const RIFT_MAP: u32 = 520;
@@ -52,7 +52,33 @@ pub struct RiftLayout {
     /// Its marks, for the map: (kind, x, y), kind 1 the exit, 2 the way back, 3 a side area's
     /// entrance, 4 a side area's boss.
     pub marks: Vec<(u8, f32, f32)>,
+    /// Its building sites, dressed by the tile holding each one's centre.
+    pub sites: Vec<RiftSite>,
 }
+
+/// A building site the server keeps clear and levels: [`SITE_FARMSTEAD`] and the rest.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RiftSite {
+    pub kind: u8,
+    pub x: f32,
+    pub y: f32,
+    /// The levelled ground's height.
+    pub z: f32,
+    /// Its facing, radians, WoW's.
+    pub o: f32,
+    pub radius: f32,
+}
+
+/// A farmhouse or barn in a fence ring, with hay, a cart, barrels and a scarecrow.
+pub const SITE_FARMSTEAD: u8 = 1;
+/// A fenced plot of crops in rows.
+pub const SITE_PLOT: u8 = 2;
+/// Tents round a fire, bones and a banner: a gnoll camp.
+pub const SITE_CAMP: u8 = 3;
+/// A watchtower and its rubble.
+pub const SITE_TOWER: u8 = 4;
+/// Felled logs, stumps and a sawhorse.
+pub const SITE_LOGGING: u8 = 5;
 
 /// A layout of Elwynn's own chunks.
 pub const THEME_OUTDOOR: u8 = 0;
@@ -217,8 +243,11 @@ pub struct RiftComposer {
     next: usize,
     chunks: Vec<ChunkMesh>,
     doodads: Vec<Doodad>,
+    wmos: Vec<WmoInstance>,
     /// A cave's textures and props, found in its sources.
     kit: CaveKit,
+    /// An outdoor area's buildings and props for its sites, found in its sources.
+    dress: DressKit,
     tile: (usize, usize),
 }
 
@@ -337,7 +366,9 @@ impl RiftComposer {
             next: 0,
             chunks: Vec::with_capacity(256),
             doodads: Vec::new(),
+            wmos: Vec::new(),
             kit: CaveKit::default(),
+            dress: DressKit::default(),
             tile: (ox, oy),
         })
     }
@@ -365,6 +396,7 @@ impl RiftComposer {
             self.kit.take(&source);
             return;
         }
+        self.dress.take(&source);
         let src_nw_x = (32.0 - f64::from(*sgx)) * f64::from(TILE_SIZE);
         let src_nw_y = (32.0 - f64::from(*sgy)) * f64::from(TILE_SIZE);
         for w in wanted {
@@ -405,6 +437,16 @@ impl RiftComposer {
                     cave_props(&self.layout, &self.kit, la, lb, &mut self.doodads);
                 }
             }
+        } else {
+            let (ox, oy) = self.tile;
+            dress_tile(
+                &self.layout,
+                &self.dress,
+                ox,
+                oy,
+                &mut self.doodads,
+                &mut self.wmos,
+            );
         }
         // MCIN order (row by row from the north-west), which `chunk_at` assumes of a whole tile;
         // the chunks were placed grouped by source.
@@ -412,7 +454,7 @@ impl RiftComposer {
         TileMesh {
             chunks: self.chunks,
             doodads: self.doodads,
-            wmos: Vec::new(),
+            wmos: self.wmos,
         }
     }
 }
@@ -550,6 +592,350 @@ fn cave_chunk(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize) -> Chunk
         area_id: u32::from(layout.area),
         impassable: false,
         liquids: Vec::new(),
+    }
+}
+
+/// A placement's Y rotation (degrees) that faces its model's front along a WoW heading
+/// (radians, 0 north): `placement_rotation` turns a model's +X to heading `ry + 180°`.
+fn rotation_y(heading: f32) -> f32 {
+    heading.to_degrees() - 180.0
+}
+
+/// What an outdoor area's sites are built from: models found in its own source tiles, so a
+/// Farmlands farmstead is one of the eastern farms' houses, by name.
+#[derive(Default)]
+struct DressKit {
+    /// Buildings (WMOs): a farm's house or barn, a watchtower.
+    houses: Vec<String>,
+    towers: Vec<String>,
+    /// Props (M2s) by use.
+    fences: Vec<String>,
+    hay: Vec<String>,
+    crops: Vec<String>,
+    farm: Vec<String>,
+    camp: Vec<String>,
+    fires: Vec<String>,
+    logging: Vec<String>,
+    obstacles: Vec<String>,
+}
+
+/// Whether a lowercased name has any of the words.
+fn named(lower: &str, words: &[&str]) -> bool {
+    words.iter().any(|w| lower.contains(w))
+}
+
+impl DressKit {
+    fn take(&mut self, source: &TileMesh) {
+        fn add(list: &mut Vec<String>, name: &str) {
+            if list.len() < 12 && !list.iter().any(|n| n == name) {
+                list.push(name.to_string());
+            }
+        }
+        // Not a farmstead's: the towns', the abbey, the walls and the mines.
+        const GRAND: [&str; 12] = [
+            "abbey",
+            "church",
+            "cathedral",
+            "stormwind",
+            "keep",
+            "wall",
+            "bridge",
+            "inn",
+            "mine",
+            "cave",
+            "dungeon",
+            "azora",
+        ];
+        for w in &source.wmos {
+            let lower = w.model.to_ascii_lowercase();
+            if named(&lower, &GRAND) {
+                continue;
+            }
+            if named(&lower, &["tower"]) {
+                add(&mut self.towers, &w.model);
+            } else if named(
+                &lower,
+                &["farm", "barn", "house", "shack", "cottage", "mill"],
+            ) {
+                add(&mut self.houses, &w.model);
+            }
+        }
+        for d in &source.doodads {
+            let lower = d.model.to_ascii_lowercase();
+            if named(&lower, &["fence"]) {
+                add(&mut self.fences, &d.model);
+            } else if named(&lower, &["hay"]) {
+                add(&mut self.hay, &d.model);
+            } else if named(
+                &lower,
+                &[
+                    "pumpkin", "wheat", "corn", "crop", "cabbage", "squash", "vine",
+                ],
+            ) {
+                add(&mut self.crops, &d.model);
+            } else if named(
+                &lower,
+                &[
+                    "cart",
+                    "wagon",
+                    "barrel",
+                    "crate",
+                    "trough",
+                    "well",
+                    "scarecrow",
+                    "sack",
+                    "plow",
+                ],
+            ) {
+                add(&mut self.farm, &d.model);
+            } else if named(
+                &lower,
+                &["tent", "banner", "bone", "skull", "gnoll", "totem"],
+            ) {
+                add(&mut self.camp, &d.model);
+            } else if named(&lower, &["campfire", "bonfire", "firepit", "fire"]) {
+                add(&mut self.fires, &d.model);
+            } else if named(
+                &lower,
+                &["log", "stump", "lumber", "saw", "woodpile", "axe"],
+            ) {
+                add(&mut self.logging, &d.model);
+            }
+            if named(&lower, &["rock", "boulder", "stump", "log"]) && !named(&lower, &["tree"]) {
+                add(&mut self.obstacles, &d.model);
+            }
+        }
+    }
+}
+
+/// Doodad and building ids for dressing, apart from moved and cave props: chunk index, then a
+/// count with bit 16 set (cave props take bit 17).
+fn dress_uid(chunk_index: u32, ordinal: u32) -> u32 {
+    RIFT_UID_BASE | (chunk_index << 18) | 0x1_0000 | (ordinal & 0xFFFF)
+}
+
+/// The tile's dressing: the sites whose centre it holds, and obstacles on its open ground.
+fn dress_tile(
+    layout: &RiftLayout,
+    kit: &DressKit,
+    ox: usize,
+    oy: usize,
+    doodads: &mut Vec<Doodad>,
+    wmos: &mut Vec<WmoInstance>,
+) {
+    let place = |model: &str, x: f32, y: f32, heading: f32, scale: f32, uid: u32| Doodad {
+        model: model.to_string(),
+        position: [x, y, layout.ground(x, y)],
+        rotation: [0.0, rotation_y(heading), 0.0],
+        scale,
+        unique_id: uid,
+    };
+    for (index, site) in layout.sites.iter().enumerate() {
+        let (si, sj) = layout.node_at(site.x, site.y);
+        let (ti, tj) = (si - (ox * 128) as f64, sj - (oy * 128) as f64);
+        if !(0.0..128.0).contains(&ti) || !(0.0..128.0).contains(&tj) {
+            continue;
+        }
+        let chunk_index = ((si / 8.0) as u32).min(31) * 32 + ((sj / 8.0) as u32).min(31);
+        let mut rng = Rng((u64::from(layout.id) << 24 ^ index as u64 ^ 0xD1B5_4A32_D192_ED03) | 1);
+        let mut n = 0u32;
+        let mut uid = || {
+            n += 1;
+            dress_uid(chunk_index, n)
+        };
+        let pick = |list: &Vec<String>, rng: &mut Rng| -> Option<String> {
+            (!list.is_empty()).then(|| list[rng.next() as usize % list.len()].clone())
+        };
+        let (cx, cy, r, o) = (site.x, site.y, site.radius, site.o);
+        let at = |a: f32, d: f32| (cx + (o + a).cos() * d, cy + (o + a).sin() * d);
+        let put =
+            |list: &Vec<String>, a: f32, d: f32, rng: &mut Rng, out: &mut Vec<Doodad>, uid: u32| {
+                if let Some(model) = pick(list, rng) {
+                    let (x, y) = at(a, d);
+                    out.push(place(
+                        &model,
+                        x,
+                        y,
+                        o + a + rng.unit() * 0.6 - 0.3,
+                        0.9 + rng.unit() * 0.2,
+                        uid,
+                    ));
+                }
+            };
+        // A fence ring at the edge, a gap facing the site's way in.
+        let fence_ring =
+            |rng: &mut Rng, out: &mut Vec<Doodad>, uid: &mut dyn FnMut() -> u32, radius: f32| {
+                let Some(model) = pick(&kit.fences, rng) else {
+                    return;
+                };
+                let steps = ((std::f32::consts::TAU * radius) / 3.5) as usize;
+                for k in 0..steps {
+                    let a = std::f32::consts::TAU * k as f32 / steps as f32;
+                    if a < 0.5 || a > std::f32::consts::TAU - 0.5 {
+                        continue; // the gate
+                    }
+                    let (x, y) = at(a, radius);
+                    out.push(place(
+                        &model,
+                        x,
+                        y,
+                        o + a + std::f32::consts::FRAC_PI_2,
+                        1.0,
+                        uid(),
+                    ));
+                }
+            };
+        match site.kind {
+            SITE_FARMSTEAD => {
+                if let Some(model) = pick(&kit.houses, &mut rng) {
+                    wmos.push(WmoInstance {
+                        model,
+                        position: [cx, cy, site.z],
+                        rotation: [0.0, rotation_y(o), 0.0],
+                        unique_id: uid(),
+                        doodad_set: 0,
+                        name_set: 0,
+                    });
+                }
+                fence_ring(&mut rng, doodads, &mut uid, r * 0.95);
+                for k in 0..2 {
+                    put(
+                        &kit.hay,
+                        2.2 + k as f32 * 0.5,
+                        r * 0.7,
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+                for k in 0..3 {
+                    put(
+                        &kit.farm,
+                        3.6 + k as f32 * 0.6,
+                        r * 0.75,
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
+            SITE_PLOT => {
+                fence_ring(&mut rng, doodads, &mut uid, r);
+                if let Some(model) = pick(&kit.crops, &mut rng) {
+                    // Rows across the plot.
+                    let (fx, fy) = (o.cos(), o.sin());
+                    let (sx, sy) = (-fy, fx);
+                    let mut row = -r * 0.7;
+                    while row <= r * 0.7 {
+                        let mut along = -r * 0.7;
+                        while along <= r * 0.7 {
+                            if row * row + along * along < r * r * 0.6 {
+                                let (x, y) =
+                                    (cx + fx * along + sx * row, cy + fy * along + sy * row);
+                                doodads.push(place(&model, x, y, o, 0.9 + rng.unit() * 0.2, uid()));
+                            }
+                            along += 2.5;
+                        }
+                        row += 3.0;
+                    }
+                }
+                put(&kit.farm, 0.0, r + 2.0, &mut rng, doodads, uid());
+            }
+            SITE_CAMP => {
+                put(&kit.fires, 0.0, 0.0, &mut rng, doodads, uid());
+                for k in 0..3 {
+                    let a = std::f32::consts::TAU * k as f32 / 3.0;
+                    put(&kit.camp, a, r * 0.6, &mut rng, doodads, uid());
+                }
+                for k in 0..3 {
+                    put(
+                        &kit.camp,
+                        1.0 + k as f32 * 2.1,
+                        r * 0.9,
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
+            SITE_TOWER => {
+                if let Some(model) = pick(&kit.towers, &mut rng) {
+                    wmos.push(WmoInstance {
+                        model,
+                        position: [cx, cy, site.z],
+                        rotation: [0.0, rotation_y(o), 0.0],
+                        unique_id: uid(),
+                        doodad_set: 0,
+                        name_set: 0,
+                    });
+                }
+                for k in 0..4 {
+                    put(
+                        &kit.obstacles,
+                        k as f32 * 1.6,
+                        r * 0.9,
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
+            SITE_LOGGING => {
+                for k in 0..7 {
+                    put(
+                        &kit.logging,
+                        k as f32 * 0.9,
+                        r * (0.3 + 0.1 * k as f32),
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    // Obstacles: now and then on a chunk's open ground, clear of the sites.
+    if kit.obstacles.is_empty() {
+        return;
+    }
+    for ca in 0..16 {
+        for cb in 0..16 {
+            let (la, lb) = (ox * 16 + ca, oy * 16 + cb);
+            let chunk_index = (la * 32 + lb) as u32;
+            let mut rng = Rng((u64::from(layout.id) << 28
+                ^ u64::from(chunk_index)
+                ^ 0x2545_F491_4F6C_DD1D)
+                | 1);
+            if rng.unit() > 0.3 {
+                continue;
+            }
+            let (i, j) = (
+                (la * 8) as f32 + 1.0 + rng.unit() * 6.0,
+                (lb * 8) as f32 + 1.0 + rng.unit() * 6.0,
+            );
+            if steepness(layout, i, j) > 0.15 {
+                continue;
+            }
+            let x = lattice(f64::from(layout.gx0) * 128.0 + f64::from(i));
+            let y = lattice(f64::from(layout.gy0) * 128.0 + f64::from(j));
+            if layout
+                .sites
+                .iter()
+                .any(|s| (s.x - x).hypot(s.y - y) < s.radius + 6.0)
+            {
+                continue;
+            }
+            let model = &kit.obstacles[rng.next() as usize % kit.obstacles.len()];
+            doodads.push(place(
+                model,
+                x,
+                y,
+                rng.unit() * std::f32::consts::TAU,
+                0.8 + rng.unit() * 0.5,
+                dress_uid(chunk_index, 0xF000),
+            ));
+        }
     }
 }
 
@@ -697,6 +1083,7 @@ mod tests {
             heights: vec![h; RIFT_NODES * RIFT_NODES],
             theme: THEME_OUTDOOR,
             marks: Vec::new(),
+            sites: Vec::new(),
         }
     }
 
@@ -787,6 +1174,86 @@ mod tests {
         assert!(first.sources.len() <= CAVE_SOURCES);
         let keys = |c: &RiftComposer| c.sources.iter().map(|(k, _)| *k).collect::<Vec<_>>();
         assert_eq!(keys(&first), keys(&second));
+    }
+
+    #[test]
+    fn sites_are_dressed_once_by_the_tile_holding_them_from_the_area_s_own_models() {
+        let mut layout = flat_layout(60.0);
+        let at = |i: f32, j: f32| {
+            (
+                (32.0 - 20.0) * TILE_SIZE - i * UNIT as f32,
+                (32.0 - 23.0) * TILE_SIZE - j * UNIT as f32,
+            )
+        };
+        let (fx, fy) = at(40.0, 40.0); // tile (0, 0) of the layout
+        let (px, py) = at(200.0, 60.0); // tile (1, 0)
+        layout.sites = vec![
+            RiftSite {
+                kind: SITE_FARMSTEAD,
+                x: fx,
+                y: fy,
+                z: 60.0,
+                o: 1.0,
+                radius: 22.0,
+            },
+            RiftSite {
+                kind: SITE_PLOT,
+                x: px,
+                y: py,
+                z: 60.0,
+                o: 0.3,
+                radius: 16.0,
+            },
+        ];
+        let kit = DressKit {
+            houses: vec!["World\\wmo\\Azeroth\\Buildings\\HumanFarm\\Farm.wmo".into()],
+            fences: vec!["World\\Generic\\Human\\Passive Doodads\\Fences\\Fence.mdx".into()],
+            crops: vec!["World\\Azeroth\\Elwynn\\Passive Doodads\\Pumpkin.mdx".into()],
+            hay: vec!["World\\Generic\\Hay.mdx".into()],
+            farm: vec!["World\\Generic\\Cart.mdx".into()],
+            obstacles: vec!["World\\Generic\\Rock.mdx".into()],
+            ..DressKit::default()
+        };
+        let (mut d0, mut w0) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 0, 0, &mut d0, &mut w0);
+        let (mut d1, mut w1) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 1, 0, &mut d1, &mut w1);
+        // The farmstead's house is tile (0, 0)'s, on the levelled ground; the plot has none.
+        assert_eq!(w0.len(), 1);
+        assert!(w1.is_empty());
+        assert_eq!(w0[0].position, [fx, fy, 60.0]);
+        // A fence ring round the farmstead, crops in the plot, and every id distinct.
+        let fences = d0.iter().filter(|d| d.model.contains("Fence")).count();
+        assert!(fences > 20, "{fences} fence pieces");
+        assert!(d1.iter().filter(|d| d.model.contains("Pumpkin")).count() > 10);
+        let mut ids: Vec<u32> = d0
+            .iter()
+            .chain(&d1)
+            .map(|d| d.unique_id)
+            .chain(w0.iter().map(|w| w.unique_id))
+            .collect();
+        let n = ids.len();
+        ids.sort_unstable();
+        ids.dedup();
+        assert_eq!(ids.len(), n, "unique ids");
+        // Obstacles keep clear of the sites.
+        for d in d0.iter().filter(|d| d.model.contains("Rock")) {
+            assert!((d.position[0] - fx).hypot(d.position[1] - fy) > 22.0);
+        }
+    }
+
+    #[test]
+    fn a_heading_turns_a_placed_model_to_face_it() {
+        for heading in [0.0f32, 0.7, 2.0, 4.5] {
+            let q = crate::coords::placement_rotation([0.0, rotation_y(heading), 0.0]);
+            let w = crate::coords::bevy_to_wow(q * crate::coords::wow_to_bevy([1.0, 0.0, 0.0]));
+            let got = w[1].atan2(w[0]);
+            let off = (got - heading).rem_euclid(std::f32::consts::TAU);
+            assert!(
+                off < 1e-3 || off > std::f32::consts::TAU - 1e-3,
+                "{heading} faced {got}"
+            );
+        }
     }
 
     #[test]

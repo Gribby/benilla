@@ -268,6 +268,7 @@ mod tests {
             heights,
             theme: THEME_CAVE,
             marks: Vec::new(),
+            sites: Vec::new(),
         }
     }
 

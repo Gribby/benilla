@@ -1053,6 +1053,9 @@ pub struct ArpgRiftLayout {
     /// The marks its map shows once seen: (kind, x, y), kind 1 the exit, 2 the way back, 3 a side
     /// area's entrance, 4 a side area's boss.
     pub marks: Vec<(u8, f32, f32)>,
+    /// Its building sites for the client to dress: kind (1 farmstead, 2 crop plot, 3 gnoll
+    /// camp, 4 watchtower, 5 logging site), x, y, z (levelled ground), orientation, radius.
+    pub sites: Vec<(u8, [f32; 5])>,
 }
 
 /// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
@@ -1095,6 +1098,20 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
             for _ in 0..marks_n {
                 marks.push((read_u8(r)?, read_f32_le(r)?, read_f32_le(r)?));
             }
+            let sites_n = match read_u8(r) {
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
+                Err(e) => return Err(e),
+            };
+            let mut sites = Vec::with_capacity(usize::from(sites_n));
+            for _ in 0..sites_n {
+                let kind = read_u8(r)?;
+                let mut v = [0.0f32; 5];
+                for f in &mut v {
+                    *f = read_f32_le(r)?;
+                }
+                sites.push((kind, v));
+            }
             Ok(ArpgRift::Layout(ArpgRiftLayout {
                 id,
                 gx0,
@@ -1105,6 +1122,7 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 pieces,
                 theme,
                 marks,
+                sites,
             }))
         }
         2 => {
@@ -1255,6 +1273,16 @@ mod tests {
             panic!("a layout");
         };
         assert_eq!(marked.marks, vec![(3, -100.0, 250.0)]);
+        assert!(marked.sites.is_empty());
+        bytes.push(1);
+        bytes.push(3);
+        for v in [1.0f32, 2.0, 3.0, 0.5, 14.0] {
+            bytes.extend_from_slice(&v.to_le_bytes());
+        }
+        let ArpgRift::Layout(sited) = read_arpg_rift(&mut bytes.as_slice()).expect("sites") else {
+            panic!("a layout");
+        };
+        assert_eq!(sited.sites, vec![(3, [1.0, 2.0, 3.0, 0.5, 14.0])]);
     }
 
     #[test]

@@ -222,3 +222,26 @@ the camera looks down between, and so none of WoW's interiors' clipping.
   A portal end a player made grows in from nothing over 0.8 sec with a slight overshoot as it
   first shows (`player/arpg/portal.rs`).
 
+## Built: dressing each area (buildings, farmland, camps, obstacles)
+
+Jeff's ask (2026-10-23): each area should look its part (the Farmlands farms, Forest's Edge gnoll
+camps) with buildings and obstacles.
+- **Sites, chosen by the server** (`ArpgRift.cpp`): each area kind lists its sites (the Farmlands
+  three farmsteads and three crop plots, Forest's Edge three gnoll camps, a watchtower and a
+  logging site, the Fields a farmstead, two plots and a tower, the side areas a few of their
+  own). A layout puts them at clearings (a chunk open all round), four chunks apart, away from
+  the start, the exit and the branches, and levels the ground under each (blending back over six
+  yards). Packs keep two chunks clear of them, but a gnoll camp gets its own pack round its fire.
+  The sites go to the client with the layout (`SMSG_ARPG_RIFT`, after the marks).
+- **Dressed by the client** (`benilla-assets` `rift.rs`, `DressKit`, `dress_tile`), from models
+  in the area's own source tiles, found by name: a farmstead is one of those tiles' farmhouses or
+  barns (towns, the abbey, walls, mines and the Tower of Azora left out) in a fence ring with a
+  gate, hay, a cart, barrels; a plot is a fence ring round rows of the tiles' pumpkins or wheat; a
+  camp is tents round a fire, bones and banners; a watchtower one of the tiles' towers with rubble;
+  a logging site logs, stumps and a sawhorse. A site whose tiles have no fitting model is dressed
+  with what they have. Rocks, logs and stumps stand on a third of the open chunks, clear of sites.
+- **The limit:** the buildings are the client's alone. Players collide with them, but the server
+  has no collision for this map, so creatures and spells pass through their walls. Sites keep
+  packs away so fights rarely meet a building; real collision waits on navmeshes built at run
+  time (Phase 2).
+
