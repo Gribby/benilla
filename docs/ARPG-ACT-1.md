@@ -49,7 +49,7 @@ its race and class (`ObjectMgr::ArpgOneStartPerFaction`), so each faction has on
 The Alliance's chapter 1 is played as Diablo II's first act (cmangos `Arpg/ArpgRift.{h,cpp}`,
 `ARPG-RANDOM-AREAS.md`). Goldshire is the town: a palisade (105 yards round the square) holds an
 Alliance character in until the Hogger quest is done; walking out brings it back inside, and a
-character found far off is brought into town. Four gates stand inside the palisade:
+character found far off is brought into town. It holds no one past level 15. Four gates stand inside the palisade:
 
 | Gate | Where | Leads to | Open |
 |---|---|---|---|
