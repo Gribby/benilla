@@ -1050,6 +1050,9 @@ pub struct ArpgRiftLayout {
     pub pieces: Vec<[u8; 4]>,
     /// 0 outdoors, 1 a roofless cave; absent from older servers' packets (0).
     pub theme: u8,
+    /// The marks its map shows once seen: (kind, x, y), kind 1 the exit, 2 the way back, 3 a side
+    /// area's entrance, 4 a side area's boss.
+    pub marks: Vec<(u8, f32, f32)>,
 }
 
 /// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
@@ -1083,6 +1086,15 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
                 Err(e) => return Err(e),
             };
+            let marks_n = match read_u8(r) {
+                Ok(n) => n,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
+                Err(e) => return Err(e),
+            };
+            let mut marks = Vec::with_capacity(usize::from(marks_n));
+            for _ in 0..marks_n {
+                marks.push((read_u8(r)?, read_f32_le(r)?, read_f32_le(r)?));
+            }
             Ok(ArpgRift::Layout(ArpgRiftLayout {
                 id,
                 gx0,
@@ -1092,6 +1104,7 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 base,
                 pieces,
                 theme,
+                marks,
             }))
         }
         2 => {
@@ -1233,6 +1246,15 @@ mod tests {
             panic!("a layout");
         };
         assert_eq!(cave.theme, 1);
+        assert!(cave.marks.is_empty());
+        bytes.push(1);
+        bytes.push(3);
+        bytes.extend_from_slice(&(-100.0f32).to_le_bytes());
+        bytes.extend_from_slice(&250.0f32.to_le_bytes());
+        let ArpgRift::Layout(marked) = read_arpg_rift(&mut bytes.as_slice()).expect("marks") else {
+            panic!("a layout");
+        };
+        assert_eq!(marked.marks, vec![(3, -100.0, 250.0)]);
     }
 
     #[test]

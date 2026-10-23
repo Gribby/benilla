@@ -16,6 +16,7 @@ mod composite;
 mod interior;
 /// The minimap ping, engine-owned and pinned to a world point.
 mod ping;
+mod rift;
 pub(crate) use ping::MinimapPing;
 
 use std::collections::HashMap;
@@ -229,6 +230,8 @@ struct MinimapAssets {
 /// the interior half by `(group, col, row)` for the building whose tile stem is resident.
 #[derive(Resource, Default)]
 struct MinimapTileCache {
+    /// An ARPG rift's tiles, drawn from its layout as it is explored (`rift`), by (tx, ty).
+    rift_tiles: HashMap<(u32, u32), Handle<Image>>,
     map_id: Option<u32>,
     tiles: HashMap<(u32, u32), Option<Handle<Image>>>,
     interior_stem: Option<String>,
@@ -555,6 +558,26 @@ fn emit_minimap(
         let (tx_hi, ty_hi) = world_to_tile(wx - half_extent, wy - half_extent);
         for ty in ty_lo..=ty_hi {
             for tx in tx_lo..=tx_hi {
+                // An ARPG rift: its explored map, not the install's art (it has none).
+                if map.0 == benilla_assets::rift::RIFT_MAP {
+                    let Some(handle) = cache.rift_tiles.get(&(tx, ty)).cloned() else {
+                        continue;
+                    };
+                    let (tile_north, tile_west) = tile_to_world(tx, ty);
+                    let left = center.x + (wy - tile_west) * px_per_yd;
+                    let top = center.y + (tile_north - wx) * -px_per_yd;
+                    let size = TILE_YARDS * px_per_yd;
+                    quads.overlays.push(UiQuad {
+                        rect: Rect::new(left, top, left + size, top + size),
+                        z_key: slot.z,
+                        texture: Some(handle),
+                        color: [1.0, 1.0, 1.0, slot.alpha],
+                        gamma_texel: true,
+                        mask: mask.clone(),
+                        ..default()
+                    });
+                    continue;
+                }
                 let handle = cache.tiles.entry((tx, ty)).or_insert_with(|| {
                     assets
                         .translate
@@ -878,6 +901,8 @@ impl Plugin for MinimapPlugin {
             .init_resource::<composite::MinimapComposite>()
             .add_systems(Startup, setup_minimap.after(AssetSet::Open))
             .add_systems(Startup, composite::setup_composite)
+            // An ARPG rift's explored map, drawn into its tiles (`rift`).
+            .add_plugins(rift::plugin)
             .add_systems(
                 Update,
                 (

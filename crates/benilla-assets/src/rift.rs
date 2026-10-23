@@ -49,6 +49,9 @@ pub struct RiftLayout {
     /// [`THEME_OUTDOOR`] (the source chunks moved into place) or [`THEME_CAVE`] (a roofless
     /// cave: rock walls and a dirt floor painted by slope, mine props, no trees or grass).
     pub theme: u8,
+    /// Its marks, for the map: (kind, x, y), kind 1 the exit, 2 the way back, 3 a side area's
+    /// entrance, 4 a side area's boss.
+    pub marks: Vec<(u8, f32, f32)>,
 }
 
 /// A layout of Elwynn's own chunks.
@@ -65,7 +68,7 @@ impl RiftLayout {
     }
 
     /// The node (fractional) under a WoW (x, y).
-    fn node_at(&self, x: f32, y: f32) -> (f64, f64) {
+    pub fn node_at(&self, x: f32, y: f32) -> (f64, f64) {
         let i = ((32.0 - f64::from(self.gx0)) * f64::from(TILE_SIZE) - f64::from(x)) / UNIT;
         let j = ((32.0 - f64::from(self.gy0)) * f64::from(TILE_SIZE) - f64::from(y)) / UNIT;
         (i, j)
@@ -144,6 +147,15 @@ pub fn layout(id: u32) -> Option<Arc<RiftLayout>> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .iter()
         .find(|l| l.id == id)
+        .cloned()
+}
+
+/// The layout last made known: the one the player is in.
+pub fn latest() -> Option<Arc<RiftLayout>> {
+    LAYOUTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .last()
         .cloned()
 }
 
@@ -684,6 +696,7 @@ mod tests {
             pieces: vec![[48, 32, 0, 0]; RIFT_PIECES * RIFT_PIECES],
             heights: vec![h; RIFT_NODES * RIFT_NODES],
             theme: THEME_OUTDOOR,
+            marks: Vec::new(),
         }
     }
 

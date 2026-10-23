@@ -42,6 +42,7 @@ mod globes;
 mod impact;
 mod juice;
 mod loot;
+mod portal;
 mod rift;
 mod scene;
 pub(crate) mod sheet;
@@ -289,6 +290,8 @@ pub(super) fn plugin(app: &mut App) {
     crate::target::arpg_soft::plugin(app);
     // The struck unit's white flash.
     fx::plugin(app);
+    // A town portal's ends grow in as they open.
+    portal::plugin(app);
     // The kill bursts and the camera's kick.
     juice::plugin(app);
     // Telegraphed attacks on the ground.

@@ -207,4 +207,18 @@ the camera looks down between, and so none of WoW's interiors' clipping.
   lantern or torch, whose model carries its light. No trees.
 - **Light:** the forest's, its ambient at 45% and its sun and fog at 35%.
 
+## Built: the automap and the town portal in random areas
+
+- **The automap** (Diablo II's): a random area has no minimap art, so the client draws its four
+  tiles from the layout (`benilla-app` `minimap/rift.rs`): floor (green outdoors, brown in a
+  cave), wall where the ground is steep, its edge against the floor outlined pale, and what is
+  more than 45 yards from anywhere the player has stood left dark. The server sends the area's
+  marks with the layout (`SMSG_ARPG_RIFT`, after the theme): the exit (gold), the way back
+  (blue), side areas' entrances (purple) and a side area's boss (red), each drawn once its spot
+  has been seen. Sight is kept per layout, so a town portal there and back finds the map as left.
+- **The town portal** in a rift works as in a dungeon: it opens home, and going back returns to
+  the same spot of the same instance. Both ends now stand while it is open (the town end a few
+  yards ahead of the arrival), walking into the town end goes back, and going back closes both.
+  A portal end a player made grows in from nothing over 0.8 sec with a slight overshoot as it
+  first shows (`player/arpg/portal.rs`).
 

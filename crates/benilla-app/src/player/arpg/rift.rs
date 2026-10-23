@@ -92,6 +92,7 @@ fn take_rift(assembly: &mut RiftAssembly, rift: ArpgRift) -> Option<RiftLayout> 
                 pieces: header.pieces,
                 heights,
                 theme: header.theme,
+                marks: header.marks,
             })
         }
     }
@@ -114,6 +115,7 @@ mod tests {
             base: 60.0,
             pieces: vec![[48, 32, 0, 0]; 256],
             theme: 1,
+            marks: vec![(1, -1.0, 2.0)],
         };
         assert!(take_rift(&mut assembly, ArpgRift::Layout(header)).is_none());
         let mut whole = None;
