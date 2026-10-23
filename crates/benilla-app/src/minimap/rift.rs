@@ -79,32 +79,33 @@ fn reveal_rift_map(
     reveal.since_draw = 0.0;
     reveal.drawn = Some(layout.id);
     let seen = &reveal.seen[&layout.id];
+    // Each redraw is a new image, the old one removed: the UI pass caches a material per image and
+    // drops it only on removal, so a changed image in place would never show. Another layout's
+    // tiles go with them, or they would draw past this one's edge.
+    for (_, old) in cache.rift_tiles.drain() {
+        images.remove(&old);
+    }
+    let base = layout.heights.iter().copied().fold(f32::INFINITY, f32::min);
     for ox in 0..2u32 {
         for oy in 0..2u32 {
             // Server grid (gx, gy) is client tile (gy, gx).
             let key = (u32::from(layout.gy0) + oy, u32::from(layout.gx0) + ox);
-            let data = draw_tile(&layout, seen, ox as usize, oy as usize);
-            match cache.rift_tiles.get(&key).and_then(|h| images.get_mut(h)) {
-                Some(image) => image.data = Some(data),
-                None => {
-                    let image = Image::new(
-                        Extent3d {
-                            width: TILE_PX as u32,
-                            height: TILE_PX as u32,
-                            depth_or_array_layers: 1,
-                        },
-                        TextureDimension::D2,
-                        data,
-                        // Gamma bytes, as the install's minimap tiles are (drawn `gamma_texel`).
-                        TextureFormat::Rgba8Unorm,
-                        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
-                    );
-                    cache.rift_tiles.insert(key, images.add(image));
-                }
-            }
+            let data = draw_tile(&layout, seen, ox as usize, oy as usize, base);
+            let image = Image::new(
+                Extent3d {
+                    width: TILE_PX as u32,
+                    height: TILE_PX as u32,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                data,
+                // Gamma bytes, as the install's minimap tiles are (drawn `gamma_texel`).
+                TextureFormat::Rgba8Unorm,
+                RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+            );
+            cache.rift_tiles.insert(key, images.add(image));
         }
     }
-    // Another layout's tiles at other keys are left: their keys never meet this one's.
 }
 
 /// Mark the nodes within [`REVEAL_YD`] of (x, y) seen; true when any was new.
@@ -147,36 +148,48 @@ fn is_wall(layout: &RiftLayout, i: usize, j: usize) -> bool {
     steep > WALL_SLOPE
 }
 
-/// A tile's pixels (RGBA, rows south from its north edge, columns east from its west).
-fn draw_tile(layout: &RiftLayout, seen: &[bool], ox: usize, oy: usize) -> Vec<u8> {
+/// A tile's pixels (RGBA, rows south from its north edge, columns east from its west), two to a
+/// node: each node's colour is worked out once, then doubled up.
+fn draw_tile(layout: &RiftLayout, seen: &[bool], ox: usize, oy: usize, base: f32) -> Vec<u8> {
     let cave = layout.theme == THEME_CAVE;
     let floor: [u8; 3] = if cave { [104, 88, 66] } else { [86, 104, 60] };
     let wall: [u8; 3] = [40, 36, 32];
     let edge: [u8; 3] = [196, 184, 150];
-    let unseen: [u8; 4] = [8, 8, 10, 255];
-    // The floor's middle height, for a little shading by height.
-    let base = layout.heights.iter().copied().fold(f32::INFINITY, f32::min);
+    let unseen: [u8; 3] = [8, 8, 10];
+    // Wall or floor, for the tile's nodes and a ring round them (the outline looks one beyond).
+    let span = 130;
+    let mut walls = vec![false; span * span];
+    for a in 0..span {
+        for b in 0..span {
+            let (i, j) = (
+                (ox * 128 + a).saturating_sub(1),
+                (oy * 128 + b).saturating_sub(1),
+            );
+            walls[a * span + b] = is_wall(layout, i.min(RIFT_NODES - 1), j.min(RIFT_NODES - 1));
+        }
+    }
+    let wall_at = |i: usize, j: usize| walls[(i + 1 - ox * 128) * span + (j + 1 - oy * 128)];
     let mut px = vec![0u8; TILE_PX * TILE_PX * 4];
-    let node_of = |p: usize| p / 2;
-    for py in 0..TILE_PX {
-        for pxx in 0..TILE_PX {
-            let (i, j) = (ox * 128 + node_of(py), oy * 128 + node_of(pxx));
-            let at = (py * TILE_PX + pxx) * 4;
-            if !seen[i * RIFT_NODES + j] {
-                px[at..at + 4].copy_from_slice(&unseen);
-                continue;
-            }
-            let colour = if is_wall(layout, i, j) {
+    for a in 0..128 {
+        for b in 0..128 {
+            let (i, j) = (ox * 128 + a, oy * 128 + b);
+            let colour = if !seen[i * RIFT_NODES + j] {
+                unseen
+            } else if wall_at(i, j) {
                 // A wall meeting seen floor is outlined, as Diablo II's map draws its walls.
                 let touches_floor =
                     [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)]
                         .iter()
                         .any(|(di, dj)| {
-                            let (a, b) = (i as i32 + di, j as i32 + dj);
-                            (0..RIFT_NODES as i32).contains(&a)
-                                && (0..RIFT_NODES as i32).contains(&b)
-                                && seen[a as usize * RIFT_NODES + b as usize]
-                                && !is_wall(layout, a as usize, b as usize)
+                            let (ni, nj) = (i as i32 + di, j as i32 + dj);
+                            (0..RIFT_NODES as i32).contains(&ni)
+                                && (0..RIFT_NODES as i32).contains(&nj)
+                                && (ni - (ox * 128) as i32) >= -1
+                                && (ni - (ox * 128) as i32) <= 128
+                                && (nj - (oy * 128) as i32) >= -1
+                                && (nj - (oy * 128) as i32) <= 128
+                                && seen[ni as usize * RIFT_NODES + nj as usize]
+                                && !wall_at(ni as usize, nj as usize)
                         });
                 if touches_floor {
                     edge
@@ -187,8 +200,11 @@ fn draw_tile(layout: &RiftLayout, seen: &[bool], ox: usize, oy: usize) -> Vec<u8
                 let shade = (1.0 + (layout.height(i, j) - base - 10.0) * 0.01).clamp(0.85, 1.15);
                 floor.map(|c| (f32::from(c) * shade).min(255.0) as u8)
             };
-            px[at..at + 3].copy_from_slice(&colour);
-            px[at + 3] = 255;
+            for (dy, dx) in [(0, 0), (0, 1), (1, 0), (1, 1)] {
+                let at = ((a * 2 + dy) * TILE_PX + b * 2 + dx) * 4;
+                px[at..at + 3].copy_from_slice(&colour);
+                px[at + 3] = 255;
+            }
         }
     }
     // The marks, once their spot has been seen.
@@ -270,7 +286,8 @@ mod tests {
         );
         assert!(seen[95 * RIFT_NODES + 40]);
         assert!(!seen[95 * RIFT_NODES + 200], "far off stays unseen");
-        let px = draw_tile(&layout, &seen, 0, 0);
+        let base = layout.heights.iter().copied().fold(f32::INFINITY, f32::min);
+        let px = draw_tile(&layout, &seen, 0, 0, base);
         let at = |i: usize, j: usize| {
             let k = ((i * 2) * TILE_PX + j * 2) * 4;
             [px[k], px[k + 1], px[k + 2]]

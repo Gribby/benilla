@@ -12,15 +12,21 @@ const GROW_SECS: f32 = 0.8;
 /// The overshoot of the ease (`easeOutBack`'s constant): a touch past full size, then settling.
 const OVERSHOOT: f32 = 1.4;
 
-/// An object growing in: time so far, and the scale it grows to.
+/// An object growing in: time so far. It grows to the server's scale, read each frame, since the
+/// visuals' attach sets the entity's scale only once the model loads.
 #[derive(Component)]
 struct GrowIn {
     elapsed: f32,
-    target: Vec3,
 }
 
 pub(super) fn plugin(app: &mut App) {
-    app.add_systems(Update, (arm_grow_in, grow_in).chain());
+    // After the visuals' attach, so its scale write never shows a frame at full size.
+    app.add_systems(
+        Update,
+        (arm_grow_in, grow_in)
+            .chain()
+            .after(crate::entities::EntityVisualsSet),
+    );
 }
 
 /// `easeOutBack` over 0..1: 0 at 0, 1 at 1, a little past 1 on the way.
@@ -38,28 +44,25 @@ fn arm_grow_in(
         if net.kind != EntityKind::GameObject || store.0.gameobject_created_by().is_none() {
             continue;
         }
-        let target = tf.scale;
-        tf.scale = target * 0.01;
-        commands.entity(entity).insert(GrowIn {
-            elapsed: 0.0,
-            target,
-        });
+        tf.scale = Vec3::splat(net.scale * 0.01);
+        commands.entity(entity).insert(GrowIn { elapsed: 0.0 });
     }
 }
 
 fn grow_in(
     mut commands: Commands,
     time: Res<Time>,
-    mut growing: Query<(Entity, &mut GrowIn, &mut Transform)>,
+    mut growing: Query<(Entity, &NetEntity, &mut GrowIn, &mut Transform)>,
 ) {
-    for (entity, mut grow, mut tf) in &mut growing {
+    for (entity, net, mut grow, mut tf) in &mut growing {
         grow.elapsed += time.delta_secs();
         let t = grow.elapsed / GROW_SECS;
+        let target = Vec3::splat(net.scale);
         if t >= 1.0 {
-            tf.scale = grow.target;
+            tf.scale = target;
             commands.entity(entity).remove::<GrowIn>();
         } else {
-            tf.scale = grow.target * ease_out_back(t).max(0.01);
+            tf.scale = target * ease_out_back(t).max(0.01);
         }
     }
 }
