@@ -245,3 +245,20 @@ camps) with buildings and obstacles.
   packs away so fights rarely meet a building; real collision waits on navmeshes built at run
   time (Phase 2).
 
+## Built: the side areas' own looks
+
+Each side area has a flavour (sent after the sites), beyond its sites:
+
+| Side area | Flavour | Its look |
+|---|---|---|
+| Jasperlode Hollow | webs | the cave's props a third webs, cocoons and egg sacs, borrowed from Duskwood's tiles |
+| Fargodeep Pit | candles | candles, ore veins, coin and chests, from Elwynn's mine mouths |
+| Echo Ridge Diggings | dig works | scaffolds, beams, picks, shovels and spoil |
+| The Defias Hideout | burnt farms | its farmstead a burnt one (borrowed from Westfall's tiles), charred props round it, and two Defias camps (tents, bedrolls, crates round a fire), each with a Defias pack |
+| Wolf Run | wolf woods | three dens (bones and rocks, a wolf pack in each), a logging site, and trees thick at the walls' feet |
+| Riverpaw Warren | warren | its gnoll camps smaller and closer, so three fit |
+
+A flavour reads its borrowed tiles (fixed server grids of Duskwood, Westfall and Elwynn's mine
+mouths) for models only, found by name as the other dressing is. A model the install lacks under
+those names is simply missing: the area falls back to what it has.
+

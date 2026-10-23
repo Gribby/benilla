@@ -269,6 +269,7 @@ mod tests {
             theme: THEME_CAVE,
             marks: Vec::new(),
             sites: Vec::new(),
+            flavour: 0,
         }
     }
 

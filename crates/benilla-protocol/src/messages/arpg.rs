@@ -1056,6 +1056,9 @@ pub struct ArpgRiftLayout {
     /// Its building sites for the client to dress: kind (1 farmstead, 2 crop plot, 3 gnoll
     /// camp, 4 watchtower, 5 logging site), x, y, z (levelled ground), orientation, radius.
     pub sites: Vec<(u8, [f32; 5])>,
+    /// A side area's look beyond its sites (1 webs, 2 candles, 3 dig works, 4 burnt farms,
+    /// 5 wolf woods, 6 warren), 0 none.
+    pub flavour: u8,
 }
 
 /// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
@@ -1112,6 +1115,11 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 }
                 sites.push((kind, v));
             }
+            let flavour = match read_u8(r) {
+                Ok(f) => f,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
+                Err(e) => return Err(e),
+            };
             Ok(ArpgRift::Layout(ArpgRiftLayout {
                 id,
                 gx0,
@@ -1123,6 +1131,7 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 theme,
                 marks,
                 sites,
+                flavour,
             }))
         }
         2 => {
@@ -1283,6 +1292,13 @@ mod tests {
             panic!("a layout");
         };
         assert_eq!(sited.sites, vec![(3, [1.0, 2.0, 3.0, 0.5, 14.0])]);
+        assert_eq!(sited.flavour, 0);
+        bytes.push(4);
+        let ArpgRift::Layout(burnt) = read_arpg_rift(&mut bytes.as_slice()).expect("flavour")
+        else {
+            panic!("a layout");
+        };
+        assert_eq!(burnt.flavour, 4);
     }
 
     #[test]

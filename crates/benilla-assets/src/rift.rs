@@ -54,7 +54,39 @@ pub struct RiftLayout {
     pub marks: Vec<(u8, f32, f32)>,
     /// Its building sites, dressed by the tile holding each one's centre.
     pub sites: Vec<RiftSite>,
+    /// A side area's look beyond its sites: [`FLAVOUR_WEBS`] and the rest, 0 none.
+    pub flavour: u8,
 }
+
+/// Jasperlode Hollow: webs and egg sacs, from Duskwood's tiles.
+pub const FLAVOUR_WEBS: u8 = 1;
+/// Fargodeep Pit: candles, ore and gold, from Elwynn's mine mouths.
+pub const FLAVOUR_CANDLES: u8 = 2;
+/// Echo Ridge Diggings: scaffolds, beams and spoil.
+pub const FLAVOUR_DIG: u8 = 3;
+/// The Defias Hideout: burnt farms (Westfall's) and Defias camps.
+pub const FLAVOUR_BURNT: u8 = 4;
+/// Wolf Run: thick woods and dens.
+pub const FLAVOUR_WOLVES: u8 = 5;
+/// Riverpaw Warren: smaller, closer camps (the server's).
+pub const FLAVOUR_WARREN: u8 = 6;
+
+/// Server grids a flavour borrows models from, beyond its own pieces' tiles: Duskwood's for
+/// webs, Westfall's for burnt farms, Elwynn's mine mouths for candles and dig works.
+fn borrowed_sources(flavour: u8) -> &'static [(u8, u8)] {
+    match flavour {
+        FLAVOUR_WEBS => &[(51, 32), (52, 33), (51, 34), (49, 33)],
+        FLAVOUR_CANDLES => &[(50, 31), (50, 32), (49, 33)],
+        FLAVOUR_DIG => &[(48, 32), (48, 31), (50, 31)],
+        FLAVOUR_BURNT => &[(51, 29), (52, 29), (52, 30), (53, 30)],
+        _ => &[],
+    }
+}
+
+/// A Defias camp: tents, bedrolls, crates and barrels.
+pub const SITE_DEFIAS_CAMP: u8 = 6;
+/// A wolf den: bones and rocks.
+pub const SITE_DEN: u8 = 7;
 
 /// A building site the server keeps clear and levels: [`SITE_FARMSTEAD`] and the rest.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -259,6 +291,8 @@ struct CaveKit {
     wall: Option<String>,
     props: Vec<String>,
     lights: Vec<String>,
+    /// The flavour's own: webs, candles and ore, or scaffolds and spoil.
+    extra: Vec<String>,
     /// Every texture seen, for a floor or a wall the names didn't give.
     seen: Vec<String>,
 }
@@ -285,7 +319,23 @@ impl CaveKit {
         }
     }
 
-    fn take(&mut self, source: &TileMesh) {
+    fn take(&mut self, source: &TileMesh, flavour: u8) {
+        let extra: &[&str] = match flavour {
+            FLAVOUR_WEBS => &["web", "cocoon", "eggsac", "egg", "spider"],
+            FLAVOUR_CANDLES => &[
+                "candle", "orevein", "copper", "tinvein", "coin", "chest", "treasure",
+            ],
+            FLAVOUR_DIG => &[
+                "scaffold", "beam", "support", "pick", "shovel", "barrow", "rubble", "dirt",
+            ],
+            _ => &[],
+        };
+        for d in &source.doodads {
+            let lower = d.model.to_ascii_lowercase();
+            if named(&lower, extra) && self.extra.len() < 12 && !self.extra.contains(&d.model) {
+                self.extra.push(d.model.clone());
+            }
+        }
         for chunk in &source.chunks {
             for name in &chunk.layer_textures {
                 if self.seen.len() < 16 && !self.seen.contains(name) {
@@ -360,6 +410,12 @@ impl RiftComposer {
                 .map(|k| (k, Vec::new()))
                 .collect();
         }
+        // A flavour's borrowed tiles: read for its models only.
+        for &key in borrowed_sources(layout.flavour) {
+            if !sources.iter().any(|(k, _)| *k == key) {
+                sources.push((key, Vec::new()));
+            }
+        }
         Some(Self {
             layout,
             sources,
@@ -393,10 +449,10 @@ impl RiftComposer {
             return;
         };
         if self.layout.theme == THEME_CAVE {
-            self.kit.take(&source);
+            self.kit.take(&source, self.layout.flavour);
             return;
         }
-        self.dress.take(&source);
+        self.dress.take(&source, self.layout.flavour);
         let src_nw_x = (32.0 - f64::from(*sgx)) * f64::from(TILE_SIZE);
         let src_nw_y = (32.0 - f64::from(*sgy)) * f64::from(TILE_SIZE);
         for w in wanted {
@@ -619,6 +675,13 @@ struct DressKit {
     fires: Vec<String>,
     logging: Vec<String>,
     obstacles: Vec<String>,
+    /// Burnt farmhouses (a hideout's), with their lift; the burnt props round them.
+    burnt_houses: Vec<(String, f32)>,
+    burnt: Vec<String>,
+    /// A Defias camp's tents, bedrolls and crates; a den's bones; a wolf wood's trees.
+    defias: Vec<String>,
+    bones: Vec<String>,
+    trees: Vec<String>,
 }
 
 /// Whether a lowercased name has any of the words.
@@ -627,7 +690,7 @@ fn named(lower: &str, words: &[&str]) -> bool {
 }
 
 impl DressKit {
-    fn take(&mut self, source: &TileMesh) {
+    fn take(&mut self, source: &TileMesh, flavour: u8) {
         fn add(list: &mut Vec<String>, name: &str) {
             if list.len() < 12 && !list.iter().any(|n| n == name) {
                 list.push(name.to_string());
@@ -663,12 +726,16 @@ impl DressKit {
                     list.push((w.model.clone(), lift));
                 }
             };
-            if named(&lower, &["tower"]) {
-                building(&mut self.towers);
-            } else if named(
+            let burnt = named(&lower, &["burnt", "burned", "destroyed", "ruin"]);
+            let farm = named(
                 &lower,
                 &["farm", "barn", "house", "shack", "cottage", "mill"],
-            ) {
+            );
+            if burnt && farm && flavour == FLAVOUR_BURNT {
+                building(&mut self.burnt_houses);
+            } else if named(&lower, &["tower"]) {
+                building(&mut self.towers);
+            } else if farm && !burnt {
                 building(&mut self.houses);
             }
         }
@@ -718,6 +785,32 @@ impl DressKit {
                 &["log", "stump", "lumber", "saw", "woodpile", "axe"],
             ) {
                 add(&mut self.logging, &d.model);
+            }
+            if flavour == FLAVOUR_BURNT
+                && named(
+                    &lower,
+                    &[
+                        "burnt", "burned", "charred", "ashes", "ashpile", "ember", "smoke",
+                    ],
+                )
+            {
+                add(&mut self.burnt, &d.model);
+            }
+            if named(
+                &lower,
+                &["tent", "bedroll", "crate", "barrel", "sack", "lantern"],
+            ) && !named(&lower, &["gnoll"])
+            {
+                add(&mut self.defias, &d.model);
+            }
+            if named(&lower, &["bone", "skull", "carcass", "ribcage", "skeleton"]) {
+                add(&mut self.bones, &d.model);
+            }
+            if flavour == FLAVOUR_WOLVES
+                && named(&lower, &["tree"])
+                && !named(&lower, &["stump", "log", "dead"])
+            {
+                add(&mut self.trees, &d.model);
             }
             if named(&lower, &["rock", "boulder", "stump", "log"])
                 && !named(&lower, &["tree", "cliff"])
@@ -812,7 +905,12 @@ fn dress_tile(
             };
         match site.kind {
             SITE_FARMSTEAD => {
-                if let Some((model, lift)) = pick_building(&kit.houses, &mut rng) {
+                let houses = if layout.flavour == FLAVOUR_BURNT && !kit.burnt_houses.is_empty() {
+                    &kit.burnt_houses
+                } else {
+                    &kit.houses
+                };
+                if let Some((model, lift)) = pick_building(houses, &mut rng) {
                     wmos.push(WmoInstance {
                         model,
                         position: [cx, cy, site.z + lift],
@@ -905,6 +1003,42 @@ fn dress_tile(
                     );
                 }
             }
+            SITE_DEFIAS_CAMP => {
+                put(&kit.fires, 0.0, 0.0, &mut rng, doodads, uid());
+                for k in 0..6 {
+                    let a = std::f32::consts::TAU * k as f32 / 6.0;
+                    put(
+                        &kit.defias,
+                        a,
+                        r * (0.5 + 0.08 * k as f32),
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
+            SITE_DEN => {
+                for k in 0..5 {
+                    put(
+                        &kit.bones,
+                        k as f32 * 1.3,
+                        r * (0.2 + 0.15 * k as f32),
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+                for k in 0..3 {
+                    put(
+                        &kit.obstacles,
+                        0.6 + k as f32 * 2.0,
+                        r * 0.9,
+                        &mut rng,
+                        doodads,
+                        uid(),
+                    );
+                }
+            }
             SITE_LOGGING => {
                 for k in 0..7 {
                     put(
@@ -918,6 +1052,67 @@ fn dress_tile(
                 }
             }
             _ => {}
+        }
+        // A hideout's farms burnt: charred props about the farmstead.
+        if site.kind == SITE_FARMSTEAD && layout.flavour == FLAVOUR_BURNT {
+            for k in 0..4 {
+                put(
+                    &kit.burnt,
+                    0.8 + k as f32 * 1.4,
+                    r * 0.6,
+                    &mut rng,
+                    doodads,
+                    uid(),
+                );
+            }
+        }
+    }
+    // A wolf wood: trees thick at the walls' feet.
+    if layout.flavour == FLAVOUR_WOLVES && !kit.trees.is_empty() {
+        for ca in 0..16 {
+            for cb in 0..16 {
+                let (la, lb) = (ox * 16 + ca, oy * 16 + cb);
+                let chunk_index = (la * 32 + lb) as u32;
+                let mut rng = Rng((u64::from(layout.id) << 30
+                    ^ u64::from(chunk_index)
+                    ^ 0x9E37_79B9_7F4A_7C15)
+                    | 1);
+                for k in 0..4u32 {
+                    let (i, j) = (
+                        (la * 8) as f32 + rng.unit() * 8.0,
+                        (lb * 8) as f32 + rng.unit() * 8.0,
+                    );
+                    let here = layout.ground_at_node(i, j);
+                    let walled = [(-3.0, 0.0), (3.0, 0.0), (0.0, -3.0), (0.0, 3.0)]
+                        .iter()
+                        .any(|(di, dj)| layout.ground_at_node(i + di, j + dj) > here + 8.0);
+                    if !walled || steepness(layout, i, j) > 0.2 {
+                        continue;
+                    }
+                    let x = lattice(f64::from(layout.gx0) * 128.0 + f64::from(i));
+                    let y = lattice(f64::from(layout.gy0) * 128.0 + f64::from(j));
+                    if layout
+                        .marks
+                        .iter()
+                        .any(|&(_, mx, my)| (mx - x).hypot(my - y) < 14.0)
+                        || layout
+                            .sites
+                            .iter()
+                            .any(|s| (s.x - x).hypot(s.y - y) < s.radius + 4.0)
+                    {
+                        continue;
+                    }
+                    let model = &kit.trees[rng.next() as usize % kit.trees.len()];
+                    doodads.push(place(
+                        model,
+                        x,
+                        y,
+                        rng.unit() * std::f32::consts::TAU,
+                        0.8 + rng.unit() * 0.5,
+                        dress_uid(chunk_index, 0xE000 + k),
+                    ));
+                }
+            }
         }
     }
     // Obstacles: now and then on a chunk's open ground, clear of the sites.
@@ -991,7 +1186,7 @@ impl Rng {
 /// A cave chunk's props: on flat floor beside a wall, a lantern or torch now and then (their
 /// models carry their own light).
 fn cave_props(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize, out: &mut Vec<Doodad>) {
-    if kit.props.is_empty() && kit.lights.is_empty() {
+    if kit.props.is_empty() && kit.lights.is_empty() && kit.extra.is_empty() {
         return;
     }
     let chunk_index = (la * 32 + lb) as u32;
@@ -1012,9 +1207,13 @@ fn cave_props(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize, out: &mu
             if !walled || rng.unit() > 0.12 {
                 continue;
             }
-            let pool = if !kit.lights.is_empty()
-                && (rng.next().is_multiple_of(6) || kit.props.is_empty())
+            // A third of them the flavour's own (webs, candles, scaffolds), one in six a light.
+            let roll = rng.next();
+            let pool = if !kit.extra.is_empty()
+                && (roll.is_multiple_of(3) || (kit.props.is_empty() && kit.lights.is_empty()))
             {
+                &kit.extra
+            } else if !kit.lights.is_empty() && (roll.is_multiple_of(6) || kit.props.is_empty()) {
                 &kit.lights
             } else {
                 &kit.props
@@ -1125,6 +1324,7 @@ mod tests {
             theme: THEME_OUTDOOR,
             marks: Vec::new(),
             sites: Vec::new(),
+            flavour: 0,
         }
     }
 
@@ -1166,6 +1366,7 @@ mod tests {
             wall: Some("Tileset\\Elwynn\\ElwynnRock.blp".into()),
             props: vec!["World\\Generic\\MineCart.mdx".into()],
             lights: vec!["World\\Generic\\Lantern.mdx".into()],
+            extra: vec!["World\\Generic\\SpiderWeb.mdx".into()],
             seen: Vec::new(),
         };
         // Chunk 5 along X spans nodes 40..48: its first rows are the wall.
@@ -1183,6 +1384,10 @@ mod tests {
             cave_props(&layout, &kit, 4, lb, &mut props);
         }
         assert!(!props.is_empty());
+        assert!(
+            props.iter().any(|p| p.model.contains("Web")),
+            "the flavour's own among them"
+        );
         for p in &props {
             assert!((p.position[2] - layout.ground(p.position[0], p.position[1])).abs() < 0.01);
             assert!(
@@ -1287,6 +1492,87 @@ mod tests {
         // Obstacles keep clear of the sites.
         for d in d0.iter().filter(|d| d.model.contains("Rock")) {
             assert!((d.position[0] - fx).hypot(d.position[1] - fy) > 22.0);
+        }
+    }
+
+    #[test]
+    fn a_hideout_is_burnt_and_camped_and_a_wolf_run_is_denned() {
+        let mut layout = flat_layout(60.0);
+        let at = |i: f32, j: f32| {
+            (
+                (32.0 - 20.0) * TILE_SIZE - i * UNIT as f32,
+                (32.0 - 23.0) * TILE_SIZE - j * UNIT as f32,
+            )
+        };
+        let (fx, fy) = at(40.0, 40.0);
+        let (cx, cy) = at(90.0, 40.0);
+        let (dx, dy) = at(40.0, 90.0);
+        layout.flavour = FLAVOUR_BURNT;
+        layout.sites = vec![
+            RiftSite {
+                kind: SITE_FARMSTEAD,
+                x: fx,
+                y: fy,
+                z: 60.0,
+                o: 0.0,
+                radius: 22.0,
+            },
+            RiftSite {
+                kind: SITE_DEFIAS_CAMP,
+                x: cx,
+                y: cy,
+                z: 60.0,
+                o: 0.0,
+                radius: 13.0,
+            },
+            RiftSite {
+                kind: SITE_DEN,
+                x: dx,
+                y: dy,
+                z: 60.0,
+                o: 0.0,
+                radius: 10.0,
+            },
+        ];
+        let kit = DressKit {
+            houses: vec![("Farm.wmo".into(), 0.0)],
+            burnt_houses: vec![("BurntFarm.wmo".into(), -0.5)],
+            burnt: vec!["Charred.mdx".into()],
+            defias: vec!["Tent.mdx".into()],
+            bones: vec!["Bones.mdx".into()],
+            fires: vec!["Campfire.mdx".into()],
+            obstacles: vec!["Rock.mdx".into()],
+            ..DressKit::default()
+        };
+        let (mut d, mut w) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 0, 0, &mut d, &mut w);
+        assert_eq!(w.len(), 1);
+        assert_eq!(
+            w[0].model, "BurntFarm.wmo",
+            "a hideout's farm is a burnt one"
+        );
+        assert_eq!(w[0].position[2], 59.5);
+        let count = |name: &str| d.iter().filter(|p| p.model == name).count();
+        assert!(count("Charred.mdx") >= 3);
+        assert!(count("Tent.mdx") >= 5 && count("Campfire.mdx") == 1);
+        assert!(count("Bones.mdx") >= 4);
+        // Not burnt: the plain farmhouse.
+        layout.flavour = 0;
+        let (mut d2, mut w2) = (Vec::new(), Vec::new());
+        dress_tile(&layout, &kit, 0, 0, &mut d2, &mut w2);
+        assert_eq!(w2[0].model, "Farm.wmo");
+        assert!(d2.iter().all(|p| p.model != "Charred.mdx"));
+    }
+
+    #[test]
+    fn a_flavour_borrows_its_tiles_once() {
+        let mut layout = flat_layout(60.0);
+        layout.flavour = FLAVOUR_WEBS;
+        layout.theme = THEME_CAVE;
+        let composer = RiftComposer::new(Arc::new(layout), 23, 20).expect("covered");
+        let keys: Vec<(u8, u8)> = composer.sources.iter().map(|(k, _)| *k).collect();
+        for b in borrowed_sources(FLAVOUR_WEBS) {
+            assert_eq!(keys.iter().filter(|k| *k == b).count(), 1, "{b:?}");
         }
     }
 
