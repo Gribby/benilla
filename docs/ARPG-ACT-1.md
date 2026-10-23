@@ -41,8 +41,29 @@ cmangos `Arpg/ArpgActs.{h,cpp}`, on with `Arpg.Acts = 1` (the default).
 
 ### One start per faction
 
-Every Alliance character starts in Northshire and every Horde one in the Valley of Trials, whatever
+Every Alliance character starts in Goldshire and every Horde one in the Valley of Trials, whatever
 its race and class (`ObjectMgr::ArpgOneStartPerFaction`), so each faction has one road.
+
+### Goldshire, the hub (Alliance)
+
+The Alliance's chapter 1 is played as Diablo II's first act (cmangos `Arpg/ArpgRift.{h,cpp}`,
+`ARPG-RANDOM-AREAS.md`). Goldshire is the town: a palisade (105 yards round the square) holds an
+Alliance character in until the Hogger quest is done; walking out brings it back inside, and a
+character found far off is brought into town. Four gates stand inside the palisade:
+
+| Gate | Where | Leads to | Open |
+|---|---|---|---|
+| North | the Northshire Fields, levels 1–5 | Kobold Vermin and Workers, Defias Thugs, wolves; Garrick Padfoot at the end | always |
+| East | the Farmlands, 5–8 | the Fargodeep and Jasperlode kobolds, the Defias bandits; Goldtooth halfway, Morgan the Collector at the end | at 5, or with the Northshire Watch done |
+| South | Forest's Edge, 8–11 | Riverpaw gnolls, prowlers, bears; Hogger at the end | at 8, or with Fire on the Farms done |
+| West | the road to Westfall (Sentinel Hill) | | with Hogger done |
+
+Each area is a random layout of Elwynn's ground from its own part of the forest, made at the gate.
+Its exit leads on into the next area (the Fields into the Farmlands, the Farmlands into Forest's
+Edge) and Forest's Edge's back to Goldshire; each area's start has a way back to town. The areas'
+creatures are the act quests' own, at the area's levels (the character's level, held to the
+area's band), and its named leaders are crowned as the act crowns them; Hogger drops the finale's
+guaranteed item. Marshal Dughan gives all the Alliance's quests: "The Road to Goldshire" is gone.
 
 ### The quests
 
@@ -56,8 +77,7 @@ found by name; a name the database lacks drops that objective and is logged at s
 
 | Quest | From, to | Asks | Leader |
 |---|---|---|---|
-| The Northshire Watch | Marshal McBride | Kobold Vermin, Defias Thugs | Garrick Padfoot (champion) |
-| The Road to Goldshire | McBride to Marshal Dughan | report | |
+| The Northshire Watch | Marshal Dughan | Kobold Vermin, Defias Thugs | Garrick Padfoot (champion) |
 | The Mines of Elwynn | Dughan | Kobold Tunnelers and Miners (Fargodeep) | Goldtooth (champion) |
 | Fire on the Farms | Dughan | Defias Bandits, Cutpurses, Rogue Wizards | Morgan the Collector (champion) |
 | Jasperlode | Dughan | Kobold Geomancers, Laborers | |

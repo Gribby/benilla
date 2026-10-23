@@ -162,3 +162,20 @@ entrance, the Horde's too), with no way back to the corpse but the spirit healer
 whatever the client's lighting gives a map with no `Light.dbc` rows. Phase 2 (more area types,
 navmeshes, a revealing map) stands as planned.
 
+## Built: Goldshire's gates (Act I, Alliance)
+
+Jeff's call (2026-10-23): Goldshire as the hub with a wall round it, the areas replacing the open
+Elwynn, three of them in a chain. How it is built (`ARPG-ACT-1.md` has the gates and areas):
+- **An area is a layout of a kind:** the free rift's kind takes pieces from all of Elwynn and
+  Elwynn's hostiles at the player's level; an area's kind takes its pieces from its part of the
+  forest (a box round Northshire's fields, the eastern farms, the south-western forest edge; all
+  of Elwynn if the box has too few), and its creatures by name.
+- **One instance holds the whole chain.** Teleporting within a map keeps the instance, so an
+  area's exit makes the next layout in another block of the same instance and moves the player
+  there; the client gets the new layout and restreams. Party members in the same instance can be
+  in different areas.
+- **The palisade** is the server's: an Alliance character before Hogger stepping past it is put
+  back inside. Its posts are game objects of a vanilla fence's or palisade's look, if the world
+  database has one (else it is unseen but still holds).
+- **Gates** are touched like the stones; a closed one says so.
+

@@ -73,6 +73,13 @@ Garrick Padfoot!".
 **Elwynn-themed**: a Rift entered from a Rift Stone (Goldshire, and Razor Hill for the Horde),
 each entry a new layout of 2×2-chunk pieces of Elwynn's own ground (`ARPG-RANDOM-AREAS.md`).
 
+**Goldshire is the hub (2026-10-23),** as Diablo II's Rogue Encampment: the Alliance starts there,
+a palisade holds the town, and its gates lead into random areas. The areas **replace** the open
+Elwynn for Act I's first chapter: **three** in a chain (the Northshire Fields 1–5, the Farmlands
+5–8, Forest's Edge 8–11), each area's exit the next one's way in, Hogger at the end of the
+last. Elwynn opens (and the Westfall road with it) once Hogger falls. The Horde's Durotar stays
+open world for now.
+
 **Deferred:** a weekly raid objective, and the camera's per-room cutaway.
 
 **Working agreements**
