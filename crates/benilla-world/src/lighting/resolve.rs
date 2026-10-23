@@ -81,6 +81,10 @@ impl WmoCrossfade {
     }
 }
 
+/// A rift cave's light against the forest's: ambient and sun (and fog) dimmed.
+const CAVE_AMBIENT: f32 = 0.45;
+const CAVE_DIFFUSE: f32 = 0.35;
+
 /// Where an ARPG rift takes its light: Goldshire, Elwynn Forest.
 const RIFT_LIGHT_AT: [f32; 3] = [-9460.0, 60.0, 57.0];
 
@@ -226,6 +230,8 @@ pub(super) fn update_time_lighting(
     let map = current_map.as_ref().map_or(0, |m| m.0);
     // An ARPG rift is cut from Elwynn Forest and lit as it is, at Goldshire (`Light.dbc` has no
     // rows for its map).
+    let in_cave = map == benilla_assets::rift::RIFT_MAP
+        && benilla_assets::rift::current_theme() == benilla_assets::rift::THEME_CAVE;
     let (map, wow_pos) = if map == benilla_assets::rift::RIFT_MAP {
         (0, RIFT_LIGHT_AT)
     } else {
@@ -284,13 +290,23 @@ pub(super) fn update_time_lighting(
     let (fac1, fac2) = submerged
         .ocean_depth_factors(eye_liquid.eye_z())
         .unwrap_or((1.0, 1.0));
+    // A rift's cave: the forest's light, dimmed, its lanterns and torches lighting the way.
+    let (fac1, fac2) = if in_cave {
+        (fac1 * CAVE_AMBIENT, fac2 * CAVE_DIFFUSE)
+    } else {
+        (fac1, fac2)
+    };
     let resolved = WowLighting {
         ambient: hsv_value_scale(atmo.ambient, fac1),
         diffuse: hsv_value_scale(atmo.sun_diffuse, fac2),
         spec: atmo.sun_color, // row 9, the specular colour
         sun_dir,
         celestial_dir,
-        fog_color: atmo.fog_color,
+        fog_color: if in_cave {
+            hsv_value_scale(atmo.fog_color, CAVE_DIFFUSE)
+        } else {
+            atmo.fog_color
+        },
         fog_start,
         fog_end,
         wmo_fog_color,

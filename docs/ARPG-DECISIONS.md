@@ -80,6 +80,15 @@ Elwynn for Act I's first chapter: **three** in a chain (the Northshire Fields 1â
 last. Elwynn opens (and the Westfall road with it) once Hogger falls. The Horde's Durotar stays
 open world for now.
 
+**Side areas and perks (2026-10-23):** each main area has two side areas off its dead ends, as
+Diablo II's Den of Evil. A side area's boss gives a **lasting perk** the first time it falls, once
+per character (a skill point, a passive point, gold found, resistances), so side areas have a
+reason. The quest bosses Goldtooth and Morgan the Collector, and the Jasperlode quest, move into
+them. Indoor side areas are **roofless caves on a map of their own**, as Diablo II's: generated
+tunnels between sheer rock walls the camera looks down into, not WoW's real interiors. (Built on
+the rift map as areas of their own rather than a separate map id: the same effect, without binds
+to cross between maps.)
+
 **Deferred:** a weekly raid objective, and the camera's per-room cutaway.
 
 **Working agreements**

@@ -1048,6 +1048,8 @@ pub struct ArpgRiftLayout {
     pub base: f32,
     /// 16×16, i-major: source grid `gx`, `gy`, first chunk `a` (along X), `b`.
     pub pieces: Vec<[u8; 4]>,
+    /// 0 outdoors, 1 a roofless cave; absent from older servers' packets (0).
+    pub theme: u8,
 }
 
 /// Kind 2: rows `first_row..first_row + rows` of the outer heights, `nodes` each, in eighths of
@@ -1061,7 +1063,7 @@ pub struct ArpgRiftHeights {
 }
 
 /// `SMSG_ARPG_RIFT`: `u8` kind; kind 1: `u32` id, `u8` gx0, `u8` gy0, `u16` nodes, `u16` area,
-/// `f32` base, then 256 × `u8` gx, gy, a, b; kind 2: `u32` id, `u16` first row, `u16` rows, then
+/// `f32` base, then 256 × `u8` gx, gy, a, b, then (newer servers) `u8` theme; kind 2: `u32` id, `u16` first row, `u16` rows, then
 /// rows × 257 `i16`.
 pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
     match read_u8(r)? {
@@ -1076,6 +1078,11 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
             for _ in 0..256 {
                 pieces.push([read_u8(r)?, read_u8(r)?, read_u8(r)?, read_u8(r)?]);
             }
+            let theme = match read_u8(r) {
+                Ok(theme) => theme,
+                Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => 0,
+                Err(e) => return Err(e),
+            };
             Ok(ArpgRift::Layout(ArpgRiftLayout {
                 id,
                 gx0,
@@ -1084,6 +1091,7 @@ pub fn read_arpg_rift(r: &mut impl io::Read) -> io::Result<ArpgRift> {
                 area,
                 base,
                 pieces,
+                theme,
             }))
         }
         2 => {
@@ -1205,6 +1213,27 @@ pub fn read_arpg_loot(r: &mut impl io::Read) -> io::Result<(u64, u32, Vec<ArpgLo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_rift_layout_reads_its_theme_when_sent() {
+        let mut bytes = vec![1u8];
+        bytes.extend_from_slice(&7u32.to_le_bytes());
+        bytes.extend_from_slice(&[8, 11]);
+        bytes.extend_from_slice(&257u16.to_le_bytes());
+        bytes.extend_from_slice(&12u16.to_le_bytes());
+        bytes.extend_from_slice(&60.0f32.to_le_bytes());
+        bytes.extend(std::iter::repeat_n(0u8, 256 * 4));
+        let old = read_arpg_rift(&mut bytes.as_slice()).expect("a header without a theme");
+        let ArpgRift::Layout(old) = old else {
+            panic!("a layout");
+        };
+        assert_eq!((old.id, old.gx0, old.gy0, old.theme), (7, 8, 11, 0));
+        bytes.push(1);
+        let ArpgRift::Layout(cave) = read_arpg_rift(&mut bytes.as_slice()).expect("a cave") else {
+            panic!("a layout");
+        };
+        assert_eq!(cave.theme, 1);
+    }
 
     #[test]
     fn a_web_reads_its_points_regions_nodes_and_links() {

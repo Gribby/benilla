@@ -46,7 +46,15 @@ pub struct RiftLayout {
     pub pieces: Vec<[u8; 4]>,
     /// `RIFT_NODES²` outer heights, row `i` (along X) by column `j`.
     pub heights: Vec<f32>,
+    /// [`THEME_OUTDOOR`] (the source chunks moved into place) or [`THEME_CAVE`] (a roofless
+    /// cave: rock walls and a dirt floor painted by slope, mine props, no trees or grass).
+    pub theme: u8,
 }
+
+/// A layout of Elwynn's own chunks.
+pub const THEME_OUTDOOR: u8 = 0;
+/// A roofless cave, as Diablo II's: sheer walls the camera looks down between.
+pub const THEME_CAVE: u8 = 1;
 
 impl RiftLayout {
     /// The outer height at node (`i`, `j`), clamped to the layout.
@@ -86,6 +94,7 @@ impl RiftLayout {
     /// The outward normal at node (`i`, `j`) in WoW axes, from the heights' central differences:
     /// continuous across chunks and tiles.
     fn normal(&self, i: usize, j: usize) -> [f32; 3] {
+        let (i, j) = (i.min(RIFT_NODES - 1), j.min(RIFT_NODES - 1));
         let ip = (i + 1).min(RIFT_NODES - 1);
         let im = i.saturating_sub(1);
         let jp = (j + 1).min(RIFT_NODES - 1);
@@ -124,6 +133,15 @@ pub fn layout(id: u32) -> Option<Arc<RiftLayout>> {
         .iter()
         .find(|l| l.id == id)
         .cloned()
+}
+
+/// The theme of the layout last made known: the one the player is in.
+pub fn current_theme() -> u8 {
+    LAYOUTS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .last()
+        .map_or(THEME_OUTDOOR, |l| l.theme)
 }
 
 /// The map directory a layout's tiles stream from.
@@ -175,6 +193,59 @@ pub struct RiftComposer {
     next: usize,
     chunks: Vec<ChunkMesh>,
     doodads: Vec<Doodad>,
+    /// A cave's textures and props, found in its sources.
+    kit: CaveKit,
+    tile: (usize, usize),
+}
+
+/// What a cave is painted and furnished with: names found in the source tiles, so they are the
+/// install's own.
+#[derive(Default)]
+struct CaveKit {
+    floor: Option<String>,
+    wall: Option<String>,
+    props: Vec<String>,
+    lights: Vec<String>,
+}
+
+/// Sources a cave reads for its kit; it takes no chunk of theirs.
+const CAVE_SOURCES: usize = 4;
+
+impl CaveKit {
+    fn take(&mut self, source: &TileMesh) {
+        for chunk in &source.chunks {
+            for name in &chunk.layer_textures {
+                let lower = name.to_ascii_lowercase();
+                if self.wall.is_none() && (lower.contains("rock") || lower.contains("cliff")) {
+                    self.wall = Some(name.clone());
+                }
+                if self.floor.is_none()
+                    && (lower.contains("dirt") || lower.contains("gravel") || lower.contains("mud"))
+                {
+                    self.floor = Some(name.clone());
+                }
+            }
+        }
+        const PROPS: [&str; 15] = [
+            "mine", "cart", "crate", "barrel", "rock", "boulder", "bone", "skull", "beam",
+            "support", "rubble", "pick", "shovel", "sack", "wagon",
+        ];
+        const LIGHTS: [&str; 5] = ["lantern", "torch", "lamp", "brazier", "candle"];
+        const GREEN: [&str; 7] = ["tree", "bush", "grass", "flower", "shrub", "fern", "leaf"];
+        for d in &source.doodads {
+            let lower = d.model.to_ascii_lowercase();
+            if GREEN.iter().any(|g| lower.contains(g)) {
+                continue;
+            }
+            if LIGHTS.iter().any(|l| lower.contains(l)) {
+                if !self.lights.contains(&d.model) {
+                    self.lights.push(d.model.clone());
+                }
+            } else if PROPS.iter().any(|p| lower.contains(p)) && !self.props.contains(&d.model) {
+                self.props.push(d.model.clone());
+            }
+        }
+    }
 }
 
 impl RiftComposer {
@@ -201,12 +272,18 @@ impl RiftComposer {
         }
         let mut sources: Vec<_> = by_source.into_iter().collect();
         sources.sort_by_key(|(k, _)| *k);
+        // A cave reads a few sources for its kit only.
+        if layout.theme == THEME_CAVE {
+            sources.truncate(CAVE_SOURCES);
+        }
         Some(Self {
             layout,
             sources,
             next: 0,
             chunks: Vec::with_capacity(256),
             doodads: Vec::new(),
+            kit: CaveKit::default(),
+            tile: (ox, oy),
         })
     }
 
@@ -229,6 +306,10 @@ impl RiftComposer {
         let Some(source) = bytes.and_then(|b| adt_to_tile_mesh(b).ok()) else {
             return;
         };
+        if self.layout.theme == THEME_CAVE {
+            self.kit.take(&source);
+            return;
+        }
         let src_nw_x = (32.0 - f64::from(*sgx)) * f64::from(TILE_SIZE);
         let src_nw_y = (32.0 - f64::from(*sgy)) * f64::from(TILE_SIZE);
         for w in wanted {
@@ -258,6 +339,17 @@ impl RiftComposer {
 
     /// The tile: its chunks and doodads, no buildings.
     pub fn finish(mut self) -> TileMesh {
+        if self.layout.theme == THEME_CAVE {
+            let (ox, oy) = self.tile;
+            for ca in 0..16 {
+                for cb in 0..16 {
+                    let (la, lb) = (ox * 16 + ca, oy * 16 + cb);
+                    self.chunks
+                        .push(cave_chunk(&self.layout, &self.kit, la, lb));
+                    cave_props(&self.layout, &self.kit, la, lb, &mut self.doodads);
+                }
+            }
+        }
         // MCIN order (row by row from the north-west), which `chunk_at` assumes of a whole tile;
         // the chunks were placed grouped by source.
         self.chunks.sort_by_key(|c| c.index_y * 16 + c.index_x);
@@ -272,6 +364,23 @@ impl RiftComposer {
 /// `src` moved to layout chunk (`la`, `lb`) under the layout's heights.
 fn place_chunk(layout: &RiftLayout, src: &ChunkMesh, la: usize, lb: usize) -> ChunkMesh {
     let mut chunk = src.clone();
+    let (positions, normals) = chunk_geometry(layout, la, lb);
+    chunk.positions = positions;
+    chunk.normals = normals;
+    // Every cell drawn: the server took no piece with holes.
+    chunk.holes = 0;
+    chunk.indices = full_indices();
+    chunk.area_id = u32::from(layout.area);
+    // MCNK IndexX runs with the tile's x (WoW Y), IndexY with WoW X.
+    chunk.index_x = (lb % 16) as u32;
+    chunk.index_y = (la % 16) as u32;
+    chunk.impassable = false;
+    chunk.liquids.clear();
+    chunk
+}
+
+/// A layout chunk's 145 vertices and their normals, in stride-17 order.
+fn chunk_geometry(layout: &RiftLayout, la: usize, lb: usize) -> (Vec<[f32; 3]>, Vec<[f32; 3]>) {
     // The chunk corner's lattice index from the map centre line: X = centre - (gx·128 + a)·unit.
     let ni = f64::from(layout.gx0) * 128.0 + (la * 8) as f64;
     let nj = f64::from(layout.gy0) * 128.0 + (lb * 8) as f64;
@@ -317,18 +426,135 @@ fn place_chunk(layout: &RiftLayout, src: &ChunkMesh, la: usize, lb: usize) -> Ch
             }
         }
     }
-    chunk.positions = positions;
-    chunk.normals = normals;
-    // Every cell drawn: the server took no piece with holes.
-    chunk.holes = 0;
-    chunk.indices = full_indices();
-    chunk.area_id = u32::from(layout.area);
-    // MCNK IndexX runs with the tile's x (WoW Y), IndexY with WoW X.
-    chunk.index_x = (lb % 16) as u32;
-    chunk.index_y = (la % 16) as u32;
-    chunk.impassable = false;
-    chunk.liquids.clear();
-    chunk
+    (positions, normals)
+}
+
+/// How steep the ground is at a (fractional) node: 0 flat, 1 sheer.
+fn steepness(layout: &RiftLayout, i: f32, j: f32) -> f32 {
+    let (i0, j0) = (i.max(0.0).floor() as usize, j.max(0.0).floor() as usize);
+    let (ti, tj) = (i - i0 as f32, j - j0 as f32);
+    let s = |a: usize, b: usize| 1.0 - layout.normal(a, b)[2];
+    let top = s(i0, j0) * (1.0 - tj) + s(i0, j0 + 1) * tj;
+    let bottom = s(i0 + 1, j0) * (1.0 - tj) + s(i0 + 1, j0 + 1) * tj;
+    top * (1.0 - ti) + bottom * ti
+}
+
+/// The rock's share of a cave's ground at a steepness: the floor's below, the wall's above.
+fn wall_weight(steep: f32) -> f32 {
+    ((steep - 0.12) / 0.25).clamp(0.0, 1.0)
+}
+
+/// A cave chunk: the layout's ground, the kit's floor under its rock by slope, no clutter.
+fn cave_chunk(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize) -> ChunkMesh {
+    let (positions, normals) = chunk_geometry(layout, la, lb);
+    let mut uvs = Vec::with_capacity(145);
+    for row in 0..9u32 {
+        for col in 0..9u32 {
+            uvs.push([col as f32 / 8.0, row as f32 / 8.0]);
+        }
+        if row < 8 {
+            for col in 0..8u32 {
+                uvs.push([(col as f32 + 0.5) / 8.0, (row as f32 + 0.5) / 8.0]);
+            }
+        }
+    }
+    let layer_textures: Vec<String> = [kit.floor.clone(), kit.wall.clone()]
+        .into_iter()
+        .flatten()
+        .collect();
+    // Layer 1 (the rock, over the floor) by slope, a texel at a time.
+    let alpha_map = (layer_textures.len() > 1).then(|| {
+        let n = benilla_formats::ALPHA_MAP_SIZE as usize;
+        let mut rgba = vec![0u8; n * n * 4];
+        for ty in 0..n {
+            for tx in 0..n {
+                let i = (la * 8) as f32 + (ty as f32 + 0.5) / n as f32 * 8.0;
+                let j = (lb * 8) as f32 + (tx as f32 + 0.5) / n as f32 * 8.0;
+                rgba[(ty * n + tx) * 4] = (wall_weight(steepness(layout, i, j)) * 255.0) as u8;
+            }
+        }
+        rgba
+    });
+    let layer_effect_ids = vec![u32::MAX; layer_textures.len()];
+    ChunkMesh {
+        positions,
+        normals,
+        uvs,
+        indices: full_indices(),
+        holes: 0,
+        base_texture: layer_textures.first().cloned(),
+        layer_textures,
+        layer_effect_ids,
+        alpha_map,
+        shadow: None,
+        pred_tex: [0; 64],
+        no_effect_doodad: [true; 64],
+        index_x: (lb % 16) as u32,
+        index_y: (la % 16) as u32,
+        area_id: u32::from(layout.area),
+        impassable: false,
+        liquids: Vec::new(),
+    }
+}
+
+/// A small seeded generator, the same props for every client of a layout.
+struct Rng(u64);
+
+impl Rng {
+    fn next(&mut self) -> u32 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        (self.0 >> 32) as u32
+    }
+
+    fn unit(&mut self) -> f32 {
+        self.next() as f32 / u32::MAX as f32
+    }
+}
+
+/// A cave chunk's props: on flat floor beside a wall, a lantern or torch now and then (their
+/// models carry their own light).
+fn cave_props(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize, out: &mut Vec<Doodad>) {
+    if kit.props.is_empty() && kit.lights.is_empty() {
+        return;
+    }
+    let chunk_index = (la * 32 + lb) as u32;
+    let mut rng =
+        Rng((u64::from(layout.id) << 20 ^ u64::from(chunk_index) ^ 0x9E37_79B9_7F4A_7C15) | 1);
+    let mut ordinal = 0u32;
+    for row in 0..8usize {
+        for col in 0..8usize {
+            let (i, j) = ((la * 8 + row) as f32 + 0.5, (lb * 8 + col) as f32 + 0.5);
+            if steepness(layout, i, j) > 0.05 {
+                continue;
+            }
+            let walled = [(-2.0, 0.0), (2.0, 0.0), (0.0, -2.0), (0.0, 2.0)]
+                .iter()
+                .any(|(di, dj)| steepness(layout, i + di, j + dj) > 0.35);
+            if !walled || rng.unit() > 0.12 {
+                continue;
+            }
+            let pool = if !kit.lights.is_empty()
+                && (rng.next().is_multiple_of(6) || kit.props.is_empty())
+            {
+                &kit.lights
+            } else {
+                &kit.props
+            };
+            let model = pool[rng.next() as usize % pool.len()].clone();
+            let x = lattice(f64::from(layout.gx0) * 128.0 + f64::from(i));
+            let y = lattice(f64::from(layout.gy0) * 128.0 + f64::from(j));
+            out.push(Doodad {
+                model,
+                position: [x, y, layout.ground(x, y)],
+                rotation: [0.0, rng.unit() * 360.0, 0.0],
+                scale: 0.8 + rng.unit() * 0.4,
+                unique_id: RIFT_UID_BASE | (chunk_index << 18) | (0x2_0000 | (ordinal & 0x1_FFFF)),
+            });
+            ordinal += 1;
+        }
+    }
 }
 
 /// Four fan triangles per cell over all 64 cells, as `adt_to_tile_mesh` winds them.
@@ -411,6 +637,7 @@ mod tests {
             area: 12,
             pieces: vec![[48, 32, 0, 0]; RIFT_PIECES * RIFT_PIECES],
             heights: vec![h; RIFT_NODES * RIFT_NODES],
+            theme: THEME_OUTDOOR,
         }
     }
 
@@ -435,6 +662,58 @@ mod tests {
         assert!(layout.covers(24, 21));
         assert!(!layout.covers(20, 23));
         assert!(!layout.covers(25, 20));
+    }
+
+    #[test]
+    fn a_cave_is_painted_rock_on_its_walls_and_furnished_beside_them() {
+        let mut layout = flat_layout(60.0);
+        layout.theme = THEME_CAVE;
+        // A wall: the ground rises 30 yards over two nodes across i 40..42.
+        for i in 0..RIFT_NODES {
+            for j in 0..RIFT_NODES {
+                layout.heights[i * RIFT_NODES + j] = 60.0 + 15.0 * (i.clamp(40, 42) - 40) as f32;
+            }
+        }
+        let kit = CaveKit {
+            floor: Some("Tileset\\Elwynn\\ElwynnDirt.blp".into()),
+            wall: Some("Tileset\\Elwynn\\ElwynnRock.blp".into()),
+            props: vec!["World\\Generic\\MineCart.mdx".into()],
+            lights: vec!["World\\Generic\\Lantern.mdx".into()],
+        };
+        // Chunk 5 along X spans nodes 40..48: its first rows are the wall.
+        let chunk = cave_chunk(&layout, &kit, 5, 3);
+        assert_eq!(chunk.layer_textures.len(), 2);
+        assert!(chunk.no_effect_doodad.iter().all(|n| *n));
+        let alpha = chunk.alpha_map.as_ref().expect("two layers");
+        let n = benilla_formats::ALPHA_MAP_SIZE as usize;
+        assert!(alpha[(4 * n + 10) * 4] > 200, "the wall is rock");
+        assert_eq!(alpha[((n - 4) * n + 10) * 4], 0, "the floor is dirt");
+        // Props stand on flat floor beside the wall, on the ground.
+        let mut props = Vec::new();
+        for lb in 0..32 {
+            cave_props(&layout, &kit, 5, lb, &mut props);
+        }
+        assert!(!props.is_empty());
+        for p in &props {
+            assert!((p.position[2] - layout.ground(p.position[0], p.position[1])).abs() < 0.01);
+            assert!(
+                p.position[2] >= 89.0,
+                "on the high floor past the wall: {}",
+                p.position[2]
+            );
+        }
+        let mut again = Vec::new();
+        for lb in 0..32 {
+            cave_props(&layout, &kit, 5, lb, &mut again);
+        }
+        assert_eq!(
+            props.len(),
+            again.len(),
+            "the same props for the same layout"
+        );
+        // A cave reads few sources.
+        let composer = RiftComposer::new(Arc::new(layout), 23, 20).expect("covered");
+        assert!(composer.sources.len() <= CAVE_SOURCES);
     }
 
     #[test]

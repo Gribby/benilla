@@ -65,6 +65,25 @@ creatures are the act quests' own, at the area's levels (the character's level, 
 area's band), and its named leaders are crowned as the act crowns them; Hogger drops the finale's
 guaranteed item. Marshal Dughan gives all the Alliance's quests: "The Road to Goldshire" is gone.
 
+**Side areas.** Each area has two side areas, entered at its dead ends (as far off the way from
+start to exit as the layout goes), each smaller, its packs closer, its boss at the far end:
+
+| Off | Side area | Levels | Boss | Perk, the first time it falls |
+|---|---|---|---|---|
+| the Northshire Fields | Echo Ridge Diggings | 2–5 | a kobold rare | a skill point |
+| the Northshire Fields | Wolf Run | 3–5 | Gruff Swiftbite | a passive point |
+| the Farmlands | Fargodeep Pit | 5–8 | Goldtooth | a skill point |
+| the Farmlands | The Defias Hideout | 6–8 | Morgan the Collector | 10% more gold found |
+| Forest's Edge | Jasperlode Hollow | 8–10 | Mother Fang | 15 to every resistance |
+| Forest's Edge | Riverpaw Warren | 9–11 | a gnoll rare | a passive point |
+
+A side area has no exit: its way back, at its start, returns to beside its entrance in the area
+it branches off (the same instance, so that area is as it was left). Its boss drops a hoard (two
+or three blues), and its perk goes to every party member there who lacks it (`Arpg/ArpgPerks.h`,
+kept in `character_arpg_perks`, shown on the sheet). The Mines of Elwynn, Fire on the Farms and
+Jasperlode send the character into Fargodeep Pit, the Defias Hideout and Jasperlode Hollow; the
+Farmlands' own exit is held by a rare.
+
 ### The quests
 
 Written into the world database at every start (entries 59000 and up, rewritten each time, so

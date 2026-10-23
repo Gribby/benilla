@@ -179,3 +179,32 @@ Elwynn, three of them in a chain. How it is built (`ARPG-ACT-1.md` has the gates
   database has one (else it is unseen but still holds).
 - **Gates** are touched like the stones; a closed one says so.
 
+## Built: side areas and perks
+
+Jeff's call (2026-10-23): a couple of side areas off each area, with a lasting reason to clear
+them. Each main area's layout marks two branch tips: the way from start to exit is traced back
+along the walking distances, and the open chunks farthest from it (eight chunks apart) take the
+side areas' entrances. A side area's layout keeps the middle 16×16 chunks only (70 open at
+least), 12 packs, its boss at the far end and no exit; it is made in the same instance on first
+entry and kept for the trip. Perks are `Arpg/ArpgPerks.{h,cpp}`.
+
+## Built: roofless caves
+
+Echo Ridge Diggings, Fargodeep Pit and Jasperlode Hollow are caves, as Diablo II's: no roof, walls
+the camera looks down between, and so none of WoW's interiors' clipping.
+- **Their own areas, on the rift map.** A cave is a layout of its own, in its own block, like any
+  area; it shares map 520 rather than a map of its own, since a second map would only add
+  instance binds to cross between them (the side area's way back is a step within the instance).
+- **Tunnels** (`CaveRegion`): a walker carves one-chunk passages through the middle 16×16 chunks
+  from the west side, turning a third of the time and opening a 3×3 chamber now and then, till
+  70 chunks are open: winding tunnels with loops where it crossed itself, chambers and dead ends.
+- **Walls** rise 30 yards over about two nodes (8 yards) above a floor with a fifth of the
+  pieces' relief: sheer, so the camera never sees over them.
+- **The client paints them** (`benilla-assets` `rift.rs`, theme byte in `SMSG_ARPG_RIFT`): every
+  chunk is two layers, a dirt floor under rock by slope (the texture names come from the source
+  tiles, so they are the install's own), no grass. Props stand on the floor beside walls, by the
+  layout's seed: the source tiles' mine carts, crates, barrels, rocks and bones, and one in six a
+  lantern or torch, whose model carries its light. No trees.
+- **Light:** the forest's, its ambient at 45% and its sun and fog at 35%.
+
+

@@ -91,6 +91,7 @@ fn take_rift(assembly: &mut RiftAssembly, rift: ArpgRift) -> Option<RiftLayout> 
                 area: header.area,
                 pieces: header.pieces,
                 heights,
+                theme: header.theme,
             })
         }
     }
@@ -112,6 +113,7 @@ mod tests {
             area: 12,
             base: 60.0,
             pieces: vec![[48, 32, 0, 0]; 256],
+            theme: 1,
         };
         assert!(take_rift(&mut assembly, ArpgRift::Layout(header)).is_none());
         let mut whole = None;
@@ -132,6 +134,7 @@ mod tests {
             (9, 8, 11, 12)
         );
         assert_eq!(layout.height(128, 200), 61.0);
+        assert_eq!(layout.theme, 1);
         // Another layout's band is not this one's.
         let stray = ArpgRiftHeights {
             id: 3,
