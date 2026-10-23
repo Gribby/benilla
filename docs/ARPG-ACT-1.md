@@ -63,7 +63,11 @@ Its exit leads on into the next area (the Fields into the Farmlands, the Farmlan
 Edge) and Forest's Edge's back to Goldshire; each area's start has a way back to town. The areas'
 creatures are the act quests' own, at the area's levels (the character's level, held to the
 area's band), and its named leaders are crowned as the act crowns them; Hogger drops the finale's
-guaranteed item. Marshal Dughan gives all the Alliance's quests: "The Road to Goldshire" is gone.
+guaranteed item. Marshal McBride has fallen back from Northshire to Goldshire: his world-database spawn is moved
+at every start to Dughan's right hand (`Arpg::PlaceActNpcs`), and he gives "The Northshire
+Watch" there (his recorded opening scene with it); Dughan gives the rest. "The Road to Goldshire"
+is gone. A new Alliance character starts six yards in front of Dughan, facing him, wherever the
+world database spawns him (`ObjectMgr::ArpgOneStartPerFaction`).
 
 **Side areas.** Each area has two side areas, entered at its dead ends (as far off the way from
 start to exit as the layout goes), each smaller, its packs closer, its boss at the far end:
@@ -96,7 +100,7 @@ found by name; a name the database lacks drops that objective and is logged at s
 
 | Quest | From, to | Asks | Leader |
 |---|---|---|---|
-| The Northshire Watch | Marshal Dughan | Kobold Vermin, Defias Thugs | Garrick Padfoot (champion) |
+| The Northshire Watch | Marshal McBride (in Goldshire) | Kobold Vermin, Defias Thugs | Garrick Padfoot (champion) |
 | The Mines of Elwynn | Dughan | Kobold Tunnelers and Miners (Fargodeep) | Goldtooth (champion) |
 | Fire on the Farms | Dughan | Defias Bandits, Cutpurses, Rogue Wizards | Morgan the Collector (champion) |
 | Jasperlode | Dughan | Kobold Geomancers, Laborers | |
