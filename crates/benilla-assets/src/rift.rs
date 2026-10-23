@@ -319,14 +319,14 @@ impl CaveKit {
         }
     }
 
-    fn take(&mut self, source: &TileMesh, flavour: u8) {
+    fn take(&mut self, source: &TileMesh, flavour: u8, borrowed: bool) {
         let extra: &[&str] = match flavour {
             FLAVOUR_WEBS => &["web", "cocoon", "eggsac", "egg", "spider"],
             FLAVOUR_CANDLES => &[
                 "candle", "orevein", "copper", "tinvein", "coin", "chest", "treasure",
             ],
             FLAVOUR_DIG => &[
-                "scaffold", "beam", "support", "pick", "shovel", "barrow", "rubble", "dirt",
+                "scaffold", "beam", "support", "pickaxe", "shovel", "barrow", "rubble", "dirt",
             ],
             _ => &[],
         };
@@ -335,6 +335,9 @@ impl CaveKit {
             if named(&lower, extra) && self.extra.len() < 12 && !self.extra.contains(&d.model) {
                 self.extra.push(d.model.clone());
             }
+        }
+        if borrowed {
+            return;
         }
         for chunk in &source.chunks {
             for name in &chunk.layer_textures {
@@ -448,11 +451,15 @@ impl RiftComposer {
         let Some(source) = bytes.and_then(|b| adt_to_tile_mesh(b).ok()) else {
             return;
         };
+        // A tile borrowed for a flavour gives that flavour's models only, never its lamps or
+        // fences.
+        let borrowed =
+            wanted.is_empty() && borrowed_sources(self.layout.flavour).contains(&(*sgx, *sgy));
         if self.layout.theme == THEME_CAVE {
-            self.kit.take(&source, self.layout.flavour);
+            self.kit.take(&source, self.layout.flavour, borrowed);
             return;
         }
-        self.dress.take(&source, self.layout.flavour);
+        self.dress.take(&source, self.layout.flavour, borrowed);
         let src_nw_x = (32.0 - f64::from(*sgx)) * f64::from(TILE_SIZE);
         let src_nw_y = (32.0 - f64::from(*sgy)) * f64::from(TILE_SIZE);
         for w in wanted {
@@ -690,7 +697,7 @@ fn named(lower: &str, words: &[&str]) -> bool {
 }
 
 impl DressKit {
-    fn take(&mut self, source: &TileMesh, flavour: u8) {
+    fn take(&mut self, source: &TileMesh, flavour: u8, borrowed: bool) {
         fn add(list: &mut Vec<String>, name: &str) {
             if list.len() < 12 && !list.iter().any(|n| n == name) {
                 list.push(name.to_string());
@@ -733,6 +740,8 @@ impl DressKit {
             );
             if burnt && farm && flavour == FLAVOUR_BURNT {
                 building(&mut self.burnt_houses);
+            } else if borrowed {
+                continue;
             } else if named(&lower, &["tower"]) {
                 building(&mut self.towers);
             } else if farm && !burnt {
@@ -741,6 +750,20 @@ impl DressKit {
         }
         for d in &source.doodads {
             let lower = d.model.to_ascii_lowercase();
+            // A borrowed tile gives its burnt props only.
+            if borrowed {
+                if flavour == FLAVOUR_BURNT
+                    && named(
+                        &lower,
+                        &[
+                            "burnt", "burned", "charred", "ashes", "ashpile", "ember", "smoke",
+                        ],
+                    )
+                {
+                    add(&mut self.burnt, &d.model);
+                }
+                continue;
+            }
             if named(&lower, &["fence"]) {
                 add(&mut self.fences, &d.model);
             } else if named(&lower, &["hay"]) {
@@ -808,7 +831,7 @@ impl DressKit {
             }
             if flavour == FLAVOUR_WOLVES
                 && named(&lower, &["tree"])
-                && !named(&lower, &["stump", "log", "dead"])
+                && !named(&lower, &["stump", "log", "dead", "street"])
             {
                 add(&mut self.trees, &d.model);
             }
@@ -1207,16 +1230,18 @@ fn cave_props(layout: &RiftLayout, kit: &CaveKit, la: usize, lb: usize, out: &mu
             if !walled || rng.unit() > 0.12 {
                 continue;
             }
-            // A third of them the flavour's own (webs, candles, scaffolds), one in six a light.
+            // One in six a light, a third the flavour's own (webs, candles, scaffolds).
             let roll = rng.next();
-            let pool = if !kit.extra.is_empty()
-                && (roll.is_multiple_of(3) || (kit.props.is_empty() && kit.lights.is_empty()))
+            let pool = if !kit.lights.is_empty()
+                && (roll.is_multiple_of(6) || (kit.props.is_empty() && kit.extra.is_empty()))
             {
-                &kit.extra
-            } else if !kit.lights.is_empty() && (roll.is_multiple_of(6) || kit.props.is_empty()) {
                 &kit.lights
-            } else {
+            } else if !kit.extra.is_empty() && (roll % 3 == 1 || kit.props.is_empty()) {
+                &kit.extra
+            } else if !kit.props.is_empty() {
                 &kit.props
+            } else {
+                &kit.lights
             };
             let model = pool[rng.next() as usize % pool.len()].clone();
             let x = lattice(f64::from(layout.gx0) * 128.0 + f64::from(i));
@@ -1387,6 +1412,10 @@ mod tests {
         assert!(
             props.iter().any(|p| p.model.contains("Web")),
             "the flavour's own among them"
+        );
+        assert!(
+            props.iter().any(|p| p.model.contains("Lantern")),
+            "and lights"
         );
         for p in &props {
             assert!((p.position[2] - layout.ground(p.position[0], p.position[1])).abs() < 0.01);
