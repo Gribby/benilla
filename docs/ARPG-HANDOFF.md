@@ -266,6 +266,10 @@ Start with `ARPG-DECISIONS.md`: what Jeff has settled, the research, and the tun
 
 ### Pitfalls that have bitten
 
+- **Teleports from per-player ARPG updates:** `Player::Update` delays far teleports only inside
+  `SetCanDelayTeleport(true)`. `Arpg::UpdateSwing` (and `UpdateCharacter` under it) now runs in
+  that window; before, a Goldshire gate's teleport took the player off its map mid-update and the
+  next call asserted in `GetMap` (2026-10-24). New per-tick ARPG code that teleports belongs there.
 - **Maps registered at run time and the vmap/navmesh managers:** both take their list of maps at
   startup and assert on any other map id (`VMapManager2::_loadMap`, `MMapManager::loadMap`). The
   rift map (520) is registered later, so `TerrainInfo::LoadMapAndVMap` skips both for it; it
