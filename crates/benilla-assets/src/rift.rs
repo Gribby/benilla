@@ -248,6 +248,41 @@ pub fn parse_rift_path(path: &str) -> Option<(u32, u32, u32)> {
     Some((id, tx.parse().ok()?, ty.parse().ok()?))
 }
 
+/// A rift map's WDT (`World/Maps/ArpgRift7/ArpgRift7.wdt`), made for the MPQ reader: `MAIN` flags
+/// the layout's four tiles alone. Without it the stream probes every tile in its window, and one
+/// past the layout's block (an area's start is at its west edge) never loads, so the loading
+/// screen waits forever. `None` for any other path, or a layout not known.
+pub fn rift_wdt(path: &str) -> Option<Vec<u8>> {
+    let lower = path.replace('\\', "/").to_ascii_lowercase();
+    let rest = lower.strip_prefix("world/maps/arpgrift")?;
+    let (id, file) = rest.split_once('/')?;
+    let id: u32 = id.parse().ok()?;
+    if file != format!("arpgrift{id}.wdt") {
+        return None;
+    }
+    let layout = layout(id)?;
+    let mut out = Vec::with_capacity(64 * 64 * 8 + 64);
+    // Chunk magics are reversed on disk.
+    out.extend_from_slice(b"REVM");
+    out.extend_from_slice(&4u32.to_le_bytes());
+    out.extend_from_slice(&18u32.to_le_bytes());
+    out.extend_from_slice(b"DHPM");
+    out.extend_from_slice(&32u32.to_le_bytes());
+    out.extend_from_slice(&[0u8; 32]);
+    out.extend_from_slice(b"NIAM");
+    out.extend_from_slice(&(64u32 * 64 * 8).to_le_bytes());
+    let mut grid = vec![0u8; 64 * 64 * 8];
+    for tile_y in 0..64u32 {
+        for tile_x in 0..64u32 {
+            if layout.covers(tile_x, tile_y) {
+                grid[((tile_y * 64 + tile_x) * 8) as usize] = 1;
+            }
+        }
+    }
+    out.extend_from_slice(&grid);
+    Some(out)
+}
+
 /// Whether the MPQ reader should answer `path` with [`PLACEHOLDER`].
 pub fn serves(path: &str) -> bool {
     parse_rift_path(path)
@@ -1680,6 +1715,30 @@ mod tests {
         dress_tile(&layout, &kit, 0, 0, &mut d2, &mut w2);
         assert_eq!(w2[0].model, "Farm.wmo");
         assert!(d2.iter().all(|p| p.model != "Charred.mdx"));
+    }
+
+    #[test]
+    fn a_rift_wdt_flags_only_its_layout_s_tiles() {
+        let mut layout = flat_layout(60.0);
+        layout.id = 990_001;
+        publish(layout);
+        let bytes = rift_wdt("World\\Maps\\ArpgRift990001\\ArpgRift990001.wdt")
+            .expect("a known layout's WDT");
+        let wdt = benilla_formats::WdtReader::new(
+            std::io::Cursor::new(bytes),
+            benilla_formats::WowVersion::Classic,
+        )
+        .read()
+        .expect("parses");
+        // Tile x is server grid gy, tile y grid gx (flat_layout's block starts at gx 20, gy 23).
+        let tiles: Vec<(usize, usize)> = (0..64)
+            .flat_map(|x| (0..64).map(move |y| (x, y)))
+            .filter(|&(x, y)| wdt.get_tile(x, y).is_some_and(|t| t.has_adt))
+            .collect();
+        assert_eq!(tiles, vec![(23, 20), (23, 21), (24, 20), (24, 21)]);
+        assert!(wdt.global_wmo().is_none());
+        assert!(rift_wdt("World\\Maps\\ArpgRift990002\\ArpgRift990002.wdt").is_none());
+        assert!(rift_wdt("World\\Maps\\ArpgRift990001\\ArpgRift990001_23_20.adt").is_none());
     }
 
     #[test]

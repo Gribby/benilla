@@ -86,6 +86,9 @@ impl AssetReader for MpqAssetReader {
         let stripped = strip_sampler_marker(raw);
         let internal = stripped.as_deref().unwrap_or(raw);
         // An ARPG rift's tile: the ADT loader builds it from its layout (`rift`).
+        if let Some(wdt) = rift::rift_wdt(internal) {
+            return Ok(VecReader::new(wdt));
+        }
         if rift::serves(internal) {
             return Ok(VecReader::new(rift::PLACEHOLDER.to_vec()));
         }
